@@ -27,25 +27,34 @@ interface NFTModalProps {
 export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps) {
   const [formData, setFormData] = useState<Omit<NFT, "id">>({
     name: "",
-    description: "",
-    appUrl: "",
-    imageUrl: "",
+    version: "",
+    did: "",
+    dataUrl: "",
+    iwpsPortalUri: "",
+    agentPortalUri: "",
+    contractAddress: "",
   })
 
   useEffect(() => {
     if (nft) {
       setFormData({
         name: nft.name,
-        description: nft.description,
-        appUrl: nft.appUrl,
-        imageUrl: nft.imageUrl,
+        version: nft.version,
+        did: nft.did,
+        dataUrl: nft.dataUrl,
+        iwpsPortalUri: nft.iwpsPortalUri,
+        agentPortalUri: nft.agentPortalUri,
+        contractAddress: nft.contractAddress || "",
       })
     } else {
       setFormData({
         name: "",
-        description: "",
-        appUrl: "",
-        imageUrl: "",
+        version: "",
+        did: "",
+        dataUrl: "",
+        iwpsPortalUri: "",
+        agentPortalUri: "",
+        contractAddress: "",
       })
     }
   }, [nft, isOpen])
@@ -84,45 +93,82 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="My Awesome App"
+                placeholder="Maximum of 32 characters"
                 required
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Describe your application..."
-                required
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="appUrl">App URL</Label>
+              <Label htmlFor="version">Version</Label>
               <Input
-                id="appUrl"
-                name="appUrl"
-                type="url"
-                value={formData.appUrl}
+                id="version"
+                name="version"
+                value={formData.version}
                 onChange={handleChange}
-                placeholder="https://myapp.example.com"
+                placeholder="Format: X.Y.Z (numbers only)"
                 required
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="imageUrl">Image URL</Label>
+              <Label htmlFor="did">DID</Label>
               <Input
-                id="imageUrl"
-                name="imageUrl"
-                type="url"
-                value={formData.imageUrl}
+                id="did"
+                name="did"
+                value={formData.did}
                 onChange={handleChange}
-                placeholder="https://example.com/image.png"
+                placeholder="did:example:123456789abcdefghi"
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="dataUrl">Data URL</Label>
+              <Input
+                id="dataUrl"
+                name="dataUrl"
+                type="url"
+                value={formData.dataUrl}
+                onChange={handleChange}
+                placeholder="See developer docs for details"
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="iwpsPortalUri">IWPS Portal URI</Label>
+              <Input
+                id="iwpsPortalUri"
+                name="iwpsPortalUri"
+                type="url"
+                value={formData.iwpsPortalUri}
+                onChange={handleChange}
+                placeholder="See developer docs"
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="agentPortalUri">Agent Portal URI</Label>
+              <Input
+                id="agentPortalUri"
+                name="agentPortalUri"
+                type="url"
+                value={formData.agentPortalUri}
+                onChange={handleChange}
+                placeholder="See developer docs"
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="contractAddress">Contract Address (Optional)</Label>
+              <Input
+                id="contractAddress"
+                name="contractAddress"
+                value={formData.contractAddress}
+                onChange={handleChange}
+                placeholder="CAIP-2 compliant smart contract address"
               />
             </div>
           </div>

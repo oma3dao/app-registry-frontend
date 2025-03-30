@@ -1,9 +1,12 @@
 export interface NFT {
     id: string
     name: string
-    description: string
-    appUrl: string
-    imageUrl: string
-  }
+    version: string
+    did: string
+    dataUrl: string
+    iwpsPortalUri: string
+    agentPortalUri: string
+    contractAddress?: string
+}
   
   
