@@ -68,11 +68,11 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{nft ? "Edit App NFT" : "Mint New App NFT"}</DialogTitle>
+            <DialogTitle>{nft ? "Edit App Registration" : "Register New App"}</DialogTitle>
             <DialogDescription>
               {nft
-                ? "Update the details of your registered application."
-                : "Fill in the details to mint a new NFT for your application."}
+                ? "Update the details of your application."
+                : "Fill in the details to register your application."}
             </DialogDescription>
           </DialogHeader>
 
@@ -131,7 +131,7 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">{nft ? "Save" : "Mint"}</Button>
+            <Button type="submit">{nft ? "Save" : "Register"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

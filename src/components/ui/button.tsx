@@ -1,6 +1,8 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
+import { ConnectButton as ThirdwebConnectButton, useActiveAccount } from "thirdweb/react"
+import { client } from "@/app/client"
 
 import { cn } from "@/lib/utils"
 
@@ -37,10 +39,64 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  isConnectButton?: boolean
+}
+
+// Extend the ThirdwebConnectButton props to include className
+type ThirdwebConnectButtonProps = React.ComponentProps<typeof ThirdwebConnectButton> & {
+  className?: string
+}
+
+// Add global CSS for the connect button styling
+if (typeof document !== "undefined") {
+  const style = document.createElement("style");
+  style.innerHTML = `
+    .tw-connect-wallet {
+      min-width: 165px !important;
+      height: auto !important;
+      font-size: 1.125rem !important; /* text-lg */
+      padding: 1.5rem 2rem !important;
+      background-color: rgb(37 99 235) !important; /* bg-blue-600 */
+      color: white !important;
+      border-radius: 0.375rem !important; /* rounded-md */
+      font-weight: 600 !important; /* font-medium rendered more boldly */
+      line-height: 1.75rem !important; /* text-lg line-height */
+      text-rendering: optimizeLegibility !important;
+      -webkit-font-smoothing: antialiased !important;
+      -moz-osx-font-smoothing: grayscale !important;
+      font-synthesis-weight: none !important;
+      letter-spacing: -0.01em !important;
+    }
+    .tw-connect-wallet:hover {
+      background-color: rgb(29 78 216) !important;
+    }
+    .tw-connect-wallet:focus {
+      outline: none !important;
+      box-shadow: 0 0 0 2px rgb(59 130 246 / 0.5), 0 0 0 4px white !important;
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, isConnectButton = false, ...props }, ref) => {
+    const account = useActiveAccount()
+
+    if (isConnectButton) {
+      const { client: _, ...restProps } = props as ThirdwebConnectButtonProps
+      return (
+        <ThirdwebConnectButton
+          client={client}
+          appMetadata={{
+            name: "OMA3 App Registry",
+            url: "https://oma3.org",
+          }}
+          className={className}
+          {...restProps}
+        />
+      )
+    }
+
     const Comp = asChild ? Slot : "button"
     return (
       <Comp

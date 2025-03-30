@@ -16,14 +16,14 @@ export default function NFTGrid({ nfts, onEdit, onMintFirst }: NFTGridProps) {
     return (
       <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
         <div className="text-center mb-6">
-          <h2 className="text-xl font-semibold mb-2">No Apps Registered Yet</h2>
+          <h2 className="text-xl font-semibold mb-2">No Applications Registered Yet</h2>
           <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            Mint your first NFT to register your application on the blockchain.
+            Register your first application on OMA3's decentralized app registry.
           </p>
         </div>
         <Button size="lg" onClick={onMintFirst} className="flex items-center gap-2">
           <PlusIcon size={16} />
-          Mint Your First App
+          Register Your First App
         </Button>
       </div>
     )

@@ -15,9 +15,24 @@
 	font-variation-settings: 'slnt' 0;
 }
 
+/* Add v0.dev specific settings */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+}
+
 @layer base {
 	body {
 		@apply bg-zinc-950 text-neutral-200;
+		/* Enhanced text rendering for better appearance */
+		font-family: -apple-system, BlinkMacSystemFont, Inter, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
 	}
   :root {
 		--background: 0 0% 100%;
@@ -74,8 +89,6 @@
 	}
 }
 
-
-
 @layer base {
   * {
     @apply border-border;
@@ -83,4 +96,14 @@
   body {
     @apply bg-background text-foreground;
 	}
+  
+  /* Enhanced text weight for better display */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700; /* Make headings bolder */
+    letter-spacing: -0.025em;
+  }
+  
+  p, button, a {
+    font-weight: 500; /* Make text slightly bolder */
+  }
 }

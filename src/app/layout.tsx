@@ -6,9 +6,16 @@ import { ThirdwebProvider } from "thirdweb/react";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "thirdweb SDK + Next starter",
-  description:
-    "Starter template for using thirdweb SDK with Next.js App router",
+  title: "OMA3 App Registry Developer Portal",
+  description: "Register and manage your applications on the OMA3 App Registry",
+  keywords: ["OMA3", "Web3", "App Registry", "Blockchain", "NFT", "Developer Portal"],
+  authors: [{ name: "OMA3" }],
+  openGraph: {
+    title: "OMA3 App Registry Developer Portal",
+    description: "Register and manage your applications on the OMA3 network",
+    type: "website",
+    url: "https://oma3.org",
+  },
 };
 
 export default function RootLayout({
