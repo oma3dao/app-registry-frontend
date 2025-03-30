@@ -42,11 +42,15 @@ export default function Dashboard() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold">OMA3 App Registry Developer Portal</h1>
         <div className="flex gap-4">
-          <Button onClick={() => handleOpenModal()} className="flex items-center gap-2">
-            <PlusIcon size={16} />
+          <Button 
+            size="lg"
+            onClick={() => handleOpenModal()} 
+            className="inline-flex items-center gap-2 text-lg leading-7 py-2 px-4 h-[52px] min-w-[165px]"
+          >
+            <PlusIcon size={20} />
             Register New App
           </Button>
-          <Button variant="outline" isConnectButton />
+          <Button size="lg" isConnectButton className="h-[52px]" />
         </div>
       </div>
 
