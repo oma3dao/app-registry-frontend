@@ -2,6 +2,16 @@ import { getContract, readContract } from "thirdweb";
 import { OMA3_APP_REGISTRY } from "@/config/contracts";
 import { client } from "@/app/client";
 import type { NFT } from "@/types/nft";
+import {
+  MAX_URL_LENGTH,
+  MAX_DID_LENGTH,
+  MAX_NAME_LENGTH,
+  validateVersion,
+  validateUrl,
+  validateDid,
+  validateName,
+  validateCaipAddress
+} from "@/lib/validation";
 
 /**
  * App type representing the contract's App struct
@@ -231,6 +241,37 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
  */
 export async function mint(nft: Omit<NFT, "id">): Promise<NFT> {
   try {
+    // Validate name
+    if (!validateName(nft.name)) {
+      throw new Error(`Invalid name: ${nft.name}. Name must be between 1 and ${MAX_NAME_LENGTH} characters.`);
+    }
+    
+    // Validate version format
+    if (!validateVersion(nft.version)) {
+      throw new Error(`Invalid version format: ${nft.version}. Version must be in the format x.y.z or x.y where x, y, and z are numbers.`);
+    }
+    
+    // Validate DID
+    if (!validateDid(nft.did)) {
+      throw new Error(`Invalid DID format: ${nft.did}. DID must follow the pattern did:method:id and not exceed ${MAX_DID_LENGTH} characters.`);
+    }
+    
+    // Validate URLs
+    const validateContractUrl = (url: string, fieldName: string) => {
+      if (!validateUrl(url)) {
+        throw new Error(`Invalid ${fieldName}: ${url}. URL must be a valid format and not exceed ${MAX_URL_LENGTH} characters.`);
+      }
+    };
+    
+    validateContractUrl(nft.dataUrl, "Data URL");
+    validateContractUrl(nft.iwpsPortalUri, "IWPS Portal URI");
+    validateContractUrl(nft.agentPortalUri, "Agent Portal URI");
+    
+    // Optional CAIP address validation
+    if (nft.contractAddress && !validateCaipAddress(nft.contractAddress)) {
+      throw new Error(`Invalid contract address format: ${nft.contractAddress}`);
+    }
+    
     const contract = getAppRegistryContract();
     
     // Convert string name to bytes32 (required by contract)
