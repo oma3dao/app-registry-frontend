@@ -12,7 +12,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-          Register your applications as NFTs on the blockchain to make them discoverable by any application store, including OMA3's Spatial Store.<br/><br/>Connect your wallet to get started.
+          Register your applications as NFTs on the blockchain to make them discoverable by any application store, including OMA3&apos;s Spatial Store.<br/><br/>Connect your wallet to get started.
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4">

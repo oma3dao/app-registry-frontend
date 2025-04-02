@@ -1,16 +1,49 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { PlusIcon } from "lucide-react"
 import NFTGrid from "@/components/nft-grid"
 import NFTModal from "@/components/nft-modal"
 import type { NFT } from "@/types/nft"
+import { getAppsByMinter, registerApp, updateStatus } from "@/contracts/appRegistry"
+import { useActiveAccount } from "thirdweb/react"
 
 export default function Dashboard() {
+  console.log("Dashboard component rendering");
+  const account = useActiveAccount();
+  const connectedAddress = account?.address;
   const [nfts, setNfts] = useState<NFT[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Fetch registered apps by the connected wallet
+  useEffect(() => {
+    const fetchApps = async () => {
+      try {
+        setIsLoading(true)
+        console.log("Fetching apps from contract...")
+        
+        if (connectedAddress) {
+          console.log("Fetching apps created by:", connectedAddress);
+          const apps = await getAppsByMinter(connectedAddress);
+          console.log("Apps fetched:", apps);
+          setNfts(apps);
+        } else {
+          console.log("No wallet connected, showing empty list");
+          setNfts([]);
+        }
+      } catch (error) {
+        console.error("Error fetching apps:", error)
+        setNfts([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchApps()
+  }, [connectedAddress])
 
   const handleOpenModal = (nft?: NFT) => {
     if (nft) {
@@ -26,15 +59,24 @@ export default function Dashboard() {
     setCurrentNft(null)
   }
 
-  const handleSaveNft = (nft: NFT) => {
-    if (currentNft) {
-      // Edit existing NFT
-      setNfts(nfts.map((item) => (item.id === nft.id ? nft : item)))
-    } else {
-      // Add new NFT
-      setNfts([...nfts, { ...nft, id: Date.now().toString() }])
+  const handleSaveNft = async (nft: NFT) => {
+    try {
+      if (currentNft) {
+        // Edit existing NFT - update status
+        const updatedNft = await updateStatus(nft)
+        setNfts(nfts.map((item) => (item.id === updatedNft.id ? updatedNft : item)))
+      } else {
+        // Add new NFT - register a new app
+        const { id, ...nftWithoutId } = nft
+        const registeredNft = await registerApp(nftWithoutId)
+        setNfts([...nfts, registeredNft])
+      }
+      
+      handleCloseModal()
+    } catch (error) {
+      console.error("Error interacting with contract:", error)
+      // Handle error - you might want to show a notification to the user
     }
-    handleCloseModal()
   }
 
   return (
@@ -54,7 +96,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <NFTGrid nfts={nfts} onEdit={handleOpenModal} onMintFirst={() => handleOpenModal()} />
+      <NFTGrid nfts={nfts} onEdit={handleOpenModal} onMintFirst={() => handleOpenModal()} isLoading={isLoading} />
 
       <NFTModal isOpen={isModalOpen} onClose={handleCloseModal} onSave={handleSaveNft} nft={currentNft} />
     </div>

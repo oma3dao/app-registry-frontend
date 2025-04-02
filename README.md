@@ -28,6 +28,14 @@ This Participant Agreement (“Agreement”) captures an individual, or, when su
 
 ![tw-banner](https://github.com/thirdweb-example/next-starter/assets/57885104/20c8ce3b-4e55-4f10-ae03-2fe4743a5ee8)
 
+# Documentation
+
+- **Project Setup**: See the Setup section below for installation and environment setup instructions.
+- **Source Code Documentation**: See [src/README.md](src/README.md) for detailed documentation on the source code, including:
+  - Blockchain configuration via `chains.ts` and `contracts.ts`
+  - How to configure and use smart contracts
+  - Best practices for blockchain integration
+
 # Setup
 
 ## Installation

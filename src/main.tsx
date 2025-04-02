@@ -1,5 +1,6 @@
 // src/main.tsx
 import { ThirdwebProvider } from "thirdweb/react";
+import App from "./app";
 
 function Main() {
   return (
@@ -8,3 +9,5 @@ function Main() {
     </ThirdwebProvider>
   );
 }
+
+export default Main;
