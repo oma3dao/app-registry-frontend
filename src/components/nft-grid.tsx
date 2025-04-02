@@ -51,7 +51,7 @@ export default function NFTGrid({ nfts, onEdit, onMintFirst, isLoading = false }
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {nfts.map((nft) => (
-        <NFTCard key={nft.id} nft={nft} onEdit={onEdit} />
+        <NFTCard key={nft.did} nft={nft} onEdit={onEdit} />
       ))}
     </div>
   )

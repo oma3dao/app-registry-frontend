@@ -63,18 +63,17 @@ export default function Dashboard() {
     try {
       if (currentNft) {
         // Edit existing NFT - update status
-        const updatedNft = await updateStatus(nft)
-        setNfts(nfts.map((item) => (item.id === updatedNft.id ? updatedNft : item)))
+        const updatedNft = await updateStatus(nft);
+        setNfts(nfts.map((item) => (item.did === updatedNft.did ? updatedNft : item)));
       } else {
         // Add new NFT - register a new app
-        const { id, ...nftWithoutId } = nft
-        const registeredNft = await registerApp(nftWithoutId)
-        setNfts([...nfts, registeredNft])
+        const registeredNft = await registerApp(nft);
+        setNfts([...nfts, registeredNft]);
       }
       
-      handleCloseModal()
+      handleCloseModal();
     } catch (error) {
-      console.error("Error interacting with contract:", error)
+      console.error("Error interacting with contract:", error);
       // Handle error - you might want to show a notification to the user
     }
   }

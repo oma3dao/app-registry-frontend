@@ -66,4 +66,4 @@ export function validateCaipAddress(address: string): boolean {
   // CAIP-2 format is chainNamespace:chainReference:address
   // For now, we'll accept any non-empty string or empty (as it's optional)
   return true;
-} 
+}

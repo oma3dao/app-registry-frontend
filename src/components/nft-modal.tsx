@@ -35,10 +35,10 @@ interface NFTModalProps {
 }
 
 export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps) {
-  const [formData, setFormData] = useState<Omit<NFT, "id">>({
+  const [formData, setFormData] = useState<NFT>({
+    did: "",
     name: "",
     version: "",
-    did: "",
     dataUrl: "",
     iwpsPortalUri: "",
     agentPortalUri: "",
@@ -49,9 +49,9 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
   useEffect(() => {
     if (nft) {
       setFormData({
+        did: nft.did,
         name: nft.name,
         version: nft.version,
-        did: nft.did,
         dataUrl: nft.dataUrl,
         iwpsPortalUri: nft.iwpsPortalUri,
         agentPortalUri: nft.agentPortalUri,
@@ -61,9 +61,9 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
       setErrors({})
     } else {
       setFormData({
+        did: "",
         name: "",
         version: "",
-        did: "",
         dataUrl: "",
         iwpsPortalUri: "",
         agentPortalUri: "",
@@ -201,10 +201,7 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
       return
     }
     
-    onSave({
-      id: nft?.id || "",
-      ...formData,
-    })
+    onSave(formData)
   }
 
   return (

@@ -27,7 +27,7 @@ type ContractApp = {
   minter: string;
   status: number;
   hasContract: boolean;
-  tokenId?: string | number;
+  // tokenId is no longer needed since we'll use DID as the primary identifier
 };
 
 /**
@@ -44,7 +44,7 @@ function processAppArray(apps: ContractApp[]): NFT[] {
   }
   
   // Map apps to NFT objects
-  return apps.map((app: ContractApp, index: number) => {
+  return apps.map((app: ContractApp) => {
     try {
       // Extract name (handle both string and bytes32 formats)
       let name = "";
@@ -74,11 +74,10 @@ function processAppArray(apps: ContractApp[]): NFT[] {
         }
       }
       
-      // Construct and return the NFT object
+      // Construct and return the NFT object using DID as the primary identifier
       return {
-        id: app.tokenId ? app.tokenId.toString() : index.toString(),
-        name: name,
         did: app.did || "",
+        name: name,
         dataUrl: app.dataUrl || "",
         iwpsPortalUri: app.iwpsPortalUri || "",
         agentPortalUri: app.agentApiUri || "",
@@ -86,7 +85,7 @@ function processAppArray(apps: ContractApp[]): NFT[] {
         version: version
       };
     } catch (mappingError) {
-      console.error(`Error mapping app ${index}:`, mappingError);
+      console.error(`Error mapping app with DID ${app.did || "unknown"}:`, mappingError);
       return null;
     }
   }).filter(Boolean) as NFT[]; // Remove any null entries
@@ -237,9 +236,9 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
 /**
  * Register a new application on the blockchain by minting an NFT
  * @param nft The NFT data to register
- * @returns The registered NFT with its assigned token ID
+ * @returns The registered NFT with its assigned DID
  */
-export async function mint(nft: Omit<NFT, "id">): Promise<NFT> {
+export async function mint(nft: NFT): Promise<NFT> {
   try {
     // Validate name
     if (!validateName(nft.name)) {
@@ -294,31 +293,20 @@ export async function mint(nft: Omit<NFT, "id">): Promise<NFT> {
     const result = await (contract as any).write.mint([
       nft.did,                // string did
       nameBytes32,            // bytes32 name
-      versionBytes32,         // bytes32 version (now a single bytes32 instead of major/minor/patch)
+      versionBytes32,         // bytes32 version
       nft.dataUrl,            // string dataUrl
       nft.iwpsPortalUri,      // string iwpsPortalUri
       nft.agentPortalUri,     // string agentApiUri
       nft.contractAddress || "" // string contractAddress
     ]);
     
-    // Get the tokenId from the transaction receipt or event
-    const events = await result.wait();
+    // Get the transaction receipt for logging purposes
+    await result.wait();
     
-    // Look for the ApplicationMinted event
-    const mintEvent = events.logs.find(
-      (log: any) => log.fragment && log.fragment.name === "ApplicationMinted"
-    );
+    console.log(`Successfully minted app with DID: ${nft.did}`);
     
-    let tokenId;
-    if (mintEvent && mintEvent.args.tokenId) {
-      tokenId = mintEvent.args.tokenId.toString();
-    } else {
-      // Fallback if we can't extract the token ID from events
-      tokenId = Date.now().toString();
-    }
-    
-    // Return the NFT with its new ID
-    return { ...nft, id: tokenId };
+    // Return the NFT object as-is
+    return nft;
   } catch (error) {
     console.error("Error minting app:", error);
     throw error;
@@ -328,19 +316,24 @@ export async function mint(nft: Omit<NFT, "id">): Promise<NFT> {
 /**
  * Wrapper function for minting a new application
  * @param nft The NFT data to register
- * @returns The registered NFT with its assigned token ID
+ * @returns The registered NFT
  */
-export async function registerApp(nft: Omit<NFT, "id">): Promise<NFT> {
+export async function registerApp(nft: NFT): Promise<NFT> {
   return mint(nft);
 }
 
 /**
  * Update an application status on the blockchain
- * @param nft The NFT with status to update
+ * @param nft The NFT with status to update, identified by DID
  * @returns The updated NFT
  */
 export async function updateStatus(nft: NFT): Promise<NFT> {
   try {
+    // Validate DID
+    if (!validateDid(nft.did)) {
+      throw new Error(`Invalid DID format: ${nft.did}. DID must follow the pattern did:method:id and not exceed ${MAX_DID_LENGTH} characters.`);
+    }
+    
     const contract = getAppRegistryContract();
     
     // The contract only supports status updates, not full app updates
