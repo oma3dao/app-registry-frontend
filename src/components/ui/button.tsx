@@ -1,10 +1,15 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import { ConnectButton as ThirdwebConnectButton, useActiveAccount } from "thirdweb/react"
+import { useActiveAccount } from "thirdweb/react"
 import { client } from "@/app/client"
 
 import { cn } from "@/lib/utils"
+
+// Lazy load the ThirdwebConnectButton to prevent early wallet access
+const ThirdwebConnectButton = React.lazy(() => 
+  import("thirdweb/react").then(mod => ({ default: mod.ConnectButton }))
+)
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
@@ -84,16 +89,25 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     if (isConnectButton) {
       const { client: _, ...restProps } = props as ThirdwebConnectButtonProps
+      // Use React.Suspense to handle the lazy loading
       return (
-        <ThirdwebConnectButton
-          client={client}
-          appMetadata={{
-            name: "OMA3 App Registry",
-            url: "https://oma3.org",
-          }}
-          className={className}
-          {...restProps}
-        />
+        <React.Suspense fallback={
+          <button className={cn(buttonVariants({ variant, size, className }))}>
+            Connect Wallet
+          </button>
+        }>
+          <ThirdwebConnectButton
+            client={client}
+            appMetadata={{
+              name: "OMA3 App Registry",
+              url: "https://oma3.org",
+            }}
+            className={className}
+            // Enable auto-connect for persistence between refreshes
+            autoConnect={true}
+            {...restProps}
+          />
+        </React.Suspense>
       )
     }
 

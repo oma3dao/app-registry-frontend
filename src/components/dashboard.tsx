@@ -61,19 +61,25 @@ export default function Dashboard() {
 
   const handleSaveNft = async (nft: NFT) => {
     try {
+      if (!account) {
+        console.error("No wallet connected");
+        // You may want to handle this case by showing a message to the user
+        return;
+      }
+
       if (currentNft) {
         // Edit existing NFT - update status
-        const updatedNft = await updateStatus(nft);
-        setNfts(nfts.map((item) => (item.did === updatedNft.did ? updatedNft : item)));
+        const updatedNft = await updateStatus(nft)
+        setNfts(nfts.map((item) => (item.did === updatedNft.did ? updatedNft : item)))
       } else {
         // Add new NFT - register a new app
-        const registeredNft = await registerApp(nft);
-        setNfts([...nfts, registeredNft]);
+        const registeredNft = await registerApp(nft, account)
+        setNfts([...nfts, registeredNft])
       }
       
-      handleCloseModal();
+      handleCloseModal()
     } catch (error) {
-      console.error("Error interacting with contract:", error);
+      console.error("Error interacting with contract:", error)
       // Handle error - you might want to show a notification to the user
     }
   }

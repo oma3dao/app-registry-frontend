@@ -1,7 +1,8 @@
-import { getContract, readContract } from "thirdweb";
+import { getContract, readContract, sendTransaction, prepareContractCall } from "thirdweb";
 import { OMA3_APP_REGISTRY } from "@/config/contracts";
 import { client } from "@/app/client";
 import type { NFT } from "@/types/nft";
+import { Account } from "thirdweb/wallets";
 import {
   MAX_URL_LENGTH,
   MAX_DID_LENGTH,
@@ -236,9 +237,10 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
 /**
  * Register a new application on the blockchain by minting an NFT
  * @param nft The NFT data to register
+ * @param account The connected wallet account
  * @returns The registered NFT with its assigned DID
  */
-export async function mint(nft: NFT): Promise<NFT> {
+export async function mint(nft: NFT, account: Account): Promise<NFT> {
   try {
     // Validate name
     if (!validateName(nft.name)) {
@@ -273,11 +275,16 @@ export async function mint(nft: NFT): Promise<NFT> {
     
     const contract = getAppRegistryContract();
     
+    // Debug contract instance
+    console.log("Contract instance:", contract);
+    console.log("Contract type:", typeof contract);
+    console.log("Contract keys:", Object.keys(contract));
+    
     // Convert string name to bytes32 (required by contract)
-    const nameBytes32 = '0x' + Buffer.from(nft.name.padEnd(32, '\0')).toString('hex');
+    const nameBytes32 = ('0x' + Buffer.from(nft.name.padEnd(32, '\0')).toString('hex')) as `0x${string}`;
     
     // Convert version string to bytes32 (required by contract)
-    const versionBytes32 = '0x' + Buffer.from(nft.version.padEnd(32, '\0')).toString('hex');
+    const versionBytes32 = ('0x' + Buffer.from(nft.version.padEnd(32, '\0')).toString('hex')) as `0x${string}`;
     
     console.log("Minting app with parameters:", {
       did: nft.did,
@@ -289,24 +296,70 @@ export async function mint(nft: NFT): Promise<NFT> {
       contractAddress: nft.contractAddress || ""
     });
     
-    // Use contract.write directly with casting
-    const result = await (contract as any).write.mint([
-      nft.did,                // string did
-      nameBytes32,            // bytes32 name
-      versionBytes32,         // bytes32 version
-      nft.dataUrl,            // string dataUrl
-      nft.iwpsPortalUri,      // string iwpsPortalUri
-      nft.agentPortalUri,     // string agentApiUri
-      nft.contractAddress || "" // string contractAddress
-    ]);
-    
-    // Get the transaction receipt for logging purposes
-    await result.wait();
-    
-    console.log(`Successfully minted app with DID: ${nft.did}`);
-    
-    // Return the NFT object as-is
-    return nft;
+    try {
+      console.log("Preparing contract call for mint function");
+      console.log("Contract chain ID:", contract.chain?.id);
+      
+      // Prepare the contract call
+      const transaction = prepareContractCall({
+        contract,
+        method: "function mint(string, bytes32, bytes32, string, string, string, string) returns (bool)",
+        params: [
+          nft.did,                // string did
+          nameBytes32,            // bytes32 name
+          versionBytes32,         // bytes32 version
+          nft.dataUrl,            // string dataUrl
+          nft.iwpsPortalUri,      // string iwpsPortalUri
+          nft.agentPortalUri,     // string agentApiUri
+          nft.contractAddress || "" // string contractAddress
+        ]
+      });
+      
+      console.log("Transaction prepared:", {
+        to: transaction.to,
+        value: transaction.value?.toString() || '0',
+        data: typeof transaction.data === 'string' ? 
+          `${transaction.data.slice(0, 66)}...` : 
+          'Function that returns data'
+      });
+      
+      console.log("Using sendTransaction with account:", {
+        address: account.address
+      });
+      
+      // This is the recommended approach using ThirdWeb's v5 transaction pattern
+      const { transactionHash } = await sendTransaction({
+        account,
+        transaction
+      });
+      
+      console.log("Transaction sent successfully with hash:", transactionHash);
+      console.log(`Successfully minted app with DID: ${nft.did}`);
+      
+      // Return the NFT object as-is
+      return nft;
+    } catch (mintError) {
+      console.error("Error during sendTransaction:", mintError);
+      
+      // Safely extract error information
+      const errorMessage = mintError instanceof Error ? mintError.message : String(mintError);
+      const errorName = mintError instanceof Error ? mintError.constructor.name : 'Unknown';
+      
+      console.error("Error type:", errorName);
+      console.error("Error message:", errorMessage);
+      
+      // For common transaction errors, provide more context
+      if (errorMessage.includes("user rejected")) {
+        console.error("User rejected the transaction in their wallet");
+      } else if (errorMessage.includes("insufficient funds")) {
+        console.error("Wallet has insufficient funds to complete the transaction");
+      } else if (errorMessage.includes("nonce")) {
+        console.error("Nonce issue - there might be pending transactions");
+      }
+      
+      console.error("Error details:", JSON.stringify(mintError, null, 2));
+      throw mintError;
+    }
   } catch (error) {
     console.error("Error minting app:", error);
     throw error;
@@ -316,10 +369,11 @@ export async function mint(nft: NFT): Promise<NFT> {
 /**
  * Wrapper function for minting a new application
  * @param nft The NFT data to register
+ * @param account The connected wallet account
  * @returns The registered NFT
  */
-export async function registerApp(nft: NFT): Promise<NFT> {
-  return mint(nft);
+export async function registerApp(nft: NFT, account: Account): Promise<NFT> {
+  return mint(nft, account);
 }
 
 /**
@@ -343,14 +397,22 @@ export async function updateStatus(nft: NFT): Promise<NFT> {
     
     console.log(`Updating status for app with DID: ${nft.did} to status: ${status}`);
     
-    // Use contract.write directly with casting
-    await (contract as any).write.updateStatus([
-      nft.did,
-      status
-    ]);
-    
-    // Return the updated NFT
-    return nft;
+    try {
+      // Use contract.call method with type assertion
+      await (contract as any).call("updateStatus", [
+        nft.did,
+        status
+      ]);
+      
+      console.log(`Successfully updated status for app with DID: ${nft.did}`);
+      
+      // Return the updated NFT
+      return nft;
+    } catch (updateError) {
+      console.error("Error during contract.call for updateStatus:", updateError);
+      console.error("Error details:", JSON.stringify(updateError, null, 2));
+      throw updateError;
+    }
   } catch (error) {
     console.error("Error updating app status:", error);
     throw error;
