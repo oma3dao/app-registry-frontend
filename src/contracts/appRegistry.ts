@@ -38,24 +38,29 @@ type ContractApp = {
  */
 function processAppArray(apps: ContractApp[]): NFT[] {
   console.log("Processing apps array, length:", apps.length);
+  console.log("Apps to process:", JSON.stringify(apps, null, 2));
   
   if (!apps || apps.length === 0) {
     console.log("No apps to process");
-    return [];
+    return [];  
   }
   
   // Map apps to NFT objects
-  return apps.map((app: ContractApp) => {
+  return apps.map((app: ContractApp, index: number) => {
     try {
+      console.log(`Processing app ${index}:`, app);
+      
       // Extract name (handle both string and bytes32 formats)
       let name = "";
       if (app.name) {
         if (typeof app.name === 'string') {
           name = app.name;
+          // If it's a hex string, convert it
+          if (name.startsWith('0x')) {
+            name = Buffer.from(name.slice(2), 'hex').toString().replace(/\0/g, '');
+          }
         } else if (typeof app.name === 'object' && app.name._hex) {
           name = Buffer.from(app.name._hex.slice(2), 'hex').toString().replace(/\0/g, '');
-        } else if (typeof app.name === 'string' && app.name.startsWith('0x')) {
-          name = Buffer.from(app.name.slice(2), 'hex').toString().replace(/\0/g, '');
         }
       }
       
@@ -64,6 +69,10 @@ function processAppArray(apps: ContractApp[]): NFT[] {
       if (app.version) {
         if (typeof app.version === 'string') {
           version = app.version;
+          // If it's a hex string, convert it
+          if (version.startsWith('0x')) {
+            version = Buffer.from(version.slice(2), 'hex').toString().replace(/\0/g, '');
+          }
         } else if (typeof app.version === 'object') {
           if ('major' in app.version && 'minor' in app.version && 'patch' in app.version) {
             version = `${app.version.major || 0}.${app.version.minor || 0}.${app.version.patch || 0}`;
@@ -74,6 +83,8 @@ function processAppArray(apps: ContractApp[]): NFT[] {
           }
         }
       }
+      
+      console.log(`Extracted name: "${name}", version: "${version}" for app ${index}`);
       
       // Construct and return the NFT object using DID as the primary identifier
       return {
@@ -95,35 +106,115 @@ function processAppArray(apps: ContractApp[]): NFT[] {
 /**
  * Extract apps array from different possible response structures
  * @param response Raw response from contract
- * @returns Array of app objects
+ * @returns Object containing app array and next index for pagination
  */
-function extractAppsArray(response: any): ContractApp[] {
+function extractAppsArrayWithPagination(response: any): { apps: ContractApp[], nextIndex: number } {
   if (!response) {
     console.log("Response is null or undefined");
-    return [];
+    return { apps: [], nextIndex: 0 };
   }
   
   console.log("Raw contract response:", response);
-  // Case 1: Response is an array where first element is apps array
-  if (Array.isArray(response) && response.length > 0) {
-    if (Array.isArray(response[0])) {
-      console.log("Found apps array in first element");
-      return response[0] as ContractApp[];
-    } else {
-      console.log("Using response array directly");
-      return response as ContractApp[];
+  let apps: ContractApp[] = [];
+  let nextIndex = 0;
+  
+  // Case 1: getApps response - array with two elements [apps[], nextIndex]
+  if (Array.isArray(response) && response.length === 2 && Array.isArray(response[0]) && typeof response[1] === 'number') {
+    console.log("Found getApps response with pagination");
+    const appsData = response[0];
+    nextIndex = response[1];
+    
+    // Process each app in the apps array
+    apps = appsData.map(appData => {
+      if (Array.isArray(appData) && appData.length >= 10) {
+        return {
+          name: appData[0],         // bytes32 name
+          version: appData[1],      // bytes32 version
+          did: appData[2],          // string did
+          dataUrl: appData[3],      // string dataUrl
+          iwpsPortalUri: appData[4], // string iwpsPortalUri
+          agentApiUri: appData[5],  // string agentApiUri
+          contractAddress: appData[6], // string contractAddress
+          minter: appData[7],       // address minter
+          status: appData[8],       // uint8 status
+          hasContract: appData[9]   // bool hasContract
+        };
+      }
+      return appData as ContractApp;
+    });
+  }
+  // Case 2: getAppsByMinter response - array with one element [apps[]]
+  else if (Array.isArray(response) && response.length === 1 && Array.isArray(response[0])) {
+    console.log("Found getAppsByMinter response");
+    const appData = response[0];
+    
+    // Handle array of raw app data vs array of app objects
+    if (Array.isArray(appData) && appData.length > 0) {
+      // If first element is array, then it's array of app data
+      if (Array.isArray(appData[0])) {
+        console.log("Found array of arrays structure");
+        apps = appData.map(innerAppData => {
+          if (Array.isArray(innerAppData) && innerAppData.length >= 10) {
+            return {
+              name: innerAppData[0],         // bytes32 name
+              version: innerAppData[1],      // bytes32 version
+              did: innerAppData[2],          // string did
+              dataUrl: innerAppData[3],      // string dataUrl
+              iwpsPortalUri: innerAppData[4], // string iwpsPortalUri
+              agentApiUri: innerAppData[5],  // string agentApiUri
+              contractAddress: innerAppData[6], // string contractAddress
+              minter: innerAppData[7],       // address minter
+              status: innerAppData[8],       // uint8 status
+              hasContract: innerAppData[9]   // bool hasContract
+            };
+          }
+          return innerAppData as ContractApp;
+        });
+      }
+      // If first element is not an array, then it's a single app in raw format
+      else if (appData.length >= 10) {
+        console.log("Found single app data array");
+        const app: ContractApp = {
+          name: appData[0],         // bytes32 name
+          version: appData[1],      // bytes32 version
+          did: appData[2],          // string did
+          dataUrl: appData[3],      // string dataUrl
+          iwpsPortalUri: appData[4], // string iwpsPortalUri
+          agentApiUri: appData[5],  // string agentApiUri
+          contractAddress: appData[6], // string contractAddress
+          minter: appData[7],       // address minter
+          status: appData[8],       // uint8 status
+          hasContract: appData[9]   // bool hasContract
+        };
+        apps = [app];
+      }
     }
-  } 
-  // Case 2: Response is an object with 'apps' property
+  }
+  // Case 3: Plain array of app objects
+  else if (Array.isArray(response)) {
+    console.log("Found plain array response");
+    apps = response as ContractApp[];
+  }
+  // Case 4: Object with 'apps' property
   else if (typeof response === 'object' && response !== null && 'apps' in response) {
     if (Array.isArray(response.apps)) {
       console.log("Found apps in object property");
-      return response.apps as ContractApp[];
+      apps = response.apps as ContractApp[];
     }
   }
   
-  console.log("No valid apps array found in response");
-  return [];
+  console.log(`Extracted ${apps.length} apps with nextIndex ${nextIndex}`);
+  return { apps, nextIndex };
+}
+
+/**
+ * Simple wrapper to maintain backward compatibility
+ * @param response Raw response from contract
+ * @returns Array of app objects
+ */
+function extractAppsArray(response: any): ContractApp[] {
+  const { apps } = extractAppsArrayWithPagination(response);
+  return apps;
 }
 
 /**
@@ -158,42 +249,76 @@ export function getAppRegistryContract() {
 
 /**
  * Get all registered applications from the contract
+ * Automatically handles pagination behind the scenes
  * @returns Array of registered NFTs
  */
 export async function getApps(): Promise<NFT[]> {
+  // Internal implementation with pagination
+  return _getAppsWithPagination();
+}
+
+/**
+ * Internal function that handles pagination logic
+ * @param startIndex Optional starting index for pagination (default is 1)
+ * @param maxResults Optional maximum number of results to return (default is 100)
+ * @returns Array of registered NFTs
+ */
+async function _getAppsWithPagination(startIndex: number = 1, maxResults: number = 100): Promise<NFT[]> {
   try {
-    console.log("Getting App Registry contract...");
+    console.log(`Getting App Registry contract (internal pagination, startIndex: ${startIndex}, maxResults: ${maxResults})...`);
     const contract = getAppRegistryContract();
     console.log("Contract obtained:", contract);
     
-    console.log("Calling readContract for getApps...");
+    // Initialize results array and current index
+    let allApps: NFT[] = [];
+    let currentIndex = BigInt(startIndex);
+    let hasMoreApps = true;
+    let requestCount = 0;
+    const MAX_REQUESTS = 10; // Safety limit for API calls
     
-    try {
-      // Using readContract from thirdweb v5 with proper type casting
-      const getAppsString = "function getApps(uint256) view returns ((bytes32, bytes32, string, string, string, string, string, address, uint8, bool)[], uint256)";
-      const result = await readContract({
-        contract: contract,
-        method: getAppsString,
-        params: [BigInt(1)],
-      });
+    // Loop to fetch all apps with pagination
+    while (hasMoreApps && allApps.length < maxResults && requestCount < MAX_REQUESTS) {
+      console.log(`Calling readContract for getApps with index ${currentIndex}...`);
       
-      // Extract apps array from the response
-      const appsArray = extractAppsArray(result);
-      
-      // Process the apps array
-      return processAppArray(appsArray);
-    } catch (readError) {
-      console.error("Error during contract read:", readError);
-      return [];
+      try {
+        // Using readContract from thirdweb v5 with proper type casting
+        const getAppsString = "function getApps(uint256) view returns ((bytes32, bytes32, string, string, string, string, string, address, uint8, bool)[], uint256)";
+        const result = await readContract({
+          contract: contract,
+          method: getAppsString,
+          params: [currentIndex],
+        });
+        
+        // Extract apps array and next index from the response
+        const { apps, nextIndex } = extractAppsArrayWithPagination(result);
+        
+        // Process the apps array
+        const processedApps = processAppArray(apps);
+        allApps = [...allApps, ...processedApps];
+        
+        console.log(`Fetched ${processedApps.length} apps, next index: ${nextIndex}`);
+        
+        // Update pagination state
+        if (nextIndex > 0) {
+          currentIndex = BigInt(nextIndex);
+          requestCount++;
+        } else {
+          hasMoreApps = false;
+        }
+      } catch (readError) {
+        console.error("Error during contract read:", readError);
+        hasMoreApps = false;
+      }
     }
     
+    console.log(`Finished fetching apps. Total apps: ${allApps.length}`);
+    return allApps.slice(0, maxResults);
   } catch (error) {
     console.error("Error fetching apps:", error);
     // Return empty array instead of throwing to prevent app from crashing
     return [];
   }
 }
-
 
 /**
  * Get applications registered by a specific minter address
@@ -218,10 +343,10 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
       });
       
       // Extract apps array from the response
-      const appsArray = extractAppsArray(result);
+      const { apps } = extractAppsArrayWithPagination(result);
       
       // Process the apps array
-      return processAppArray(appsArray);
+      return processAppArray(apps);
     } catch (readError) {
       console.error("Error during contract read:", readError);
       return [];
@@ -418,3 +543,5 @@ export async function updateStatus(nft: NFT): Promise<NFT> {
     throw error;
   }
 }
+
+
