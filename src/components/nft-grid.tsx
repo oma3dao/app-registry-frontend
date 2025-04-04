@@ -8,11 +8,44 @@ import { PlusIcon } from "lucide-react"
 interface NFTGridProps {
   nfts: NFT[]
   onEdit: (nft: NFT) => void
-  onMintFirst: () => void
+  onOpenMintModal: () => void
   isLoading?: boolean
 }
 
-export default function NFTGrid({ nfts, onEdit, onMintFirst, isLoading = false }: NFTGridProps) {
+export default function NFTGrid({ nfts, onEdit, onOpenMintModal, isLoading = false }: NFTGridProps) {
+  // Debug log all NFTs
+  console.log("NFTs received:", nfts);
+  
+  // Filter out duplicate NFTs by creating a unique key from DID and version
+  const uniqueNfts = nfts.reduce<NFT[]>((acc, nft) => {
+    // Debug log each NFT
+    console.log("Processing NFT:", nft);
+    
+    // Make sure did and version exist
+    if (!nft.did || !nft.version) {
+      console.warn("NFT missing did or version:", nft);
+      return acc;
+    }
+    
+    const key = `${nft.did}-${nft.version}`;
+    console.log("Generated key:", key);
+    
+    const existingIndex = acc.findIndex(item => `${item.did}-${item.version}` === key);
+    
+    if (existingIndex === -1) {
+      // NFT with this key doesn't exist yet, add it
+      console.log("Adding NFT with key:", key);
+      acc.push(nft);
+    } else {
+      console.log("Duplicate NFT found with key:", key);
+    }
+    
+    return acc;
+  }, []);
+  
+  // Debug log unique NFTs
+  console.log("Unique NFTs:", uniqueNfts);
+  
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
@@ -27,7 +60,7 @@ export default function NFTGrid({ nfts, onEdit, onMintFirst, isLoading = false }
     )
   }
 
-  if (nfts.length === 0) {
+  if (uniqueNfts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
         <div className="text-center mb-6">
@@ -38,7 +71,7 @@ export default function NFTGrid({ nfts, onEdit, onMintFirst, isLoading = false }
         </div>
         <Button 
           size="lg" 
-          onClick={onMintFirst} 
+          onClick={onOpenMintModal} 
           className="inline-flex items-center gap-2 text-lg leading-7 py-2 px-4 h-[52px] min-w-[165px]"
         >
           <PlusIcon size={20} />
@@ -50,10 +83,9 @@ export default function NFTGrid({ nfts, onEdit, onMintFirst, isLoading = false }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {nfts.map((nft) => (
-        <NFTCard key={nft.did} nft={nft} onEdit={onEdit} />
+      {uniqueNfts.map((nft) => (
+        <NFTCard key={`${nft.did}-${nft.version}`} nft={nft} onEdit={onEdit} />
       ))}
     </div>
   )
 }
-

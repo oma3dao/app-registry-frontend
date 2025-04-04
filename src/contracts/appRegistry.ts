@@ -32,13 +32,77 @@ type ContractApp = {
 };
 
 /**
+ * Helper function to convert bytes32 hex string to regular string
+ * @param hex The hex string to convert
+ * @returns Decoded string with null bytes removed
+ */
+function hexToString(hex: string | { _hex: string } | any): string {
+  try {
+    if (typeof hex === 'string' && hex.startsWith('0x')) {
+      return Buffer.from(hex.slice(2), 'hex').toString().replace(/\0/g, '');
+    } else if (typeof hex === 'object' && hex?._hex) {
+      return Buffer.from(hex._hex.slice(2), 'hex').toString().replace(/\0/g, '');
+    }
+    return String(hex || '');
+  } catch (e) {
+    console.error("Error converting hex to string:", e);
+    return '';
+  }
+}
+
+/**
+ * Convert raw app data from contract to a standardized ContractApp object
+ * @param appData Raw app data from contract (array format)
+ * @param index Index for debugging
+ * @param defaultMinter Optional default minter address
+ * @returns Formatted ContractApp object or null if invalid
+ */
+function parseRawAppData(appData: any[], index: number, defaultMinter: string = ''): ContractApp | null {
+  if (!Array.isArray(appData) || appData.length < 3) {
+    console.error(`App data at index ${index} is not in expected format:`, appData);
+    return null;
+  }
+  
+  try {
+    // Process name (bytes32)
+    const name = hexToString(appData[0]) || `App ${index}`;
+    
+    // Process version (bytes32)
+    const version = hexToString(appData[1]) || "0.0.1";
+    
+    // Process DID
+    const did = String(appData[2] || "");
+    if (!did) {
+      console.warn(`App ${index} has no DID, skipping`);
+      return null;
+    }
+    
+    // Create ContractApp object with all fields
+    return {
+      did: did,
+      name: name,
+      version: version,
+      dataUrl: String(appData[3] || ""),
+      iwpsPortalUri: String(appData[4] || ""),
+      agentApiUri: String(appData[5] || ""),
+      contractAddress: String(appData[6] || ""),
+      minter: String(appData[7] || defaultMinter),
+      status: typeof appData[8] === 'number' ? appData[8] : 0,
+      hasContract: Boolean(appData[9])
+    };
+  } catch (error) {
+    console.error(`Error processing app ${index}:`, error);
+    return null;
+  }
+}
+
+/**
  * Helper function to process app arrays from contract responses
  * @param apps Array of app objects from the contract
  * @returns Processed array of NFT objects
  */
 function processAppArray(apps: ContractApp[]): NFT[] {
   console.log("Processing apps array, length:", apps.length);
-  console.log("Apps to process:", JSON.stringify(apps, null, 2));
   
   if (!apps || apps.length === 0) {
     console.log("No apps to process");
@@ -48,53 +112,25 @@ function processAppArray(apps: ContractApp[]): NFT[] {
   // Map apps to NFT objects
   return apps.map((app: ContractApp, index: number) => {
     try {
-      console.log(`Processing app ${index}:`, app);
-      
-      // Extract name (handle both string and bytes32 formats)
-      let name = "";
-      if (app.name) {
-        if (typeof app.name === 'string') {
-          name = app.name;
-          // If it's a hex string, convert it
-          if (name.startsWith('0x')) {
-            name = Buffer.from(name.slice(2), 'hex').toString().replace(/\0/g, '');
-          }
-        } else if (typeof app.name === 'object' && app.name._hex) {
-          name = Buffer.from(app.name._hex.slice(2), 'hex').toString().replace(/\0/g, '');
-        }
+      // Skip if no DID
+      if (!app.did) {
+        console.warn(`App ${index} has no DID, skipping`);
+        return null;
       }
       
-      // Extract version (handle different formats)
-      let version = "0.0.0";
-      if (app.version) {
-        if (typeof app.version === 'string') {
-          version = app.version;
-          // If it's a hex string, convert it
-          if (version.startsWith('0x')) {
-            version = Buffer.from(version.slice(2), 'hex').toString().replace(/\0/g, '');
-          }
-        } else if (typeof app.version === 'object') {
-          if ('major' in app.version && 'minor' in app.version && 'patch' in app.version) {
-            version = `${app.version.major || 0}.${app.version.minor || 0}.${app.version.patch || 0}`;
-          } else if (app.version._hex || (typeof app.version === 'string' && app.version.startsWith('0x'))) {
-            // Handle bytes32 version format
-            const versionHex = app.version._hex || app.version;
-            version = Buffer.from(versionHex.slice(2), 'hex').toString().replace(/\0/g, '');
-          }
-        }
-      }
-      
-      console.log(`Extracted name: "${name}", version: "${version}" for app ${index}`);
+      console.log(`Extracted name: "${app.name}", version: "${app.version}", did: "${app.did}" for app ${index}`);
       
       // Construct and return the NFT object using DID as the primary identifier
       return {
-        did: app.did || "",
-        name: name,
+        did: app.did,
+        name: app.name || `App ${index}`,
         dataUrl: app.dataUrl || "",
         iwpsPortalUri: app.iwpsPortalUri || "",
         agentPortalUri: app.agentApiUri || "",
         contractAddress: app.contractAddress || "",
-        version: version
+        version: app.version || "0.0.1",
+        status: typeof app.status === 'number' ? app.status : 0,
+        minter: app.minter || ""
       };
     } catch (mappingError) {
       console.error(`Error mapping app with DID ${app.did || "unknown"}:`, mappingError);
@@ -104,11 +140,12 @@ function processAppArray(apps: ContractApp[]): NFT[] {
 }
 
 /**
- * Extract apps array from different possible response structures
+ * Process any contract response into standardized ContractApp array
  * @param response Raw response from contract
+ * @param defaultMinter Optional default minter address for data filling
  * @returns Object containing app array and next index for pagination
  */
-function extractAppsArrayWithPagination(response: any): { apps: ContractApp[], nextIndex: number } {
+function processContractResponse(response: any, defaultMinter: string = ''): { apps: ContractApp[], nextIndex: number } {
   if (!response) {
     console.log("Response is null or undefined");
     return { apps: [], nextIndex: 0 };
@@ -118,103 +155,68 @@ function extractAppsArrayWithPagination(response: any): { apps: ContractApp[], n
   let apps: ContractApp[] = [];
   let nextIndex = 0;
   
-  // Case 1: getApps response - array with two elements [apps[], nextIndex]
-  if (Array.isArray(response) && response.length === 2 && Array.isArray(response[0]) && typeof response[1] === 'number') {
-    console.log("Found getApps response with pagination");
-    const appsData = response[0];
-    nextIndex = response[1];
+  // For debugging and data inspection
+  if (Array.isArray(response)) {
+    console.log("Response is an array with length:", response.length);
     
-    // Process each app in the apps array
-    apps = appsData.map(appData => {
-      if (Array.isArray(appData) && appData.length >= 10) {
-        return {
-          name: appData[0],         // bytes32 name
-          version: appData[1],      // bytes32 version
-          did: appData[2],          // string did
-          dataUrl: appData[3],      // string dataUrl
-          iwpsPortalUri: appData[4], // string iwpsPortalUri
-          agentApiUri: appData[5],  // string agentApiUri
-          contractAddress: appData[6], // string contractAddress
-          minter: appData[7],       // address minter
-          status: appData[8],       // uint8 status
-          hasContract: appData[9]   // bool hasContract
-        };
-      }
-      return appData as ContractApp;
-    });
-  }
-  // Case 2: getAppsByMinter response - array with one element [apps[]]
-  else if (Array.isArray(response) && response.length === 1 && Array.isArray(response[0])) {
-    console.log("Found getAppsByMinter response");
-    const appData = response[0];
-    
-    // Handle array of raw app data vs array of app objects
-    if (Array.isArray(appData) && appData.length > 0) {
-      // If first element is array, then it's array of app data
-      if (Array.isArray(appData[0])) {
-        console.log("Found array of arrays structure");
-        apps = appData.map(innerAppData => {
-          if (Array.isArray(innerAppData) && innerAppData.length >= 10) {
-            return {
-              name: innerAppData[0],         // bytes32 name
-              version: innerAppData[1],      // bytes32 version
-              did: innerAppData[2],          // string did
-              dataUrl: innerAppData[3],      // string dataUrl
-              iwpsPortalUri: innerAppData[4], // string iwpsPortalUri
-              agentApiUri: innerAppData[5],  // string agentApiUri
-              contractAddress: innerAppData[6], // string contractAddress
-              minter: innerAppData[7],       // address minter
-              status: innerAppData[8],       // uint8 status
-              hasContract: innerAppData[9]   // bool hasContract
-            };
-          }
-          return innerAppData as ContractApp;
-        });
-      }
-      // If first element is not an array, then it's a single app in raw format
-      else if (appData.length >= 10) {
-        console.log("Found single app data array");
-        const app: ContractApp = {
-          name: appData[0],         // bytes32 name
-          version: appData[1],      // bytes32 version
-          did: appData[2],          // string did
-          dataUrl: appData[3],      // string dataUrl
-          iwpsPortalUri: appData[4], // string iwpsPortalUri
-          agentApiUri: appData[5],  // string agentApiUri
-          contractAddress: appData[6], // string contractAddress
-          minter: appData[7],       // address minter
-          status: appData[8],       // uint8 status
-          hasContract: appData[9]   // bool hasContract
-        };
-        apps = [app];
+    // Plain array of raw app data - each item is a complete app
+    if (response.length > 0 && Array.isArray(response[0]) && response[0].length >= 3) {
+      console.log("Processing raw array of app data");
+      
+      apps = response.map((appData, index) => 
+        parseRawAppData(appData, index, defaultMinter)
+      ).filter(Boolean) as ContractApp[];
+    } 
+    // Case 1: getApps response - array with two elements [apps[], nextIndex]
+    else if (response.length === 2 && Array.isArray(response[0]) && typeof response[1] === 'number') {
+      console.log("Found getApps response with pagination");
+      const appsData = response[0];
+      nextIndex = response[1];
+      
+      // Process each app in the apps array
+      apps = appsData.map((appData, index) => 
+        Array.isArray(appData) ? parseRawAppData(appData, index, defaultMinter) : appData as ContractApp
+      ).filter(Boolean) as ContractApp[];
+    }
+    // Case 2: getAppsByMinter response - array with one element [apps[]]
+    else if (response.length === 1 && Array.isArray(response[0])) {
+      console.log("Found getAppsByMinter response");
+      const appData = response[0];
+      
+      // Handle array of raw app data vs array of app objects
+      if (Array.isArray(appData) && appData.length > 0) {
+        // If first element is array, then it's array of app data
+        if (Array.isArray(appData[0])) {
+          console.log("Found array of arrays structure");
+          apps = appData.map((innerAppData, index) => 
+            parseRawAppData(innerAppData, index, defaultMinter)
+          ).filter(Boolean) as ContractApp[];
+        }
+        // If first element is not an array, then it's a single app in raw format
+        else if (appData.length >= 10) {
+          console.log("Found single app data array");
+          const app = parseRawAppData(appData, 0, defaultMinter);
+          if (app) apps = [app];
+        }
       }
     }
-  }
-  // Case 3: Plain array of app objects
-  else if (Array.isArray(response)) {
-    console.log("Found plain array response");
-    apps = response as ContractApp[];
+    // Case 3: Plain array of app objects (fallback)
+    else {
+      console.log("Found plain array response, treating as array of ContractApp objects");
+      apps = response as ContractApp[];
+    }
   }
   // Case 4: Object with 'apps' property
   else if (typeof response === 'object' && response !== null && 'apps' in response) {
-    if (Array.isArray(response.apps)) {
+    const responseWithApps = response as { apps: any[] };
+    if (Array.isArray(responseWithApps.apps)) {
       console.log("Found apps in object property");
-      apps = response.apps as ContractApp[];
+      apps = responseWithApps.apps as ContractApp[];
     }
   }
   
   console.log(`Extracted ${apps.length} apps with nextIndex ${nextIndex}`);
   return { apps, nextIndex };
-}
-
-/**
- * Simple wrapper to maintain backward compatibility
- * @param response Raw response from contract
- * @returns Array of app objects
- */
-function extractAppsArray(response: any): ContractApp[] {
-  const { apps } = extractAppsArrayWithPagination(response);
-  return apps;
 }
 
 /**
@@ -290,7 +292,7 @@ async function _getAppsWithPagination(startIndex: number = 1, maxResults: number
         });
         
         // Extract apps array and next index from the response
-        const { apps, nextIndex } = extractAppsArrayWithPagination(result);
+        const { apps, nextIndex } = processContractResponse(result);
         
         // Process the apps array
         const processedApps = processAppArray(apps);
@@ -331,7 +333,7 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
     const contract = getAppRegistryContract();
     console.log("Contract obtained:", contract);
     
-    console.log("Calling readContract for getAppsByMinter...");
+    console.log(`Calling readContract for getAppsByMinter with address: ${minterAddress}...`);
     
     try {
       // Using readContract from thirdweb v5 with proper type casting
@@ -342,11 +344,14 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
         params: [minterAddress],
       });
       
-      // Extract apps array from the response
-      const { apps } = extractAppsArrayWithPagination(result);
+      console.log("Raw result from getAppsByMinter:", result);
       
-      // Process the apps array
-      return processAppArray(apps);
+      // Process the response using our unified function
+      const { apps } = processContractResponse(result, minterAddress);
+      const processedApps = processAppArray(apps);
+      
+      console.log(`Processed ${processedApps.length} apps`);
+      return processedApps;
     } catch (readError) {
       console.error("Error during contract read:", readError);
       return [];
@@ -357,7 +362,7 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
     // Return empty array instead of throwing to prevent app from crashing
     return [];
   }
-} 
+}
 
 /**
  * Register a new application on the blockchain by minting an NFT
@@ -461,7 +466,7 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
       console.log("Transaction sent successfully with hash:", transactionHash);
       console.log(`Successfully minted app with DID: ${nft.did}`);
       
-      // Return the NFT object as-is
+      // Return the NFT object as-is - the contract will handle status assignment
       return nft;
     } catch (mintError) {
       console.error("Error during sendTransaction:", mintError);
@@ -504,37 +509,61 @@ export async function registerApp(nft: NFT, account: Account): Promise<NFT> {
 /**
  * Update an application status on the blockchain
  * @param nft The NFT with status to update, identified by DID
+ * @param account The connected wallet account
  * @returns The updated NFT
  */
-export async function updateStatus(nft: NFT): Promise<NFT> {
+export async function updateStatus(nft: NFT, account: Account): Promise<NFT> {
   try {
     // Validate DID
     if (!validateDid(nft.did)) {
       throw new Error(`Invalid DID format: ${nft.did}. DID must follow the pattern did:method:id and not exceed ${MAX_DID_LENGTH} characters.`);
     }
     
+    // Validate status
+    if (typeof nft.status !== 'number' || nft.status < 0 || nft.status > 2) {
+      const errorMsg = `Invalid status value: ${nft.status}. Status must be 0 (Active), 1 (Deprecated), or 2 (Replaced).`;
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    console.log(`Updating status for app with DID: ${nft.did} to status: ${nft.status}`);
+    console.log(`Status value type: ${typeof nft.status}`);
+    
     const contract = getAppRegistryContract();
     
-    // The contract only supports status updates, not full app updates
-    // Since our current implementation doesn't track status,
-    // this is a placeholder for when we add status to the NFT type
-    const status = 0; // Pending status (default)
-    
-    console.log(`Updating status for app with DID: ${nft.did} to status: ${status}`);
-    
     try {
-      // Use contract.call method with type assertion
-      await (contract as any).call("updateStatus", [
-        nft.did,
-        status
-      ]);
+      // Prepare the contract call
+      const transaction = prepareContractCall({
+        contract,
+        method: "function updateStatus(string, uint8) returns (bool)",
+        params: [
+          nft.did,
+          nft.status
+        ]
+      });
       
-      console.log(`Successfully updated status for app with DID: ${nft.did}`);
+      console.log("Transaction prepared:", {
+        to: transaction.to,
+        method: "updateStatus",
+        params: [nft.did, nft.status]
+      });
+      
+      // Additional logging before wallet interaction
+      console.log("Account address used for transaction:", account.address);
+      console.log("About to send transaction - wallet signing dialog should appear now");
+      
+      // Send the transaction with the provided account
+      const { transactionHash } = await sendTransaction({
+        account,
+        transaction
+      });
+      
+      console.log(`Successfully updated status for app with DID: ${nft.did}, transaction hash: ${transactionHash}`);
       
       // Return the updated NFT
       return nft;
     } catch (updateError) {
-      console.error("Error during contract.call for updateStatus:", updateError);
+      console.error("Error during status update transaction:", updateError);
       console.error("Error details:", JSON.stringify(updateError, null, 2));
       throw updateError;
     }
@@ -543,5 +572,3 @@ export async function updateStatus(nft: NFT): Promise<NFT> {
     throw error;
   }
 }
-
-

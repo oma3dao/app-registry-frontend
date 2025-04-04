@@ -26,15 +26,17 @@ import {
   validateName,
   validateCaipAddress
 } from "@/lib/validation"
+import { TransactionAlert } from "@/components/ui/transaction-alert"
+import { isMobile } from "@/lib/utils"
 
-interface NFTModalProps {
+interface NFTMintModalProps {
   isOpen: boolean
-  onClose: () => void
-  onSave: (nft: NFT) => void
+  handleCloseMintModal: () => void
+  onSave: (nft: NFT) => Promise<void>
   nft: NFT | null
 }
 
-export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps) {
+export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft }: NFTMintModalProps) {
   const [formData, setFormData] = useState<NFT>({
     did: "",
     name: "",
@@ -43,8 +45,12 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
     iwpsPortalUri: "",
     agentPortalUri: "",
     contractAddress: "",
+    status: 0, // Default to Active
+    minter: ""
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSaving, setIsSaving] = useState(false)
+  const [showTxAlert, setShowTxAlert] = useState(false)
 
   useEffect(() => {
     if (nft) {
@@ -56,6 +62,8 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
         iwpsPortalUri: nft.iwpsPortalUri,
         agentPortalUri: nft.agentPortalUri,
         contractAddress: nft.contractAddress || "",
+        status: nft.status || 0,
+        minter: nft.minter || ""
       })
       // Clear errors when opening with existing NFT
       setErrors({})
@@ -68,10 +76,15 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
         iwpsPortalUri: "",
         agentPortalUri: "",
         contractAddress: "",
+        status: 0, // Default to Active
+        minter: ""
       })
       // Clear errors when opening empty form
       setErrors({})
     }
+    // Reset state when modal opens
+    setIsSaving(false)
+    setShowTxAlert(false)
   }, [nft, isOpen])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -159,7 +172,7 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     // Validate all fields before submission
@@ -201,21 +214,37 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
       return
     }
     
-    onSave(formData)
+    setIsSaving(true)
+    setShowTxAlert(true)
+    
+    try {
+      await onSave(formData)
+    } catch (error) {
+      console.error("Error registering app:", error)
+      setShowTxAlert(false)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={isOpen ? onClose : undefined}>
+    <Dialog open={isOpen} onOpenChange={isOpen ? handleCloseMintModal : undefined}>
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{nft ? "Edit App Registration" : "Register New App"}</DialogTitle>
+            <DialogTitle>Register New App</DialogTitle>
             <DialogDescription>
-              {nft
-                ? "Update the details of your application."
-                : "Fill in the details to register your application."}
+              Fill in the details to register your application.
             </DialogDescription>
           </DialogHeader>
+
+          {showTxAlert && (
+            <TransactionAlert
+              title="App Registration Transaction"
+              description="Please approve the transaction in your wallet to register your app."
+              isMobile={isMobile()}
+            />
+          )}
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -334,16 +363,15 @@ export default function NFTModal({ isOpen, onClose, onSave, nft }: NFTModalProps
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={handleCloseMintModal} disabled={isSaving}>
               Cancel
             </Button>
-            <Button type="submit" disabled={Object.keys(errors).length > 0}>
-              {nft ? "Save" : "Register"}
+            <Button type="submit" disabled={Object.keys(errors).length > 0 || isSaving}>
+              {isSaving ? "Registering..." : "Register"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   )
-}
-
+} 

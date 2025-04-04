@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { PlusIcon } from "lucide-react"
 import NFTGrid from "@/components/nft-grid"
-import NFTModal from "@/components/nft-modal"
+import NFTMintModal from "@/components/nft-mint-modal"
+import NFTViewModal from "@/components/nft-view-modal"
 import type { NFT } from "@/types/nft"
 import { getAppsByMinter, registerApp, updateStatus } from "@/contracts/appRegistry"
 import { useActiveAccount } from "thirdweb/react"
@@ -14,7 +15,8 @@ export default function Dashboard() {
   const account = useActiveAccount();
   const connectedAddress = account?.address;
   const [nfts, setNfts] = useState<NFT[]>([])
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isMintModalOpen, setIsMintModalOpen] = useState(false)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -28,8 +30,43 @@ export default function Dashboard() {
         if (connectedAddress) {
           console.log("Fetching apps created by:", connectedAddress);
           const apps = await getAppsByMinter(connectedAddress);
-          console.log("Apps fetched:", apps);
-          setNfts(apps);
+          
+          // Validate NFTs before setting them in state
+          if (!apps || !Array.isArray(apps)) {
+            console.error("Invalid apps data received:", apps);
+            setNfts([]);
+            return;
+          }
+          
+          // Log the apps we received
+          console.log("Apps fetched successfully:", apps);
+          console.log("Number of apps:", apps.length);
+          
+          // Filter out invalid NFTs
+          const validApps = apps.filter(app => {
+            if (!app) {
+              console.warn("Null or undefined app found");
+              return false;
+            }
+            
+            if (!app.did) {
+              console.warn("App missing DID:", app);
+              return false;
+            }
+            
+            if (!app.version) {
+              console.warn("App missing version:", app);
+              return false;
+            }
+            
+            return true;
+          });
+          
+          // Log filtering results
+          console.log(`Filtered apps: ${validApps.length} valid out of ${apps.length} total`);
+          
+          // Set only valid apps in state
+          setNfts(validApps);
         } else {
           console.log("No wallet connected, showing empty list");
           setNfts([]);
@@ -45,42 +82,87 @@ export default function Dashboard() {
     fetchApps()
   }, [connectedAddress])
 
-  const handleOpenModal = (nft?: NFT) => {
+  // Opens the mint modal - only for creating new apps
+  const handleOpenMintModal = (nft?: NFT) => {
+    // The mint modal should only be used for creating new NFTs
+    // Existing NFTs should be viewed/edited in the view modal
     if (nft) {
-      setCurrentNft(nft)
-    } else {
-      setCurrentNft(null)
+      console.log("Opening view modal for existing NFT instead of mint modal");
+      handleOpenViewModal(nft);
+      return;
     }
-    setIsModalOpen(true)
+    
+    setCurrentNft(null);
+    setIsMintModalOpen(true);
   }
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
+  const handleCloseMintModal = () => {
+    setIsMintModalOpen(false)
     setCurrentNft(null)
   }
 
-  const handleSaveNft = async (nft: NFT) => {
+  // Opens the view modal - only for viewing and updating status of existing apps
+  const handleOpenViewModal = (nft: NFT) => {
+    setCurrentNft(nft)
+    setIsViewModalOpen(true)
+  }
+
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false)
+    setCurrentNft(null)
+  }
+
+  // Handles registering a new app from the mint modal
+  const handleRegisterApp = async (nft: NFT) => {
     try {
       if (!account) {
         console.error("No wallet connected");
-        // You may want to handle this case by showing a message to the user
-        return;
+        return Promise.reject(new Error("No wallet connected"));
       }
 
-      if (currentNft) {
-        // Edit existing NFT - update status
-        const updatedNft = await updateStatus(nft)
-        setNfts(nfts.map((item) => (item.did === updatedNft.did ? updatedNft : item)))
-      } else {
-        // Add new NFT - register a new app
-        const registeredNft = await registerApp(nft, account)
-        setNfts([...nfts, registeredNft])
+      // Mint modal should only be used for new app registration
+      console.log("Registering new app:", nft);
+      const registeredNft = await registerApp(nft, account)
+      setNfts([...nfts, registeredNft])
+      
+      handleCloseMintModal()
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Error registering app:", error)
+      return Promise.reject(error);
+    }
+  }
+
+  // Handles updating an app's status from the view modal
+  const handleUpdateStatus = async (nft: NFT, newStatus: number) => {
+    try {
+      if (!account) {
+        console.error("No account connected, cannot update status");
+        return Promise.reject(new Error("No account connected"));
       }
       
-      handleCloseModal()
+      // Validate status
+      if (typeof newStatus !== 'number' || newStatus < 0 || newStatus > 2) {
+        const errorMsg = `Invalid status value: ${newStatus}. Status must be 0 (Active), 1 (Deprecated), or 2 (Replaced).`;
+        console.error(errorMsg);
+        return Promise.reject(new Error(errorMsg));
+      }
+
+      console.log(`Dashboard: Updating status for ${nft.did} from ${nft.status} to ${newStatus}`);
+      console.log(`Dashboard: Calling updateStatus function in appRegistry.ts`);
+      
+      // Update the NFT with the new status - this should trigger wallet transaction
+      const updatedNft = await updateStatus({...nft, status: newStatus}, account);
+      
+      console.log(`Dashboard: Status update successful, updating UI`);
+      
+      // Update the local state with the updated NFT
+      setNfts(prev => prev.map(item => (item.did === updatedNft.did ? updatedNft : item)));
+      
+      return Promise.resolve();
     } catch (error) {
-      console.error("Error interacting with contract:", error)
-      // Handle error - you might want to show a notification to the user
+      console.error("Dashboard: Error updating status:", error);
+      return Promise.reject(error);
     }
   }
 
@@ -91,7 +173,7 @@ export default function Dashboard() {
         <div className="flex gap-4">
           <Button 
             size="lg"
-            onClick={() => handleOpenModal()} 
+            onClick={() => handleOpenMintModal()} 
             className="inline-flex items-center gap-2 text-lg leading-7 py-2 px-4 h-[52px] min-w-[165px]"
           >
             <PlusIcon size={20} />
@@ -101,11 +183,28 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <NFTGrid nfts={nfts} onEdit={handleOpenModal} onMintFirst={() => handleOpenModal()} isLoading={isLoading} />
+      <NFTGrid 
+        nfts={nfts} 
+        onEdit={handleOpenViewModal} 
+        onOpenMintModal={() => handleOpenMintModal()} 
+        isLoading={isLoading} 
+      />
 
-      <NFTModal isOpen={isModalOpen} onClose={handleCloseModal} onSave={handleSaveNft} nft={currentNft} />
+      {/* Mint Modal - Used only for registering new apps */}
+      <NFTMintModal 
+        isOpen={isMintModalOpen} 
+        handleCloseMintModal={handleCloseMintModal} 
+        onSave={handleRegisterApp} 
+        nft={currentNft} 
+      />
+
+      {/* View Modal - Used for viewing app details and updating status */}
+      <NFTViewModal 
+        isOpen={isViewModalOpen} 
+        handleCloseViewModal={handleCloseViewModal} 
+        nft={currentNft} 
+        onUpdateStatus={handleUpdateStatus} 
+      />
     </div>
   )
 }
-
-
