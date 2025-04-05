@@ -43,7 +43,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     version: "",
     dataUrl: "",
     iwpsPortalUri: "",
-    agentPortalUri: "",
+    agentApiUri: "",
     contractAddress: "",
     status: 0, // Default to Active
     minter: ""
@@ -60,7 +60,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         version: nft.version,
         dataUrl: nft.dataUrl,
         iwpsPortalUri: nft.iwpsPortalUri,
-        agentPortalUri: nft.agentPortalUri,
+        agentApiUri: nft.agentApiUri,
         contractAddress: nft.contractAddress || "",
         status: nft.status || 0,
         minter: nft.minter || ""
@@ -74,7 +74,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         version: "",
         dataUrl: "",
         iwpsPortalUri: "",
-        agentPortalUri: "",
+        agentApiUri: "",
         contractAddress: "",
         status: 0, // Default to Active
         minter: ""
@@ -110,7 +110,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         
       case "dataUrl":
       case "iwpsPortalUri":
-      case "agentPortalUri":
+      case "agentApiUri":
         if (value && !validateUrl(value)) {
           setErrors(prev => ({ 
             ...prev, 
@@ -199,8 +199,8 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
       newErrors.iwpsPortalUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`
     }
     
-    if (!validateUrl(formData.agentPortalUri)) {
-      newErrors.agentPortalUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`
+    if (!validateUrl(formData.agentApiUri)) {
+      newErrors.agentApiUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`
     }
     
     // Optional field validations
@@ -330,19 +330,19 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="agentPortalUri">Agent Portal URI</Label>
+              <Label htmlFor="agentApiUri">Agent API URI</Label>
               <Input
-                id="agentPortalUri"
-                name="agentPortalUri"
+                id="agentApiUri"
+                name="agentApiUri"
                 type="url"
-                value={formData.agentPortalUri}
+                value={formData.agentApiUri}
                 onChange={handleChange}
                 placeholder={`Valid URL (max ${MAX_URL_LENGTH} chars)`}
                 required
-                className={errors.agentPortalUri ? "border-red-500" : ""}
+                className={errors.agentApiUri ? "border-red-500" : ""}
               />
-              {errors.agentPortalUri && (
-                <p className="text-red-500 text-sm mt-1">{errors.agentPortalUri}</p>
+              {errors.agentApiUri && (
+                <p className="text-red-500 text-sm mt-1">{errors.agentApiUri}</p>
               )}
             </div>
 

@@ -127,7 +127,7 @@ function processAppArray(apps: ContractApp[]): NFT[] {
         name: app.name || `App ${index}`,
         dataUrl: app.dataUrl || "",
         iwpsPortalUri: app.iwpsPortalUri || "",
-        agentPortalUri: app.agentApiUri || "",
+        agentApiUri: app.agentApiUri || "",
         contractAddress: app.contractAddress || "",
         version: app.version || "0.0.1",
         status: typeof app.status === 'number' ? app.status : 0,
@@ -430,7 +430,7 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
     
     validateContractUrl(nft.dataUrl, "Data URL");
     validateContractUrl(nft.iwpsPortalUri, "IWPS Portal URI");
-    validateContractUrl(nft.agentPortalUri, "Agent Portal URI");
+    validateContractUrl(nft.agentApiUri, "Agent API URI");
     
     // Optional CAIP address validation
     if (nft.contractAddress && !validateCaipAddress(nft.contractAddress)) {
@@ -456,7 +456,7 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
       version: versionBytes32,
       dataUrl: nft.dataUrl,
       iwpsPortalUri: nft.iwpsPortalUri,
-      agentApiUri: nft.agentPortalUri,
+      agentApiUri: nft.agentApiUri,
       contractAddress: nft.contractAddress || ""
     });
     
@@ -474,7 +474,7 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
           versionBytes32,         // bytes32 version
           nft.dataUrl,            // string dataUrl
           nft.iwpsPortalUri,      // string iwpsPortalUri
-          nft.agentPortalUri,     // string agentApiUri
+          nft.agentApiUri,        // string agentApiUri
           nft.contractAddress || "" // string contractAddress
         ]
       });

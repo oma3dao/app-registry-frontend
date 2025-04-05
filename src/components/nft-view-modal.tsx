@@ -202,8 +202,8 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           <div className="grid gap-2">
             <Label className="text-base font-medium">Agent Portal URI</Label>
             <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
-              <a href={nft.agentPortalUri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                {nft.agentPortalUri}
+              <a href={nft.agentApiUri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                {nft.agentApiUri}
               </a>
             </div>
           </div>

@@ -4,7 +4,7 @@ export interface NFT {
     version: string
     dataUrl: string
     iwpsPortalUri: string
-    agentPortalUri: string
+    agentApiUri: string
     contractAddress?: string
     status: number // 0: Active, 1: Deprecated, 2: Replaced
     minter: string // Ethereum address of the app creator
