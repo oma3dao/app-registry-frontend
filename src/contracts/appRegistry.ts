@@ -71,6 +71,7 @@ function parseRawAppData(appData: any[], index: number, defaultMinter: string = 
     const version = hexToString(appData[1]) || "0.0.1";
     
     // Process DID
+    console.log(`Raw DID value at index ${index}:`, appData[2], "type:", typeof appData[2]);
     const did = String(appData[2] || "");
     if (!did) {
       console.warn(`App ${index} has no DID, skipping`);
@@ -168,10 +169,10 @@ function processContractResponse(response: any, defaultMinter: string = ''): { a
       ).filter(Boolean) as ContractApp[];
     } 
     // Case 1: getApps response - array with two elements [apps[], nextIndex]
-    else if (response.length === 2 && Array.isArray(response[0]) && typeof response[1] === 'number') {
+    else if (response.length === 2 && Array.isArray(response[0]) && (typeof response[1] === 'number' || typeof response[1] === 'bigint')) {
       console.log("Found getApps response with pagination");
       const appsData = response[0];
-      nextIndex = response[1];
+      nextIndex = typeof response[1] === 'bigint' ? Number(response[1]) : response[1];
       
       // Process each app in the apps array
       apps = appsData.map((appData, index) => 
@@ -256,7 +257,7 @@ export function getAppRegistryContract() {
  */
 export async function getApps(): Promise<NFT[]> {
   // Internal implementation with pagination
-  return _getAppsWithPagination();
+  return getAppsWithPagination();
 }
 
 /**
@@ -265,9 +266,9 @@ export async function getApps(): Promise<NFT[]> {
  * @param maxResults Optional maximum number of results to return (default is 100)
  * @returns Array of registered NFTs
  */
-async function _getAppsWithPagination(startIndex: number = 1, maxResults: number = 100): Promise<NFT[]> {
+export async function getAppsWithPagination(startIndex: number = 1, maxResults: number = 100): Promise<NFT[]> {
   try {
-    console.log(`Getting App Registry contract (internal pagination, startIndex: ${startIndex}, maxResults: ${maxResults})...`);
+    console.log(`Getting App Registry contract (pagination, startIndex: ${startIndex}, maxResults: ${maxResults})...`);
     const contract = getAppRegistryContract();
     console.log("Contract obtained:", contract);
     
@@ -361,6 +362,39 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
     console.error("Error fetching apps by minter:", error);
     // Return empty array instead of throwing to prevent app from crashing
     return [];
+  }
+}
+
+/**
+ * Get the total number of registered apps
+ * @returns Total number of apps registered in the contract
+ */
+export async function getTotalApps(): Promise<number> {
+  try {
+    console.log("Getting total registered apps count...");
+    const contract = getAppRegistryContract();
+    
+    try {
+      // Using readContract from thirdweb v5 to call getTotalApps function
+      const getTotalAppsString = "function getTotalApps() view returns (uint256)";
+      const result = await readContract({
+        contract: contract,
+        method: getTotalAppsString,
+        params: [],
+      });
+      
+      console.log("Total apps count from contract:", result);
+      
+      // Convert BigInt to number for easier usage
+      const totalApps = typeof result === 'bigint' ? Number(result) : 0;
+      return totalApps;
+    } catch (readError) {
+      console.error("Error getting total apps count:", readError);
+      return 0;
+    }
+  } catch (error) {
+    console.error("Error getting total apps count:", error);
+    return 0;
   }
 }
 

@@ -7,12 +7,13 @@ import { PlusIcon } from "lucide-react"
 
 interface NFTGridProps {
   nfts: NFT[]
-  onEdit: (nft: NFT) => void
+  onNFTCardClick: (nft: NFT) => void
   onOpenMintModal: () => void
   isLoading?: boolean
+  className?: string
 }
 
-export default function NFTGrid({ nfts, onEdit, onOpenMintModal, isLoading = false }: NFTGridProps) {
+export default function NFTGrid({ nfts, onNFTCardClick, onOpenMintModal, isLoading = false, className = "" }: NFTGridProps) {
   // Debug log all NFTs
   console.log("NFTs received:", nfts);
   
@@ -82,9 +83,9 @@ export default function NFTGrid({ nfts, onEdit, onOpenMintModal, isLoading = fal
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ${className}`}>
       {uniqueNfts.map((nft) => (
-        <NFTCard key={`${nft.did}-${nft.version}`} nft={nft} onEdit={onEdit} />
+        <NFTCard key={`${nft.did}-${nft.version}`} nft={nft} onNFTCardClick={onNFTCardClick} />
       ))}
     </div>
   )

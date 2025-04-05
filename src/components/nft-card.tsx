@@ -6,10 +6,10 @@ import { getStatusLabel, getStatusClasses } from "@/types/nft"
 
 interface NFTCardProps {
   nft: NFT
-  onEdit: (nft: NFT) => void
+  onNFTCardClick: (nft: NFT) => void
 }
 
-export default function NFTCard({ nft, onEdit }: NFTCardProps) {
+export default function NFTCard({ nft, onNFTCardClick }: NFTCardProps) {
   // Debug log key generation
   const key = `${nft.did || 'unknown'}-${nft.version || 'unknown'}`;
   console.log(`NFTCard rendering with key: ${key}`, nft);
@@ -23,8 +23,8 @@ export default function NFTCard({ nft, onEdit }: NFTCardProps) {
   
   return (
     <Card 
-      className="overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer hover:scale-[1.02] border-2 hover:border-blue-500"
-      onClick={() => onEdit(nft)}
+      className="overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer hover:scale-[1.02] border-2 hover:border-blue-500 min-h-[300px] flex flex-col"
+      onClick={() => onNFTCardClick(nft)}
     >
       <CardHeader className="p-4">
         <CardTitle className="flex justify-between items-start">
@@ -35,7 +35,7 @@ export default function NFTCard({ nft, onEdit }: NFTCardProps) {
         </CardTitle>
         <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Version: {version}</p>
       </CardHeader>
-      <CardContent className="p-4 pt-0 space-y-2">
+      <CardContent className="p-4 pt-0 space-y-2 flex-grow">
         <div className="text-sm">
           <span className="font-medium text-slate-700 dark:text-slate-300">DID: </span>
           <span className="text-slate-600 dark:text-slate-400 break-all">{did}</span>

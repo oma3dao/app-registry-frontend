@@ -1,12 +1,89 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import NFTGrid from "@/components/nft-grid"
+import { getTotalApps, getAppsWithPagination } from "@/contracts/appRegistry"
+import type { NFT } from "@/types/nft"
+import { LANDING_PAGE_NUM_APPS } from "@/config/app-config"
+import NFTViewModal from "@/components/nft-view-modal"
 
 export default function LandingPage() {
+  const [latestApps, setLatestApps] = useState<NFT[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
+  const [currentNft, setCurrentNft] = useState<NFT | null>(null)
+  
+  useEffect(() => {
+    const fetchLatestApps = async () => {
+      try {
+        setIsLoading(true)
+        
+        // Get total number of apps first to know how many there are
+        const totalApps = await getTotalApps()
+        console.log(`Total registered apps: ${totalApps}`)
+        
+        // If there are apps, fetch the latest ones
+        if (totalApps > 0) {
+          try {
+            // Calculate the starting index based on total apps
+            // If totalApps <= LANDING_PAGE_NUM_APPS, start from beginning (index 1)
+            // Otherwise, start from (totalApps - LANDING_PAGE_NUM_APPS + 1)
+            const startIndex = Math.max(1, totalApps - LANDING_PAGE_NUM_APPS + 1)
+            console.log(`Fetching the latest apps starting from index ${startIndex}`)
+            
+            // Always use pagination to fetch the exact apps we need
+            const apps = await getAppsWithPagination(startIndex, LANDING_PAGE_NUM_APPS)
+            
+            // Reverse the array to show newest first
+            const reversedApps = apps.reverse()
+            
+            console.log(`Showing the latest ${reversedApps.length} apps`)
+            setLatestApps(reversedApps)
+          } catch (getAppsError) {
+            console.error("Error fetching apps:", getAppsError)
+            // Continue showing loading state as false, but with no apps
+          }
+        } else {
+          console.log("No apps registered yet or couldn't get total count")
+        }
+      } catch (error) {
+        console.error("Error fetching latest apps:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    fetchLatestApps()
+  }, [])
+
+  // Opens the view modal for an NFT
+  const handleOpenViewModal = (nft: NFT) => {
+    setCurrentNft(nft)
+    setIsViewModalOpen(true)
+  }
+
+  // Closes the view modal
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false)
+    setCurrentNft(null)
+  }
+
+  // Stub function for updateStatus - not used on landing page but required by NFTViewModal
+  const handleUpdateStatus = async (nft: NFT, newStatus: number): Promise<void> => {
+    console.log("Status cannot be updated from landing page")
+    return Promise.resolve()
+  }
+  
+  // Dummy function for opening mint modal - not used on landing page but required by NFTGrid
+  const handleOpenMintModal = () => {
+    console.log("Mint modal cannot be opened from landing page")
+  }
+  
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 text-center">
-      <div className="max-w-3xl mx-auto space-y-8">
-        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl">
+    <div className="flex flex-col items-center justify-center px-4 text-center">
+      <div className="max-w-5xl mx-auto space-y-8 pb-12">
+        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl pt-12">
           <span className="block text-primary">OMA3 App Registry</span>
           <span className="block text-slate-700 dark:text-slate-300">Developer Portal</span>
         </h1>
@@ -16,14 +93,14 @@ export default function LandingPage() {
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4">
-          <Button isConnectButton />
+          <Button size="lg" isConnectButton />
         </div>
 
         <div className="pt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-medium mb-2">Register</h3>
             <p className="text-slate-600 dark:text-slate-400">
-              Register your applications
+              Register your applications as NFTs on the blockchain
             </p>
           </div>
           <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
@@ -39,7 +116,26 @@ export default function LandingPage() {
             </p>
           </div>
         </div>
+        
+        <div className="pt-16 w-full">
+          <h1 className="text-3xl font-bold mb-8 text-left">Latest Registered Apps</h1>
+          <NFTGrid 
+            nfts={latestApps} 
+            onNFTCardClick={handleOpenViewModal}
+            onOpenMintModal={handleOpenMintModal}
+            isLoading={isLoading}
+            className="sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
+          />
+        </div>
       </div>
+
+      {/* View Modal - Used for viewing app details */}
+      <NFTViewModal 
+        isOpen={isViewModalOpen} 
+        handleCloseViewModal={handleCloseViewModal} 
+        nft={currentNft} 
+        onUpdateStatus={handleUpdateStatus} 
+      />
     </div>
   )
 }

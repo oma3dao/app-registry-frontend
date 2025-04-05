@@ -183,9 +183,13 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-1">My Registered Applications</h1>
+      </div>
+
       <NFTGrid 
         nfts={nfts} 
-        onEdit={handleOpenViewModal} 
+        onNFTCardClick={handleOpenViewModal} 
         onOpenMintModal={() => handleOpenMintModal()} 
         isLoading={isLoading} 
       />
