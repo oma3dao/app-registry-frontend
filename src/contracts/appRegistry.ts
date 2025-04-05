@@ -54,10 +54,9 @@ function hexToString(hex: string | { _hex: string } | any): string {
  * Convert raw app data from contract to a standardized ContractApp object
  * @param appData Raw app data from contract (array format)
  * @param index Index for debugging
- * @param defaultMinter Optional default minter address
  * @returns Formatted ContractApp object or null if invalid
  */
-function parseRawAppData(appData: any[], index: number, defaultMinter: string = ''): ContractApp | null {
+function parseRawAppData(appData: any[], index: number): ContractApp | null {
   if (!Array.isArray(appData) || appData.length < 3) {
     console.error(`App data at index ${index} is not in expected format:`, appData);
     return null;
@@ -65,16 +64,24 @@ function parseRawAppData(appData: any[], index: number, defaultMinter: string = 
   
   try {
     // Process name (bytes32)
-    const name = hexToString(appData[0]) || `App ${index}`;
+    const name = hexToString(appData[0]);
+    if (!name) {
+      console.error(`App ${index} has no name`);
+      return null;
+    }
     
     // Process version (bytes32)
-    const version = hexToString(appData[1]) || "0.0.1";
+    const version = hexToString(appData[1]);
+    if (!version) {
+      console.error(`App ${index} has no version`);
+      return null;
+    }
     
     // Process DID
     console.log(`Raw DID value at index ${index}:`, appData[2], "type:", typeof appData[2]);
-    const did = String(appData[2] || "");
+    const did = String(appData[2]);
     if (!did) {
-      console.warn(`App ${index} has no DID, skipping`);
+      console.error(`App ${index} has no DID`);
       return null;
     }
     
@@ -83,11 +90,11 @@ function parseRawAppData(appData: any[], index: number, defaultMinter: string = 
       did: did,
       name: name,
       version: version,
-      dataUrl: String(appData[3] || ""),
-      iwpsPortalUri: String(appData[4] || ""),
-      agentApiUri: String(appData[5] || ""),
-      contractAddress: String(appData[6] || ""),
-      minter: String(appData[7] || defaultMinter),
+      dataUrl: String(appData[3]),
+      iwpsPortalUri: String(appData[4]),
+      agentApiUri: String(appData[5]),
+      contractAddress: String(appData[6]),
+      minter: String(appData[7]),
       status: typeof appData[8] === 'number' ? appData[8] : 0,
       hasContract: Boolean(appData[9])
     };
@@ -143,10 +150,9 @@ function processAppArray(apps: ContractApp[]): NFT[] {
 /**
  * Process any contract response into standardized ContractApp array
  * @param response Raw response from contract
- * @param defaultMinter Optional default minter address for data filling
  * @returns Object containing app array and next index for pagination
  */
-function processContractResponse(response: any, defaultMinter: string = ''): { apps: ContractApp[], nextIndex: number } {
+function processContractResponse(response: any): { apps: ContractApp[], nextIndex: number } {
   if (!response) {
     console.log("Response is null or undefined");
     return { apps: [], nextIndex: 0 };
@@ -160,25 +166,17 @@ function processContractResponse(response: any, defaultMinter: string = ''): { a
   if (Array.isArray(response)) {
     console.log("Response is an array with length:", response.length);
     
-    // Plain array of raw app data - each item is a complete app
-    if (response.length > 0 && Array.isArray(response[0]) && response[0].length >= 3) {
-      console.log("Processing raw array of app data");
-      
-      apps = response.map((appData, index) => 
-        parseRawAppData(appData, index, defaultMinter)
-      ).filter(Boolean) as ContractApp[];
-    } 
     // Case 1: getApps response - array with two elements [apps[], nextIndex]
-    else if (response.length === 2 && Array.isArray(response[0]) && (typeof response[1] === 'number' || typeof response[1] === 'bigint')) {
+    if (response.length === 2 && Array.isArray(response[0]) && (typeof response[1] === 'number' || typeof response[1] === 'bigint')) {
       console.log("Found getApps response with pagination");
       const appsData = response[0];
       nextIndex = typeof response[1] === 'bigint' ? Number(response[1]) : response[1];
       
       // Process each app in the apps array
       apps = appsData.map((appData, index) => 
-        Array.isArray(appData) ? parseRawAppData(appData, index, defaultMinter) : appData as ContractApp
+        Array.isArray(appData) ? parseRawAppData(appData, index) : appData as ContractApp
       ).filter(Boolean) as ContractApp[];
-    }
+    } 
     // Case 2: getAppsByMinter response - array with one element [apps[]]
     else if (response.length === 1 && Array.isArray(response[0])) {
       console.log("Found getAppsByMinter response");
@@ -190,21 +188,24 @@ function processContractResponse(response: any, defaultMinter: string = ''): { a
         if (Array.isArray(appData[0])) {
           console.log("Found array of arrays structure");
           apps = appData.map((innerAppData, index) => 
-            parseRawAppData(innerAppData, index, defaultMinter)
+            parseRawAppData(innerAppData, index)
           ).filter(Boolean) as ContractApp[];
-        }
-        // If first element is not an array, then it's a single app in raw format
-        else if (appData.length >= 10) {
-          console.log("Found single app data array");
-          const app = parseRawAppData(appData, 0, defaultMinter);
-          if (app) apps = [app];
         }
       }
     }
-    // Case 3: Plain array of app objects (fallback)
-    else {
-      console.log("Found plain array response, treating as array of ContractApp objects");
-      apps = response as ContractApp[];
+    // Case 3: Direct array of apps
+    else if (response.length > 0 && Array.isArray(response[0])) {
+      console.log("Found direct array of apps");
+      apps = response.map((appData, index) => 
+        parseRawAppData(appData, index)
+      ).filter(Boolean) as ContractApp[];
+    } else {
+      console.error("Unexpected array response format:", {
+        length: response.length,
+        firstElementType: response.length > 0 ? typeof response[0] : 'empty',
+        firstElementIsArray: response.length > 0 ? Array.isArray(response[0]) : false,
+        response
+      });
     }
   }
   // Case 4: Object with 'apps' property
@@ -213,7 +214,17 @@ function processContractResponse(response: any, defaultMinter: string = ''): { a
     if (Array.isArray(responseWithApps.apps)) {
       console.log("Found apps in object property");
       apps = responseWithApps.apps as ContractApp[];
+    } else {
+      console.error("Unexpected object response format: 'apps' property is not an array", response);
     }
+  } else {
+    console.error("Unexpected response format:", {
+      type: typeof response,
+      isArray: Array.isArray(response),
+      isObject: typeof response === 'object' && response !== null,
+      hasAppsProperty: typeof response === 'object' && response !== null && 'apps' in response,
+      response
+    });
   }
   
   console.log(`Extracted ${apps.length} apps with nextIndex ${nextIndex}`);
@@ -348,7 +359,7 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
       console.log("Raw result from getAppsByMinter:", result);
       
       // Process the response using our unified function
-      const { apps } = processContractResponse(result, minterAddress);
+      const { apps } = processContractResponse(result);
       const processedApps = processAppArray(apps);
       
       console.log(`Processed ${processedApps.length} apps`);
