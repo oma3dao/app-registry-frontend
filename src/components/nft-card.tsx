@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { NFT } from "@/types/nft"
 import { getStatusLabel, getStatusClasses } from "@/types/nft"
+import { log } from "@/lib/log"
 
 interface NFTCardProps {
   nft: NFT
@@ -12,7 +13,7 @@ interface NFTCardProps {
 export default function NFTCard({ nft, onNFTCardClick }: NFTCardProps) {
   // Debug log key generation
   const key = `${nft.did || 'unknown'}-${nft.version || 'unknown'}`;
-  console.log(`NFTCard rendering with key: ${key}`, nft);
+  log(`NFTCard rendering with key: ${key}`, nft);
   
   // Ensure we have valid data
   const name = nft.name || "Unnamed App";

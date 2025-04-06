@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import NFTCard from "@/components/nft-card"
 import type { NFT } from "@/types/nft"
 import { PlusIcon } from "lucide-react"
+import { log } from "@/lib/log"
 
 interface NFTGridProps {
   nfts: NFT[]
@@ -15,12 +16,12 @@ interface NFTGridProps {
 
 export default function NFTGrid({ nfts, onNFTCardClick, onOpenMintModal, isLoading = false, className = "" }: NFTGridProps) {
   // Debug log all NFTs
-  console.log("NFTs received:", nfts);
+  log("NFTs received:", nfts);
   
   // Filter out duplicate NFTs by creating a unique key from DID and version
   const uniqueNfts = nfts.reduce<NFT[]>((acc, nft) => {
     // Debug log each NFT
-    console.log("Processing NFT:", nft);
+    log("Processing NFT:", nft);
     
     // Make sure did and version exist
     if (!nft.did || !nft.version) {
@@ -29,23 +30,23 @@ export default function NFTGrid({ nfts, onNFTCardClick, onOpenMintModal, isLoadi
     }
     
     const key = `${nft.did}-${nft.version}`;
-    console.log("Generated key:", key);
+    log("Generated key:", key);
     
     const existingIndex = acc.findIndex(item => `${item.did}-${item.version}` === key);
     
     if (existingIndex === -1) {
       // NFT with this key doesn't exist yet, add it
-      console.log("Adding NFT with key:", key);
+      log("Adding NFT with key:", key);
       acc.push(nft);
     } else {
-      console.log("Duplicate NFT found with key:", key);
+      log("Duplicate NFT found with key:", key);
     }
     
     return acc;
   }, []);
   
   // Debug log unique NFTs
-  console.log("Unique NFTs:", uniqueNfts);
+  log("Unique NFTs:", uniqueNfts);
   
   if (isLoading) {
     return (

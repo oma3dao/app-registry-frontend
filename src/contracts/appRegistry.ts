@@ -13,6 +13,7 @@ import {
   validateName,
   validateCaipAddress
 } from "@/lib/validation";
+import { log } from "@/lib/log"
 
 /**
  * App type representing the contract's App struct
@@ -78,7 +79,7 @@ function parseRawAppData(appData: any[], index: number): ContractApp | null {
     }
     
     // Process DID
-    console.log(`Raw DID value at index ${index}:`, appData[2], "type:", typeof appData[2]);
+    log(`Raw DID value at index ${index}:`, appData[2], "type:", typeof appData[2]);
     const did = String(appData[2]);
     if (!did) {
       console.error(`App ${index} has no DID`);
@@ -110,10 +111,10 @@ function parseRawAppData(appData: any[], index: number): ContractApp | null {
  * @returns Processed array of NFT objects
  */
 function processAppArray(apps: ContractApp[]): NFT[] {
-  console.log("Processing apps array, length:", apps.length);
+  log("Processing apps array, length:", apps.length);
   
   if (!apps || apps.length === 0) {
-    console.log("No apps to process");
+    log("No apps to process");
     return [];  
   }
   
@@ -126,7 +127,7 @@ function processAppArray(apps: ContractApp[]): NFT[] {
         return null;
       }
       
-      console.log(`Extracted name: "${app.name}", version: "${app.version}", did: "${app.did}" for app ${index}`);
+      log(`Extracted name: "${app.name}", version: "${app.version}", did: "${app.did}" for app ${index}`);
       
       // Construct and return the NFT object using DID as the primary identifier
       return {
@@ -154,21 +155,21 @@ function processAppArray(apps: ContractApp[]): NFT[] {
  */
 function processContractResponse(response: any): { apps: ContractApp[], nextIndex: number } {
   if (!response) {
-    console.log("Response is null or undefined");
+    log("Response is null or undefined");
     return { apps: [], nextIndex: 0 };
   }
   
-  console.log("Raw contract response:", response);
+  log("Raw contract response:", response);
   let apps: ContractApp[] = [];
   let nextIndex = 0;
   
   // For debugging and data inspection
   if (Array.isArray(response)) {
-    console.log("Response is an array with length:", response.length);
+    log("Response is an array with length:", response.length);
     
     // Case 1: getApps response - array with two elements [apps[], nextIndex]
     if (response.length === 2 && Array.isArray(response[0]) && (typeof response[1] === 'number' || typeof response[1] === 'bigint')) {
-      console.log("Found getApps response with pagination");
+      log("Found getApps response with pagination");
       const appsData = response[0];
       nextIndex = typeof response[1] === 'bigint' ? Number(response[1]) : response[1];
       
@@ -179,14 +180,14 @@ function processContractResponse(response: any): { apps: ContractApp[], nextInde
     } 
     // Case 2: getAppsByMinter response - array with one element [apps[]]
     else if (response.length === 1 && Array.isArray(response[0])) {
-      console.log("Found getAppsByMinter response");
+      log("Found getAppsByMinter response");
       const appData = response[0];
       
       // Handle array of raw app data vs array of app objects
       if (Array.isArray(appData) && appData.length > 0) {
         // If first element is array, then it's array of app data
         if (Array.isArray(appData[0])) {
-          console.log("Found array of arrays structure");
+          log("Found array of arrays structure");
           apps = appData.map((innerAppData, index) => 
             parseRawAppData(innerAppData, index)
           ).filter(Boolean) as ContractApp[];
@@ -195,7 +196,7 @@ function processContractResponse(response: any): { apps: ContractApp[], nextInde
     }
     // Case 3: Direct array of apps
     else if (response.length > 0 && Array.isArray(response[0])) {
-      console.log("Found direct array of apps");
+      log("Found direct array of apps");
       apps = response.map((appData, index) => 
         parseRawAppData(appData, index)
       ).filter(Boolean) as ContractApp[];
@@ -212,7 +213,7 @@ function processContractResponse(response: any): { apps: ContractApp[], nextInde
   else if (typeof response === 'object' && response !== null && 'apps' in response) {
     const responseWithApps = response as { apps: any[] };
     if (Array.isArray(responseWithApps.apps)) {
-      console.log("Found apps in object property");
+      log("Found apps in object property");
       apps = responseWithApps.apps as ContractApp[];
     } else {
       console.error("Unexpected object response format: 'apps' property is not an array", response);
@@ -227,7 +228,7 @@ function processContractResponse(response: any): { apps: ContractApp[], nextInde
     });
   }
   
-  console.log(`Extracted ${apps.length} apps with nextIndex ${nextIndex}`);
+  log(`Extracted ${apps.length} apps with nextIndex ${nextIndex}`);
   return { apps, nextIndex };
 }
 
@@ -237,7 +238,7 @@ function processContractResponse(response: any): { apps: ContractApp[], nextInde
  */
 export function getAppRegistryContract() {
   try {
-    console.log("Creating contract with parameters:", {
+    log("Creating contract with parameters:", {
       address: OMA3_APP_REGISTRY.address,
       chainId: OMA3_APP_REGISTRY.chain.id,
     });
@@ -247,7 +248,7 @@ export function getAppRegistryContract() {
       throw new Error("Thirdweb client is not initialized");
     }
     
-    console.log("Thirdweb client initialized successfully:", !!client);
+    log("Thirdweb client initialized successfully:", !!client);
     
     return getContract({
       client,
@@ -279,9 +280,9 @@ export async function getApps(): Promise<NFT[]> {
  */
 export async function getAppsWithPagination(startIndex: number = 1, maxResults: number = 100): Promise<NFT[]> {
   try {
-    console.log(`Getting App Registry contract (pagination, startIndex: ${startIndex}, maxResults: ${maxResults})...`);
+    log(`Getting App Registry contract (pagination, startIndex: ${startIndex}, maxResults: ${maxResults})...`);
     const contract = getAppRegistryContract();
-    console.log("Contract obtained:", contract);
+    log("Contract obtained:", contract);
     
     // Initialize results array and current index
     let allApps: NFT[] = [];
@@ -292,7 +293,7 @@ export async function getAppsWithPagination(startIndex: number = 1, maxResults: 
     
     // Loop to fetch all apps with pagination
     while (hasMoreApps && allApps.length < maxResults && requestCount < MAX_REQUESTS) {
-      console.log(`Calling readContract for getApps with index ${currentIndex}...`);
+      log(`Calling readContract for getApps with index ${currentIndex}...`);
       
       try {
         // Using readContract from thirdweb v5 with proper type casting
@@ -310,7 +311,7 @@ export async function getAppsWithPagination(startIndex: number = 1, maxResults: 
         const processedApps = processAppArray(apps);
         allApps = [...allApps, ...processedApps];
         
-        console.log(`Fetched ${processedApps.length} apps, next index: ${nextIndex}`);
+        log(`Fetched ${processedApps.length} apps, next index: ${nextIndex}`);
         
         // Update pagination state
         if (nextIndex > 0) {
@@ -325,7 +326,7 @@ export async function getAppsWithPagination(startIndex: number = 1, maxResults: 
       }
     }
     
-    console.log(`Finished fetching apps. Total apps: ${allApps.length}`);
+    log(`Finished fetching apps. Total apps: ${allApps.length}`);
     return allApps.slice(0, maxResults);
   } catch (error) {
     console.error("Error fetching apps:", error);
@@ -341,11 +342,11 @@ export async function getAppsWithPagination(startIndex: number = 1, maxResults: 
  */
 export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
   try {
-    console.log("Getting App Registry contract...");
+    log("Getting App Registry contract...");
     const contract = getAppRegistryContract();
-    console.log("Contract obtained:", contract);
+    log("Contract obtained:", contract);
     
-    console.log(`Calling readContract for getAppsByMinter with address: ${minterAddress}...`);
+    log(`Calling readContract for getAppsByMinter with address: ${minterAddress}...`);
     
     try {
       // Using readContract from thirdweb v5 with proper type casting
@@ -356,13 +357,13 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
         params: [minterAddress],
       });
       
-      console.log("Raw result from getAppsByMinter:", result);
+      log("Raw result from getAppsByMinter:", result);
       
       // Process the response using our unified function
       const { apps } = processContractResponse(result);
       const processedApps = processAppArray(apps);
       
-      console.log(`Processed ${processedApps.length} apps`);
+      log(`Processed ${processedApps.length} apps`);
       return processedApps;
     } catch (readError) {
       console.error("Error during contract read:", readError);
@@ -382,7 +383,7 @@ export async function getAppsByMinter(minterAddress: string): Promise<NFT[]> {
  */
 export async function getTotalApps(): Promise<number> {
   try {
-    console.log("Getting total registered apps count...");
+    log("Getting total registered apps count...");
     const contract = getAppRegistryContract();
     
     try {
@@ -394,7 +395,7 @@ export async function getTotalApps(): Promise<number> {
         params: [],
       });
       
-      console.log("Total apps count from contract:", result);
+      log("Total apps count from contract:", result);
       
       // Convert BigInt to number for easier usage
       const totalApps = typeof result === 'bigint' ? Number(result) : 0;
@@ -451,9 +452,9 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
     const contract = getAppRegistryContract();
     
     // Debug contract instance
-    console.log("Contract instance:", contract);
-    console.log("Contract type:", typeof contract);
-    console.log("Contract keys:", Object.keys(contract));
+    log("Contract instance:", contract);
+    log("Contract type:", typeof contract);
+    log("Contract keys:", Object.keys(contract));
     
     // Convert string name to bytes32 (required by contract)
     const nameBytes32 = ('0x' + Buffer.from(nft.name.padEnd(32, '\0')).toString('hex')) as `0x${string}`;
@@ -461,7 +462,7 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
     // Convert version string to bytes32 (required by contract)
     const versionBytes32 = ('0x' + Buffer.from(nft.version.padEnd(32, '\0')).toString('hex')) as `0x${string}`;
     
-    console.log("Minting app with parameters:", {
+    log("Minting app with parameters:", {
       did: nft.did,
       name: nameBytes32,
       version: versionBytes32,
@@ -472,8 +473,8 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
     });
     
     try {
-      console.log("Preparing contract call for mint function");
-      console.log("Contract chain ID:", contract.chain?.id);
+      log("Preparing contract call for mint function");
+      log("Contract chain ID:", contract.chain?.id);
       
       // Prepare the contract call
       const transaction = prepareContractCall({
@@ -490,7 +491,7 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
         ]
       });
       
-      console.log("Transaction prepared:", {
+      log("Transaction prepared:", {
         to: transaction.to,
         value: transaction.value?.toString() || '0',
         data: typeof transaction.data === 'string' ? 
@@ -498,7 +499,7 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
           'Function that returns data'
       });
       
-      console.log("Using sendTransaction with account:", {
+      log("Using sendTransaction with account:", {
         address: account.address
       });
       
@@ -508,8 +509,8 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
         transaction
       });
       
-      console.log("Transaction sent successfully with hash:", transactionHash);
-      console.log(`Successfully minted app with DID: ${nft.did}`);
+      log("Transaction sent successfully with hash:", transactionHash);
+      log(`Successfully minted app with DID: ${nft.did}`);
       
       // Return the NFT object as-is - the contract will handle status assignment
       return nft;
@@ -571,8 +572,8 @@ export async function updateStatus(nft: NFT, account: Account): Promise<NFT> {
       throw new Error(errorMsg);
     }
     
-    console.log(`Updating status for app with DID: ${nft.did} to status: ${nft.status}`);
-    console.log(`Status value type: ${typeof nft.status}`);
+    log(`Updating status for app with DID: ${nft.did} to status: ${nft.status}`);
+    log(`Status value type: ${typeof nft.status}`);
     
     const contract = getAppRegistryContract();
     
@@ -587,15 +588,15 @@ export async function updateStatus(nft: NFT, account: Account): Promise<NFT> {
         ]
       });
       
-      console.log("Transaction prepared:", {
+      log("Transaction prepared:", {
         to: transaction.to,
         method: "updateStatus",
         params: [nft.did, nft.status]
       });
       
       // Additional logging before wallet interaction
-      console.log("Account address used for transaction:", account.address);
-      console.log("About to send transaction - wallet signing dialog should appear now");
+      log("Account address used for transaction:", account.address);
+      log("About to send transaction - wallet signing dialog should appear now");
       
       // Send the transaction with the provided account
       const { transactionHash } = await sendTransaction({
@@ -603,7 +604,7 @@ export async function updateStatus(nft: NFT, account: Account): Promise<NFT> {
         transaction
       });
       
-      console.log(`Successfully updated status for app with DID: ${nft.did}, transaction hash: ${transactionHash}`);
+      log(`Successfully updated status for app with DID: ${nft.did}, transaction hash: ${transactionHash}`);
       
       // Return the updated NFT
       return nft;

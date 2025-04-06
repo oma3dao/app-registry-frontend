@@ -7,6 +7,7 @@ import { getTotalApps, getAppsWithPagination } from "@/contracts/appRegistry"
 import type { NFT } from "@/types/nft"
 import { LANDING_PAGE_NUM_APPS } from "@/config/app-config"
 import NFTViewModal from "@/components/nft-view-modal"
+import { log } from "@/lib/log"
 
 export default function LandingPage() {
   const [latestApps, setLatestApps] = useState<NFT[]>([])
@@ -21,7 +22,7 @@ export default function LandingPage() {
         
         // Get total number of apps first to know how many there are
         const totalApps = await getTotalApps()
-        console.log(`Total registered apps: ${totalApps}`)
+        log(`Total registered apps: ${totalApps}`)
         
         // If there are apps, fetch the latest ones
         if (totalApps > 0) {
@@ -30,7 +31,7 @@ export default function LandingPage() {
             // If totalApps <= LANDING_PAGE_NUM_APPS, start from beginning (index 1)
             // Otherwise, start from (totalApps - LANDING_PAGE_NUM_APPS + 1)
             const startIndex = Math.max(1, totalApps - LANDING_PAGE_NUM_APPS + 1)
-            console.log(`Fetching the latest apps starting from index ${startIndex}`)
+            log(`Fetching the latest apps starting from index ${startIndex}`)
             
             // Always use pagination to fetch the exact apps we need
             const apps = await getAppsWithPagination(startIndex, LANDING_PAGE_NUM_APPS)
@@ -38,17 +39,17 @@ export default function LandingPage() {
             // Reverse the array to show newest first
             const reversedApps = apps.reverse()
             
-            console.log(`Showing the latest ${reversedApps.length} apps`)
+            log(`Showing the latest ${reversedApps.length} apps`)
             setLatestApps(reversedApps)
           } catch (getAppsError) {
-            console.error("Error fetching apps:", getAppsError)
+            log("Error fetching apps:", getAppsError)
             // Continue showing loading state as false, but with no apps
           }
         } else {
-          console.log("No apps registered yet or couldn't get total count")
+          log("No apps registered yet or couldn't get total count")
         }
       } catch (error) {
-        console.error("Error fetching latest apps:", error)
+        log("Error fetching latest apps:", error)
       } finally {
         setIsLoading(false)
       }
@@ -71,13 +72,13 @@ export default function LandingPage() {
 
   // Stub function for updateStatus - not used on landing page but required by NFTViewModal
   const handleUpdateStatus = async (nft: NFT, newStatus: number): Promise<void> => {
-    console.log("Status cannot be updated from landing page")
+    log("Status cannot be updated from landing page")
     return Promise.resolve()
   }
   
   // Dummy function for opening mint modal - not used on landing page but required by NFTGrid
   const handleOpenMintModal = () => {
-    console.log("Mint modal cannot be opened from landing page")
+    log("Mint modal cannot be opened from landing page")
   }
   
   return (

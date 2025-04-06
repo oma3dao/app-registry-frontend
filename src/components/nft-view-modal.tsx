@@ -23,6 +23,7 @@ import { APP_STATUSES, getStatusLabel, getStatusClasses } from "@/types/nft"
 import { useActiveAccount } from "thirdweb/react"
 import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile } from "@/lib/utils"
+import { log } from "@/lib/log"
 
 interface NFTViewModalProps {
   isOpen: boolean
@@ -86,7 +87,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
         status: selectedStatus
       }
       
-      console.log(`Updating ${nft.did} status from ${nft.status} to ${selectedStatus}`)
+      log(`Updating ${nft.did} status from ${nft.status} to ${selectedStatus}`)
       await onUpdateStatus(updatedNft, selectedStatus)
       setIsEditingStatus(false)
       

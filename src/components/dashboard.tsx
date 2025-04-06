@@ -9,9 +9,10 @@ import NFTViewModal from "@/components/nft-view-modal"
 import type { NFT } from "@/types/nft"
 import { getAppsByMinter, registerApp, updateStatus } from "@/contracts/appRegistry"
 import { useActiveAccount } from "thirdweb/react"
+import { log } from "@/lib/log"
 
 export default function Dashboard() {
-  console.log("Dashboard component rendering");
+  log("Dashboard component rendering");
   const account = useActiveAccount();
   const connectedAddress = account?.address;
   const [nfts, setNfts] = useState<NFT[]>([])
@@ -25,10 +26,10 @@ export default function Dashboard() {
     const fetchApps = async () => {
       try {
         setIsLoading(true)
-        console.log("Fetching apps from contract...")
+        log("Fetching apps from contract...")
         
         if (connectedAddress) {
-          console.log("Fetching apps created by:", connectedAddress);
+          log("Fetching apps created by:", connectedAddress);
           const apps = await getAppsByMinter(connectedAddress);
           
           // Validate NFTs before setting them in state
@@ -39,8 +40,8 @@ export default function Dashboard() {
           }
           
           // Log the apps we received
-          console.log("Apps fetched successfully:", apps);
-          console.log("Number of apps:", apps.length);
+          log("Apps fetched successfully:", apps);
+          log("Number of apps:", apps.length);
           
           // Filter out invalid NFTs
           const validApps = apps.filter(app => {
@@ -63,12 +64,12 @@ export default function Dashboard() {
           });
           
           // Log filtering results
-          console.log(`Filtered apps: ${validApps.length} valid out of ${apps.length} total`);
+          log(`Filtered apps: ${validApps.length} valid out of ${apps.length} total`);
           
           // Set only valid apps in state
           setNfts(validApps);
         } else {
-          console.log("No wallet connected, showing empty list");
+          log("No wallet connected, showing empty list");
           setNfts([]);
         }
       } catch (error) {
@@ -87,7 +88,7 @@ export default function Dashboard() {
     // The mint modal should only be used for creating new NFTs
     // Existing NFTs should be viewed/edited in the view modal
     if (nft) {
-      console.log("Opening view modal for existing NFT instead of mint modal");
+      log("Opening view modal for existing NFT instead of mint modal");
       handleOpenViewModal(nft);
       return;
     }
@@ -121,7 +122,7 @@ export default function Dashboard() {
       }
 
       // Mint modal should only be used for new app registration
-      console.log("Registering new app:", nft);
+      log("Registering new app:", nft);
       const registeredNft = await registerApp(nft, account)
       setNfts([...nfts, registeredNft])
       
@@ -148,13 +149,13 @@ export default function Dashboard() {
         return Promise.reject(new Error(errorMsg));
       }
 
-      console.log(`Dashboard: Updating status for ${nft.did} from ${nft.status} to ${newStatus}`);
-      console.log(`Dashboard: Calling updateStatus function in appRegistry.ts`);
+      log(`Dashboard: Updating status for ${nft.did} from ${nft.status} to ${newStatus}`);
+      log(`Dashboard: Calling updateStatus function in appRegistry.ts`);
       
       // Update the NFT with the new status - this should trigger wallet transaction
       const updatedNft = await updateStatus({...nft, status: newStatus}, account);
       
-      console.log(`Dashboard: Status update successful, updating UI`);
+      log(`Dashboard: Status update successful, updating UI`);
       
       // Update the local state with the updated NFT
       setNfts(prev => prev.map(item => (item.did === updatedNft.did ? updatedNft : item)));
