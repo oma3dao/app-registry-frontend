@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThirdwebProvider } from "thirdweb/react";
 import { PreAlphaBanner } from "@/components/pre-alpha-banner";
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,7 +27,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+       <head>
+        <Script
+          src="https://static.klaviyo.com/onsite/js/klaviyo.js?company_id=RY5MAa"
+          strategy="afterInteractive"
+        />
+      </head>
+     <body className={inter.className}>
         <PreAlphaBanner />
         <ThirdwebProvider>
           {children}
