@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThirdwebProvider } from "thirdweb/react";
 import { PreAlphaBanner } from "@/components/pre-alpha-banner";
+import { Navigation } from "@/components/navigation";
 import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -36,6 +37,7 @@ export default function RootLayout({
      <body className={inter.className}>
         <PreAlphaBanner />
         <ThirdwebProvider>
+          <Navigation />
           {children}
         </ThirdwebProvider>
       </body>
