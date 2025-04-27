@@ -11,6 +11,7 @@ export const MAX_NAME_LENGTH = 32;
 // Regular expressions for validation
 export const VERSION_REGEX = /^\d+\.\d+(\.\d+)?$/;
 export const DID_REGEX = /^did:[a-z0-9]+:[a-zA-Z0-9.%-]+$/;
+export const URL_REGEX = /^(https?:\/\/)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?$/;
 
 /**
  * Validates a version string in format x.y.z or x.y
@@ -27,15 +28,17 @@ export function validateVersion(version: string): boolean {
  * @returns True if the URL is valid and within length limits
  */
 export function validateUrl(url: string): boolean {
-  if (url.length > MAX_URL_LENGTH) return false;
+  // Return false for empty URLs
+  if (!url) return false;
   
-  try {
-    // Check if the URL is valid
-    new URL(url);
-    return true;
-  } catch (e) {
-    return false;
-  }
+  // Trim the URL to remove leading/trailing whitespace
+  const trimmedUrl = url.trim();
+  
+  // Check if the URL exceeds the maximum allowed length (256 characters)
+  if (trimmedUrl.length > MAX_URL_LENGTH) return false;
+  
+  // Validate the URL format using regex
+  return URL_REGEX.test(trimmedUrl);
 }
 
 /**
