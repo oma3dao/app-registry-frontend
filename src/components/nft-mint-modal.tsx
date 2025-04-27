@@ -17,6 +17,9 @@ import {
   DialogClose
 } from "@/components/ui/dialog"
 import type { NFT } from "@/types/nft"
+import type { WizardFormData } from "@/types/form"
+import type { RegistryContractData } from "@/types/registry-contract"
+import type { MetadataContractData } from "@/types/metadata-contract"
 import {
   MAX_URL_LENGTH,
   MAX_DID_LENGTH,
@@ -38,7 +41,7 @@ type WizardStep = 1 | 2 | 3 | 4;
 // Group form fields by step for validation
 const STEP_FIELDS = {
   1: ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri', 'agentApiUri', 'contractAddress'],
-  2: ['images'],     // Image/asset fields for future
+  2: ['metadata.descriptionUrl', 'metadata.marketingUrl', 'metadata.tokenContractAddress', 'metadata.iconUrl', 'metadata.screenshotUrls'],
   3: ['availability'], // Will add these fields later
   4: ['final'] // Final confirmation step - no validation needed
 };
@@ -58,8 +61,43 @@ interface NFTMintModalProps {
   nft: NFT | null
 }
 
+// Helper function to convert from NFT to WizardFormData
+const nftToWizardForm = (nft: NFT): WizardFormData => {
+  return {
+    // Registry fields
+    did: nft.did,
+    name: nft.name,
+    version: nft.version,
+    dataUrl: nft.dataUrl,
+    iwpsPortalUri: nft.iwpsPortalUri,
+    agentApiUri: nft.agentApiUri,
+    contractAddress: nft.contractAddress || "",
+    status: nft.status || 0,
+    minter: nft.minter || "",
+    
+    // Metadata fields with defaults
+    metadata: {
+      descriptionUrl: "",
+      marketingUrl: "",
+      tokenContractAddress: "",
+      iconUrl: "",
+      screenshotUrls: ["", "", "", "", ""]
+    }
+  };
+};
+
+// Helper function to convert from WizardFormData to NFT
+const wizardFormToNft = (formData: WizardFormData): NFT => {
+  // Extract registry fields
+  const { metadata, ...registryFields } = formData;
+  
+  // Return as NFT
+  return registryFields as NFT;
+};
+
 export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft }: NFTMintModalProps) {
-  const [formData, setFormData] = useState<NFT>({
+  const [formData, setFormData] = useState<WizardFormData>({
+    // Registry fields (direct properties)
     did: "",
     name: "",
     version: "",
@@ -68,11 +106,21 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     agentApiUri: "",
     contractAddress: "",
     status: 0, // Default to Active
-    minter: ""
+    minter: "",
+    
+    // Metadata fields (nested under metadata)
+    metadata: {
+      descriptionUrl: "",
+      marketingUrl: "",
+      tokenContractAddress: "",
+      iconUrl: "",
+      screenshotUrls: ["", "", "", "", ""]
+    }
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
   const [showTxAlert, setShowTxAlert] = useState(false)
+  const [txError, setTxError] = useState<string | null>(null)
   const [currentStep, setCurrentStep] = useState<WizardStep>(1)
   const [isCustomizingUrls, setIsCustomizingUrls] = useState(false)
   
@@ -106,17 +154,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
   useEffect(() => {
     if (nft) {
       // Existing NFT - use its values
-      setFormData({
-        did: nft.did,
-        name: nft.name,
-        version: nft.version,
-        dataUrl: nft.dataUrl,
-        iwpsPortalUri: nft.iwpsPortalUri,
-        agentApiUri: nft.agentApiUri,
-        contractAddress: nft.contractAddress || "",
-        status: nft.status || 0,
-        minter: nft.minter || ""
-      });
+      setFormData(nftToWizardForm(nft));
       // Clear errors when opening with existing NFT
       setErrors({});
     } else {
@@ -130,7 +168,14 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         agentApiUri: "",
         contractAddress: "",
         status: 0, // Default to Active
-        minter: ""
+        minter: "",
+        metadata: {
+          descriptionUrl: "",
+          marketingUrl: "",
+          tokenContractAddress: "",
+          iconUrl: "",
+          screenshotUrls: ["", "", "", "", ""]
+        },
       };
       setFormData(emptyNft);
       // Clear errors when opening empty form
@@ -139,6 +184,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     // Reset state when modal opens
     setIsSaving(false);
     setShowTxAlert(false);
+    setTxError(null);
     setCurrentStep(1);
     setIsCustomizingUrls(false);
   }, [nft, isOpen]);
@@ -271,7 +317,12 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
 
   const toggleUrlCustomization = () => {
     if (!isCustomizingUrls) {
-      // Enable customization mode
+      // Enable customization mode and clear URL fields
+      setFormData(prev => ({
+        ...prev,
+        dataUrl: "",
+        iwpsPortalUri: "",
+      }));
       setIsCustomizingUrls(true);
     } else {
       // Revert to default URLs
@@ -293,52 +344,97 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     
     // Validate each field in the current step
     stepFieldsToValidate.forEach(field => {
-      switch(field) {
-        case 'name':
-          if (!validateName(formData.name)) {
-            stepErrors.name = `Name must be between 1 and ${MAX_NAME_LENGTH} characters`;
-          }
-          break;
-          
-        case 'version':
-          if (!validateVersion(formData.version)) {
-            stepErrors.version = "Version must be in format X.Y.Z or X.Y where X, Y, and Z are numbers";
-          }
-          break;
-          
-        case 'did':
-          if (!validateDid(formData.did)) {
-            stepErrors.did = `Valid DID required (max ${MAX_DID_LENGTH} characters, format: did:method:id)`;
-          }
-          break;
-          
-        case 'dataUrl':
-          if (!validateUrl(formData.dataUrl)) {
-            stepErrors.dataUrl = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
-          }
-          break;
-          
-        case 'iwpsPortalUri':
-          if (!validateUrl(formData.iwpsPortalUri)) {
-            stepErrors.iwpsPortalUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
-          }
-          break;
-          
-        case 'agentApiUri':
-          // Validate only if provided (it's optional)
-          if (formData.agentApiUri && !validateUrl(formData.agentApiUri)) {
-            stepErrors.agentApiUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
-          }
-          break;
-          
-        case 'contractAddress':
-          // Optional field - only validate if not empty
-          if (formData.contractAddress && !validateCaipAddress(formData.contractAddress)) {
-            stepErrors.contractAddress = "Invalid contract address format";
-          }
-          break;
-          
-        // Add cases for future fields in steps 3 and 4
+      // Handle nested fields (metadata.field)
+      if (field.startsWith('metadata.')) {
+        const metadataField = field.split('.')[1];
+        
+        // Validate metadata fields
+        switch(metadataField) {
+          case 'descriptionUrl':
+            if (!formData.metadata?.descriptionUrl || !validateUrl(formData.metadata.descriptionUrl)) {
+              stepErrors['metadata.descriptionUrl'] = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+            }
+            break;
+            
+          case 'marketingUrl':
+            if (!formData.metadata?.marketingUrl || !validateUrl(formData.metadata.marketingUrl)) {
+              stepErrors['metadata.marketingUrl'] = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+            }
+            break;
+            
+          case 'tokenContractAddress':
+            if (formData.metadata?.tokenContractAddress && !validateCaipAddress(formData.metadata.tokenContractAddress)) {
+              stepErrors['metadata.tokenContractAddress'] = "Invalid contract address format";
+            }
+            break;
+            
+          case 'iconUrl':
+            if (!formData.metadata?.iconUrl || !validateUrl(formData.metadata.iconUrl)) {
+              stepErrors['metadata.iconUrl'] = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+            }
+            break;
+            
+          case 'screenshotUrls':
+            // Validate first screenshot URL (required)
+            if (!formData.metadata?.screenshotUrls?.[0] || !validateUrl(formData.metadata?.screenshotUrls[0])) {
+              stepErrors['metadata.screenshotUrls.0'] = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+            }
+            
+            // Validate optional screenshots if provided
+            formData.metadata?.screenshotUrls.slice(1).forEach((url, index) => {
+              if (url && !validateUrl(url)) {
+                stepErrors[`metadata.screenshotUrls.${index + 1}`] = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+              }
+            });
+            break;
+        }
+      } else {
+        // Validate registry fields (top level)
+        switch(field) {
+          case 'name':
+            if (!validateName(formData.name)) {
+              stepErrors.name = `Name must be between 1 and ${MAX_NAME_LENGTH} characters`;
+            }
+            break;
+            
+          case 'version':
+            if (!validateVersion(formData.version)) {
+              stepErrors.version = "Version must be in format X.Y.Z or X.Y where X, Y, and Z are numbers";
+            }
+            break;
+            
+          case 'did':
+            if (!validateDid(formData.did)) {
+              stepErrors.did = `Valid DID required (max ${MAX_DID_LENGTH} characters, format: did:method:id)`;
+            }
+            break;
+            
+          case 'dataUrl':
+            if (!validateUrl(formData.dataUrl)) {
+              stepErrors.dataUrl = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+            }
+            break;
+            
+          case 'iwpsPortalUri':
+            if (!validateUrl(formData.iwpsPortalUri)) {
+              stepErrors.iwpsPortalUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+            }
+            break;
+            
+          case 'agentApiUri':
+            // Validate only if provided (it's optional)
+            if (formData.agentApiUri && !validateUrl(formData.agentApiUri)) {
+              stepErrors.agentApiUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+            }
+            break;
+            
+          case 'contractAddress':
+            // Optional field - only validate if not empty
+            if (formData.contractAddress && !validateCaipAddress(formData.contractAddress)) {
+              stepErrors.contractAddress = "Invalid contract address format";
+            }
+            break;
+        }
       }
     });
     
@@ -387,7 +483,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
       if (currentStep === 1) {
         // Required fields for registration (agentApiUri is optional)
         const requiredFields = ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri'];
-        const missingRequired = requiredFields.filter(field => !formData[field as keyof NFT]);
+        const missingRequired = requiredFields.filter(field => !formData[field as keyof WizardFormData]);
         
         if (missingRequired.length > 0) {
           console.error(`Missing required fields: ${missingRequired.join(', ')}`);
@@ -404,12 +500,27 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
       
       setIsSaving(true);
       setShowTxAlert(true);
+      setTxError(null);
       
       try {
-        await onSave(formData);
+        await onSave(wizardFormToNft(formData));
       } catch (error) {
         console.error("Error registering app:", error);
         setShowTxAlert(false);
+        
+        // Display the error to the user
+        let errorMessage = "Failed to register app";
+        
+        // Extract error message if available
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error && typeof error === 'object' && 'message' in error) {
+          errorMessage = String(error.message);
+        }
+        
+        setTxError(errorMessage);
       } finally {
         setIsSaving(false);
       }
@@ -629,22 +740,210 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         return (
           <div className="p-4 border rounded-md bg-slate-50 dark:bg-slate-900">
             <p className="font-medium mb-2">Review your app details</p>
-            <div className="space-y-2 text-sm">
-              <div><span className="font-medium">Name:</span> {formData.name}</div>
-              <div><span className="font-medium">Version:</span> {formData.version}</div>
-              <div><span className="font-medium">DID:</span> {formData.did}</div>
-              <div><span className="font-medium">Data URL:</span> {formData.dataUrl}</div>
-              <div><span className="font-medium">IWPS Portal URI:</span> {formData.iwpsPortalUri}</div>
-              {formData.agentApiUri && (
-                <div><span className="font-medium">Agent API URI:</span> {formData.agentApiUri}</div>
+            
+            {/* Registry information */}
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold mb-2">Registry Information</h3>
+              <div className="space-y-2 text-sm">
+                <div><span className="font-medium">Name:</span> {formData.name}</div>
+                <div><span className="font-medium">Version:</span> {formData.version}</div>
+                <div><span className="font-medium">DID:</span> {formData.did}</div>
+                <div><span className="font-medium">Data URL:</span> {formData.dataUrl}</div>
+                <div><span className="font-medium">IWPS Portal URI:</span> {formData.iwpsPortalUri}</div>
+                {formData.agentApiUri && (
+                  <div><span className="font-medium">Agent API URI:</span> {formData.agentApiUri}</div>
+                )}
+                {formData.contractAddress && (
+                  <div><span className="font-medium">Contract Address:</span> {formData.contractAddress}</div>
+                )}
+              </div>
+            </div>
+            
+            {/* Metadata information */}
+            <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold mb-2">Metadata Information</h3>
+              <div className="space-y-2 text-sm">
+                <div><span className="font-medium">Description URL:</span> {formData.metadata?.descriptionUrl || "None"}</div>
+                <div><span className="font-medium">Marketing URL:</span> {formData.metadata?.marketingUrl || "None"}</div>
+                {formData.metadata?.tokenContractAddress && (
+                  <div><span className="font-medium">Token Contract Address:</span> {formData.metadata?.tokenContractAddress}</div>
+                )}
+                <div><span className="font-medium">Icon URL:</span> {formData.metadata?.iconUrl || "None"}</div>
+                
+                {/* Screenshot URLs */}
+                <div className="mt-2">
+                  <div className="font-medium">Screenshot URLs:</div>
+                  <ol className="list-decimal list-inside mt-1 pl-2">
+                    {formData.metadata?.screenshotUrls.map((url, index) => (
+                      url ? (
+                        <li key={index} className="text-xs truncate">
+                          {url}
+                        </li>
+                      ) : null
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            </div>
+            
+            {/* Transaction information */}
+            <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700 text-sm">
+              <p className="font-medium text-orange-600 dark:text-orange-400">
+                You will need to sign two separate transactions:
+              </p>
+              <ol className="list-decimal list-inside mt-1 pl-2">
+                <li className="mb-1">Registry contract: To register your app identity</li>
+                <li>Metadata contract: To store your app's metadata</li>
+              </ol>
+            </div>
+          </div>
+        );
+        
+      case 2:
+        return (
+          <div className="grid gap-4">
+            {/* Description URL */}
+            <div className="grid gap-2">
+              <Label htmlFor="descriptionUrl">Description URL</Label>
+              <Textarea
+                id="descriptionUrl"
+                name="metadata.descriptionUrl"
+                value={formData.metadata?.descriptionUrl || ""}
+                onChange={(e) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    metadata: {
+                      ...prev.metadata!,
+                      descriptionUrl: e.target.value
+                    }
+                  }));
+                }}
+                placeholder={`URL for app description (max ${MAX_URL_LENGTH} chars)`}
+                required
+                className={`min-h-[80px] ${errors['metadata.descriptionUrl'] ? "border-red-500" : ""}`}
+              />
+              {errors['metadata.descriptionUrl'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['metadata.descriptionUrl']}</p>
               )}
-              {formData.contractAddress && (
-                <div><span className="font-medium">Contract Address:</span> {formData.contractAddress}</div>
+            </div>
+
+            {/* Marketing URL */}
+            <div className="grid gap-2">
+              <Label htmlFor="marketingUrl">Marketing URL</Label>
+              <Textarea
+                id="marketingUrl"
+                name="metadata.marketingUrl"
+                value={formData.metadata?.marketingUrl || ""}
+                onChange={(e) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    metadata: {
+                      ...prev.metadata!,
+                      marketingUrl: e.target.value
+                    }
+                  }));
+                }}
+                placeholder={`URL for marketing materials (max ${MAX_URL_LENGTH} chars)`}
+                required
+                className={`min-h-[80px] ${errors['metadata.marketingUrl'] ? "border-red-500" : ""}`}
+              />
+              {errors['metadata.marketingUrl'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['metadata.marketingUrl']}</p>
               )}
-              
-              {/* Add placeholder for platform availability summary */}
-              <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <p><span className="font-medium">Platform Availability:</span> All platforms</p>
+            </div>
+
+            {/* Token Contract Address */}
+            <div className="grid gap-2">
+              <Label htmlFor="tokenContractAddress">Token Contract Address</Label>
+              <Input
+                id="tokenContractAddress"
+                name="metadata.tokenContractAddress"
+                value={formData.metadata?.tokenContractAddress || ""}
+                onChange={(e) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    metadata: {
+                      ...prev.metadata!,
+                      tokenContractAddress: e.target.value
+                    }
+                  }));
+                }}
+                placeholder="CAIP-2 compliant token contract address"
+                required
+                className={errors['metadata.tokenContractAddress'] ? "border-red-500" : ""}
+              />
+              {errors['metadata.tokenContractAddress'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['metadata.tokenContractAddress']}</p>
+              )}
+            </div>
+
+            {/* Images section with border */}
+            <div className="border p-4 rounded-md mt-2 bg-white dark:bg-slate-800">
+              <p className="font-medium mb-2">App Images</p>
+
+              {/* Icon URL */}
+              <div className="grid gap-2 mb-4">
+                <Label htmlFor="iconUrl">Icon URL</Label>
+                <Textarea
+                  id="iconUrl"
+                  name="metadata.iconUrl"
+                  value={formData.metadata?.iconUrl || ""}
+                  onChange={(e) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      metadata: {
+                        ...prev.metadata!,
+                        iconUrl: e.target.value
+                      }
+                    }));
+                  }}
+                  placeholder="URL to app icon (1024 x 1024 resolution)"
+                  required
+                  className={`min-h-[80px] ${errors['metadata.iconUrl'] ? "border-red-500" : ""}`}
+                />
+                {errors['metadata.iconUrl'] && (
+                  <p className="text-red-500 text-sm mt-1">{errors['metadata.iconUrl']}</p>
+                )}
+              </div>
+
+              {/* Screenshot URLs */}
+              <div className="space-y-4">
+                <p className="text-sm font-medium">Screenshot URLs</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                  First screenshot is required; others are optional. Maximum resolution is 2048 x 2048.
+                </p>
+
+                {formData.metadata?.screenshotUrls.map((url, index) => (
+                  <div key={index} className="grid gap-2">
+                    <Label htmlFor={`screenshot${index}`}>
+                      Screenshot {index + 1} {index === 0 ? "(Required)" : "(Optional)"}
+                    </Label>
+                    <Textarea
+                      id={`screenshot${index}`}
+                      name={`metadata.screenshotUrls[${index}]`}
+                      value={url}
+                      onChange={(e) => {
+                        setFormData(prev => {
+                          const newScreenshots = [...prev.metadata!.screenshotUrls];
+                          newScreenshots[index] = e.target.value;
+                          return {
+                            ...prev,
+                            metadata: {
+                              ...prev.metadata!,
+                              screenshotUrls: newScreenshots
+                            }
+                          };
+                        });
+                      }}
+                      placeholder={`URL to screenshot ${index + 1} (max 2048 x 2048 resolution)`}
+                      required={index === 0}
+                      className={`min-h-[80px] ${errors[`metadata.screenshotUrls.${index}`] ? "border-red-500" : ""}`}
+                    />
+                    {errors[`metadata.screenshotUrls.${index}`] && (
+                      <p className="text-red-500 text-sm mt-1">{errors[`metadata.screenshotUrls.${index}`]}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -666,7 +965,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     if (currentStep === 1) {
       // Note: agentApiUri is NOT in the required fields list since it's optional
       const requiredFields = ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri'];
-      const hasEmptyRequiredField = requiredFields.some(field => !formData[field as keyof NFT]);
+      const hasEmptyRequiredField = requiredFields.some(field => !formData[field as keyof WizardFormData]);
       return !hasValidationErrors && !hasEmptyRequiredField;
     }
     
@@ -703,6 +1002,18 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
               description="Please approve the transaction in your wallet to register your app."
               isMobile={isMobile()}
             />
+          )}
+
+          {txError && (
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-md">
+              <div className="flex gap-2 items-start text-red-700 dark:text-red-400">
+                <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium mb-1">Registration Error</p>
+                  <p>{txError}</p>
+                </div>
+              </div>
+            </div>
           )}
 
           <div className="grid gap-4 py-4">
