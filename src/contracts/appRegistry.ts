@@ -442,7 +442,11 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
     
     validateContractUrl(nft.dataUrl, "Data URL");
     validateContractUrl(nft.iwpsPortalUri, "IWPS Portal URI");
-    validateContractUrl(nft.agentApiUri, "Agent API URI");
+    
+    // Agent API URI is optional - only validate if provided
+    if (nft.agentApiUri && nft.agentApiUri.trim() !== "") {
+      validateContractUrl(nft.agentApiUri, "Agent API URI");
+    }
     
     // Optional CAIP address validation
     if (nft.contractAddress && !validateCaipAddress(nft.contractAddress)) {
@@ -486,7 +490,7 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
           versionBytes32,         // bytes32 version
           nft.dataUrl,            // string dataUrl
           nft.iwpsPortalUri,      // string iwpsPortalUri
-          nft.agentApiUri,        // string agentApiUri
+          nft.agentApiUri || "",  // string agentApiUri (empty string if not provided)
           nft.contractAddress || "" // string contractAddress
         ]
       });

@@ -4,6 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { OMA3_DOCS_URL, OMA3_WEBSITE_URL } from "@/config/app-config"
 
 export function Navigation() {
   const pathname = usePathname()
@@ -11,13 +12,13 @@ export function Navigation() {
   const links = [
     {
       name: "Docs",
-      href: "https://docs.oma3.org",
+      href: OMA3_DOCS_URL,
       isActive: false,
       isExternal: true
     },
     {
       name: "About",
-      href: "https://oma3.org",
+      href: OMA3_WEBSITE_URL,
       isActive: false,
       isExternal: true
     }

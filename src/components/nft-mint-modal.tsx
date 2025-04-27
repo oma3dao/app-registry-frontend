@@ -29,8 +29,27 @@ import {
 } from "@/lib/validation"
 import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile } from "@/lib/utils"
-import { SELF_HOSTING_DOCS_URL } from "@/config/app-config"
-import { ExternalLinkIcon, EditIcon, AlertCircleIcon } from "lucide-react"
+import { SELF_HOSTING_DOCS_URL, APP_REGISTRY_METADATA_BASE_URL, IWPS_PORTAL_BASE_URL } from "@/config/app-config"
+import { ExternalLinkIcon, EditIcon, AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon } from "lucide-react"
+
+// Define type for wizard steps
+type WizardStep = 1 | 2 | 3 | 4;
+
+// Group form fields by step for validation
+const STEP_FIELDS = {
+  1: ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri', 'agentApiUri', 'contractAddress'],
+  2: ['images'],     // Image/asset fields for future
+  3: ['availability'], // Will add these fields later
+  4: ['final'] // Final confirmation step - no validation needed
+};
+
+// Step titles for the wizard
+const stepTitles = {
+  1: "App Identity & URLs",
+  2: "Images & Assets",
+  3: "Platform Availability",
+  4: "Review & Submit"
+};
 
 interface NFTMintModalProps {
   isOpen: boolean
@@ -54,22 +73,31 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
   const [showTxAlert, setShowTxAlert] = useState(false)
-  const [isStep1, setIsStep1] = useState(true)
+  const [currentStep, setCurrentStep] = useState<WizardStep>(1)
   const [isCustomizingUrls, setIsCustomizingUrls] = useState(false)
-
+  
   // Function to generate default URLs based on DID and version
   const generateDefaultUrls = (did: string, version: string) => {
     console.log(`Generating URLs for DID: '${did}' and version: '${version}'`);
-    // Only generate the data URL if both DID and version are present
-    const dataUrl = did && version 
-      ? `https://app-registry-metadata.oma3.org/${did}/v/${version}` 
+    // Only generate URLs if both DID and version are present
+    const hasBothValues = did && version;
+    
+    // Generate data URL
+    const dataUrl = hasBothValues 
+      ? `${APP_REGISTRY_METADATA_BASE_URL}/${did}/v/${version}` 
+      : "";
+    
+    // Generate IWPS Portal URI with the same pattern
+    const iwpsPortalUri = hasBothValues
+      ? `${IWPS_PORTAL_BASE_URL}/${did}/v/${version}`
       : "";
     
     console.log(`Generated dataUrl: '${dataUrl}'`);
+    console.log(`Generated iwpsPortalUri: '${iwpsPortalUri}'`);
     
     return {
       dataUrl,
-      iwpsPortalUri: "https://iwps.oma3.org/portal-uri",
+      iwpsPortalUri,
       agentApiUri: ""
     };
   }
@@ -98,7 +126,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         name: "",
         version: "",
         dataUrl: "",
-        iwpsPortalUri: "https://iwps.oma3.org/portal-uri",
+        iwpsPortalUri: "",
         agentApiUri: "",
         contractAddress: "",
         status: 0, // Default to Active
@@ -111,7 +139,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     // Reset state when modal opens
     setIsSaving(false);
     setShowTxAlert(false);
-    setIsStep1(true);
+    setCurrentStep(1);
     setIsCustomizingUrls(false);
   }, [nft, isOpen]);
 
@@ -258,93 +286,146 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     }
   };
 
-  const handleContinue = () => {
-    // For now, continue button does nothing as per requirements
-    // In future, this will advance to step 2
-    console.log("Continue to step 2");
+  // Validate fields for the current step
+  const validateStep = (step: WizardStep): boolean => {
+    const stepFieldsToValidate = STEP_FIELDS[step];
+    const stepErrors: Record<string, string> = {};
+    
+    // Validate each field in the current step
+    stepFieldsToValidate.forEach(field => {
+      switch(field) {
+        case 'name':
+          if (!validateName(formData.name)) {
+            stepErrors.name = `Name must be between 1 and ${MAX_NAME_LENGTH} characters`;
+          }
+          break;
+          
+        case 'version':
+          if (!validateVersion(formData.version)) {
+            stepErrors.version = "Version must be in format X.Y.Z or X.Y where X, Y, and Z are numbers";
+          }
+          break;
+          
+        case 'did':
+          if (!validateDid(formData.did)) {
+            stepErrors.did = `Valid DID required (max ${MAX_DID_LENGTH} characters, format: did:method:id)`;
+          }
+          break;
+          
+        case 'dataUrl':
+          if (!validateUrl(formData.dataUrl)) {
+            stepErrors.dataUrl = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+          }
+          break;
+          
+        case 'iwpsPortalUri':
+          if (!validateUrl(formData.iwpsPortalUri)) {
+            stepErrors.iwpsPortalUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+          }
+          break;
+          
+        case 'agentApiUri':
+          // Validate only if provided (it's optional)
+          if (formData.agentApiUri && !validateUrl(formData.agentApiUri)) {
+            stepErrors.agentApiUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`;
+          }
+          break;
+          
+        case 'contractAddress':
+          // Optional field - only validate if not empty
+          if (formData.contractAddress && !validateCaipAddress(formData.contractAddress)) {
+            stepErrors.contractAddress = "Invalid contract address format";
+          }
+          break;
+          
+        // Add cases for future fields in steps 3 and 4
+      }
+    });
+    
+    // Update errors state with current step errors
+    setErrors(stepErrors);
+    
+    // Return true if there are no errors for the current step
+    return Object.keys(stepErrors).length === 0;
+  };
+
+  // Handle next button click - validate current step before proceeding
+  const handleNextStep = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => {
+        const nextStep = prev + 1;
+        return (nextStep > 4 ? 4 : nextStep) as WizardStep;
+      });
+    }
+  };
+
+  // Handle back button click
+  const handlePrevStep = () => {
+    setCurrentStep(prev => {
+      const prevStep = prev - 1;
+      return (prevStep < 1 ? 1 : prevStep) as WizardStep;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     
-    if (isStep1 && !isCustomizingUrls) {
-      handleContinue();
+    // If on step 1 and not customizing URLs, move to the next step
+    if (currentStep === 1 && !isCustomizingUrls) {
+      handleNextStep();
       return;
     }
     
-    // Validate all fields before submission
-    const newErrors: Record<string, string> = {}
-    
-    // Required field validations
-    if (!validateName(formData.name)) {
-      newErrors.name = `Name must be between 1 and ${MAX_NAME_LENGTH} characters`
+    // In step 1 with customized URLs, or in final step, proceed with registration
+    if (currentStep === 1 || currentStep === 4) {
+      // Validate fields for the current step
+      if (!validateStep(currentStep)) {
+        return;
+      }
+      
+      // If we're at step 1 with custom URLs, validate all required fields manually
+      if (currentStep === 1) {
+        // Required fields for registration (agentApiUri is optional)
+        const requiredFields = ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri'];
+        const missingRequired = requiredFields.filter(field => !formData[field as keyof NFT]);
+        
+        if (missingRequired.length > 0) {
+          console.error(`Missing required fields: ${missingRequired.join(', ')}`);
+          return;
+        }
+        
+        // Check for validation errors in the current step
+        const fieldsToValidate = STEP_FIELDS[1];
+        const hasErrors = fieldsToValidate.some(field => field in errors);
+        if (hasErrors) {
+          return;
+        }
+      }
+      
+      setIsSaving(true);
+      setShowTxAlert(true);
+      
+      try {
+        await onSave(formData);
+      } catch (error) {
+        console.error("Error registering app:", error);
+        setShowTxAlert(false);
+      } finally {
+        setIsSaving(false);
+      }
+      return;
     }
     
-    if (!validateVersion(formData.version)) {
-      newErrors.version = "Version must be in format X.Y.Z or X.Y where X, Y, and Z are numbers"
-    }
-    
-    if (!validateDid(formData.did)) {
-      newErrors.did = `Valid DID required (max ${MAX_DID_LENGTH} characters, format: did:method:id)`
-    }
-    
-    if (!validateUrl(formData.dataUrl)) {
-      newErrors.dataUrl = `Valid URL required (max ${MAX_URL_LENGTH} characters)`
-    }
-    
-    if (!validateUrl(formData.iwpsPortalUri)) {
-      newErrors.iwpsPortalUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`
-    }
-    
-    // Agent API URL is optional - only validate if provided
-    if (formData.agentApiUri && !validateUrl(formData.agentApiUri)) {
-      newErrors.agentApiUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`
-    }
-    
-    // Optional field validations
-    if (formData.contractAddress && !validateCaipAddress(formData.contractAddress)) {
-      newErrors.contractAddress = "Invalid contract address format"
-    }
-    
-    // If there are errors, don't submit
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
-      return
-    }
-    
-    setIsSaving(true)
-    setShowTxAlert(true)
-    
-    try {
-      await onSave(formData)
-    } catch (error) {
-      console.error("Error registering app:", error)
-      setShowTxAlert(false)
-    } finally {
-      setIsSaving(false)
-    }
-  }
+    // For other steps, just move to the next step
+    handleNextStep();
+  };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={isOpen ? handleCloseMintModal : undefined}>
-      <DialogContent className="sm:max-w-[500px]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Register New App</DialogTitle>
-            <DialogDescription>
-              Fill in the details to register your application.
-            </DialogDescription>
-          </DialogHeader>
-
-          {showTxAlert && (
-            <TransactionAlert
-              title="App Registration Transaction"
-              description="Please approve the transaction in your wallet to register your app."
-              isMobile={isMobile()}
-            />
-          )}
-
-          <div className="grid gap-4 py-4">
+  // Render the current step content
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <>
             <div className="grid gap-2">
               <Label htmlFor="name">App Name</Label>
               <Input
@@ -505,18 +586,170 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                 <p className="text-red-500 text-sm mt-1">{errors.contractAddress}</p>
               )}
             </div>
+          </>
+        );
+        
+      case 2:
+        return (
+          <div className="p-4 border rounded-md bg-slate-50 dark:bg-slate-900">
+            <p className="font-medium mb-2">Images & Assets</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              Upload images and assets related to your application.
+            </p>
+            
+            {/* Placeholder for image upload */}
+            <div className="space-y-2">
+              <p className="text-sm text-slate-500 italic">
+                Image upload functionality will be added here.
+              </p>
+              {/* We'll add image upload fields here in the future */}
+            </div>
+          </div>
+        );
+        
+      case 3:
+        return (
+          <div className="p-4 border rounded-md bg-slate-50 dark:bg-slate-900">
+            <p className="font-medium mb-2">Platform Availability</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              Configure which platforms your application is available on.
+            </p>
+            
+            {/* Placeholder for platform availability checkboxes */}
+            <div className="space-y-2">
+              <p className="text-sm text-slate-500 italic">
+                Platform availability options will be added here.
+              </p>
+              {/* We'll add availability fields here in the future */}
+            </div>
+          </div>
+        );
+        
+      case 4:
+        return (
+          <div className="p-4 border rounded-md bg-slate-50 dark:bg-slate-900">
+            <p className="font-medium mb-2">Review your app details</p>
+            <div className="space-y-2 text-sm">
+              <div><span className="font-medium">Name:</span> {formData.name}</div>
+              <div><span className="font-medium">Version:</span> {formData.version}</div>
+              <div><span className="font-medium">DID:</span> {formData.did}</div>
+              <div><span className="font-medium">Data URL:</span> {formData.dataUrl}</div>
+              <div><span className="font-medium">IWPS Portal URI:</span> {formData.iwpsPortalUri}</div>
+              {formData.agentApiUri && (
+                <div><span className="font-medium">Agent API URI:</span> {formData.agentApiUri}</div>
+              )}
+              {formData.contractAddress && (
+                <div><span className="font-medium">Contract Address:</span> {formData.contractAddress}</div>
+              )}
+              
+              {/* Add placeholder for platform availability summary */}
+              <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <p><span className="font-medium">Platform Availability:</span> All platforms</p>
+              </div>
+            </div>
+          </div>
+        );
+        
+      default:
+        return null;
+    }
+  };
+
+  // Improved validation for current step
+  const isCurrentStepValid = () => {
+    const stepFieldsToCheck = STEP_FIELDS[currentStep];
+    
+    // Check if any field in current step has validation errors
+    const hasValidationErrors = stepFieldsToCheck.some(field => field in errors);
+    
+    // For step 1, also check if required fields have values
+    if (currentStep === 1) {
+      // Note: agentApiUri is NOT in the required fields list since it's optional
+      const requiredFields = ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri'];
+      const hasEmptyRequiredField = requiredFields.some(field => !formData[field as keyof NFT]);
+      return !hasValidationErrors && !hasEmptyRequiredField;
+    }
+    
+    return !hasValidationErrors;
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={isOpen ? handleCloseMintModal : undefined}>
+      <DialogContent className="sm:max-w-[500px]">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Register New App</DialogTitle>
+            <DialogDescription>
+              Step {currentStep} of 4: {stepTitles[currentStep]}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Step Indicator */}
+          <div className="flex justify-between mb-4 mt-2">
+            {[1, 2, 3, 4].map((step) => (
+              <div 
+                key={step} 
+                className={`w-1/4 h-1 mx-1 rounded-full ${
+                  step === currentStep ? 'bg-blue-500' : 
+                  step < currentStep ? 'bg-blue-300' : 'bg-gray-200'
+                }`}
+              />
+            ))}
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleCloseMintModal} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={Object.keys(errors).length > 0 || isSaving}
-            >
-              {isSaving ? "Registering..." : isStep1 && !isCustomizingUrls ? "Continue" : "Register"}
-            </Button>
+          {showTxAlert && (
+            <TransactionAlert
+              title="App Registration Transaction"
+              description="Please approve the transaction in your wallet to register your app."
+              isMobile={isMobile()}
+            />
+          )}
+
+          <div className="grid gap-4 py-4">
+            {renderStepContent()}
+          </div>
+
+          <DialogFooter className="flex justify-between">
+            <div>
+              {currentStep > 1 && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={handlePrevStep}
+                  className="flex items-center gap-1"
+                  disabled={isSaving}
+                >
+                  <ArrowLeftIcon size={16} />
+                  Back
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleCloseMintModal} 
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              
+              <Button 
+                type="submit" 
+                disabled={!isCurrentStepValid() || isSaving}
+                className="flex items-center gap-1"
+              >
+                {isSaving ? "Registering..." : 
+                 (currentStep === 1 && isCustomizingUrls) ? "Register" :
+                 currentStep < 4 ? (
+                   <>
+                     Next
+                     <ArrowRightIcon size={16} />
+                   </>
+                 ) : "Register"}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
