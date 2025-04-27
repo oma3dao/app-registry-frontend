@@ -34,6 +34,7 @@ export const celoAlfajores = {
   ],
   testnet: true,
   contracts: {
-    OMA3AppRegistry: "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83"
+    OMA3AppRegistry: "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83",
+    OMA3AppMetadataV0: "0x9f1f5559b6D08eC855cafaCD76D9ae69c41169C9"
   }
 };

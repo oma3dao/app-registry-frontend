@@ -14,6 +14,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose
 } from "@/components/ui/dialog"
 import type { NFT } from "@/types/nft"
 import {
@@ -28,6 +29,8 @@ import {
 } from "@/lib/validation"
 import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile } from "@/lib/utils"
+import { SELF_HOSTING_DOCS_URL } from "@/config/app-config"
+import { ExternalLinkIcon, EditIcon, AlertCircleIcon } from "lucide-react"
 
 interface NFTMintModalProps {
   isOpen: boolean
@@ -51,9 +54,30 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
   const [showTxAlert, setShowTxAlert] = useState(false)
+  const [isStep1, setIsStep1] = useState(true)
+  const [isCustomizingUrls, setIsCustomizingUrls] = useState(false)
 
+  // Function to generate default URLs based on DID and version
+  const generateDefaultUrls = (did: string, version: string) => {
+    console.log(`Generating URLs for DID: '${did}' and version: '${version}'`);
+    // Only generate the data URL if both DID and version are present
+    const dataUrl = did && version 
+      ? `https://app-registry-metadata.oma3.org/${did}/v/${version}` 
+      : "";
+    
+    console.log(`Generated dataUrl: '${dataUrl}'`);
+    
+    return {
+      dataUrl,
+      iwpsPortalUri: "https://iwps.oma3.org/portal-uri",
+      agentApiUri: ""
+    };
+  }
+
+  // Initialize form data when modal opens
   useEffect(() => {
     if (nft) {
+      // Existing NFT - use its values
       setFormData({
         did: nft.did,
         name: nft.name,
@@ -64,32 +88,77 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         contractAddress: nft.contractAddress || "",
         status: nft.status || 0,
         minter: nft.minter || ""
-      })
+      });
       // Clear errors when opening with existing NFT
-      setErrors({})
+      setErrors({});
     } else {
-      setFormData({
+      // For new NFT, set default values
+      const emptyNft = {
         did: "",
         name: "",
         version: "",
         dataUrl: "",
-        iwpsPortalUri: "",
+        iwpsPortalUri: "https://iwps.oma3.org/portal-uri",
         agentApiUri: "",
         contractAddress: "",
         status: 0, // Default to Active
         minter: ""
-      })
+      };
+      setFormData(emptyNft);
       // Clear errors when opening empty form
-      setErrors({})
+      setErrors({});
     }
     // Reset state when modal opens
-    setIsSaving(false)
-    setShowTxAlert(false)
-  }, [nft, isOpen])
+    setIsSaving(false);
+    setShowTxAlert(false);
+    setIsStep1(true);
+    setIsCustomizingUrls(false);
+  }, [nft, isOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    const { name, value } = e.target;
+    
+    // If changing DID or version and not customizing URLs, handle URL updates
+    if ((name === 'did' || name === 'version') && !isCustomizingUrls) {
+      // Create a new form data object with the updated field
+      const updatedFormData = { ...formData, [name]: value };
+      const hasBothValues = 
+        (name === 'did' ? value : formData.did) && 
+        (name === 'version' ? value : formData.version);
+      
+      console.log('handleChange - checking for URL update:', {
+        field: name,
+        value,
+        hasBothValues,
+        did: name === 'did' ? value : formData.did,
+        version: name === 'version' ? value : formData.version
+      });
+      
+      // Generate default URLs based on the updated values
+      const defaults = generateDefaultUrls(
+        name === 'did' ? value : formData.did,
+        name === 'version' ? value : formData.version
+      );
+      
+      // Update form data with field value and auto-generated URLs
+      setFormData(prev => {
+        const updated = { ...prev, [name]: value }; // Ensure changed field value is preserved
+        
+        // Only set the dataUrl if both DID and version are available
+        if (hasBothValues) {
+          updated.dataUrl = defaults.dataUrl;
+        }
+        
+        // Always update the other URLs
+        updated.iwpsPortalUri = defaults.iwpsPortalUri;
+        updated.agentApiUri = defaults.agentApiUri;
+        
+        return updated;
+      });
+    } else {
+      // For non-URL related fields, simply update the form data
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
     
     // Field-specific validations
     switch (name) {
@@ -172,8 +241,36 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     }
   }
 
+  const toggleUrlCustomization = () => {
+    if (!isCustomizingUrls) {
+      // Enable customization mode
+      setIsCustomizingUrls(true);
+    } else {
+      // Revert to default URLs
+      const defaults = generateDefaultUrls(formData.did, formData.version);
+      setFormData(prev => ({
+        ...prev,
+        dataUrl: defaults.dataUrl,
+        iwpsPortalUri: defaults.iwpsPortalUri,
+        agentApiUri: defaults.agentApiUri
+      }));
+      setIsCustomizingUrls(false);
+    }
+  };
+
+  const handleContinue = () => {
+    // For now, continue button does nothing as per requirements
+    // In future, this will advance to step 2
+    console.log("Continue to step 2");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (isStep1 && !isCustomizingUrls) {
+      handleContinue();
+      return;
+    }
     
     // Validate all fields before submission
     const newErrors: Record<string, string> = {}
@@ -199,7 +296,8 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
       newErrors.iwpsPortalUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`
     }
     
-    if (!validateUrl(formData.agentApiUri)) {
+    // Agent API URL is optional - only validate if provided
+    if (formData.agentApiUri && !validateUrl(formData.agentApiUri)) {
       newErrors.agentApiUri = `Valid URL required (max ${MAX_URL_LENGTH} characters)`
     }
     
@@ -270,7 +368,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                 name="version"
                 value={formData.version}
                 onChange={handleChange}
-                placeholder="Format: X.Y.Z or X.Y (numbers only)"
+                placeholder="Format: x.y.z or x.y (numbers only)"
                 required
                 className={errors.version ? "border-red-500" : ""}
               />
@@ -280,7 +378,13 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="did">DID</Label>
+              <Label 
+                htmlFor="did" 
+                title="To use a web address as a DID, use the format did:web:appname.mydomain.tld"
+                className="cursor-help"
+              >
+                DID
+              </Label>
               <Input
                 id="did"
                 name="did"
@@ -289,57 +393,98 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                 placeholder={`did:method:id (max ${MAX_DID_LENGTH} chars)`}
                 required
                 className={errors.did ? "border-red-500" : ""}
+                title="To use a web address as a DID, use the format did:web:subdomain.example.com"
               />
               {errors.did && (
                 <p className="text-red-500 text-sm mt-1">{errors.did}</p>
               )}
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="dataUrl">Data URL</Label>
-              <Input
-                id="dataUrl"
-                name="dataUrl"
-                type="url"
-                value={formData.dataUrl}
-                onChange={handleChange}
-                placeholder={`Valid URL (max ${MAX_URL_LENGTH} chars)`}
-                required
-                className={errors.dataUrl ? "border-red-500" : ""}
-              />
-              {errors.dataUrl && (
-                <p className="text-red-500 text-sm mt-1">{errors.dataUrl}</p>
+            <div className="border p-4 rounded-md mt-2 mb-2 bg-slate-50 dark:bg-slate-900">
+              {isCustomizingUrls && (
+                <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+                  <div className="flex gap-2 items-start text-amber-700 dark:text-amber-400">
+                    <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium mb-1">Self-hosting URLs</p>
+                      <p>You are electing to self-host these URLs. Follow the documentation at{" "}
+                        <a 
+                          href={SELF_HOSTING_DOCS_URL} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center"
+                        >
+                          {SELF_HOSTING_DOCS_URL.replace("https://", "")}
+                          <ExternalLinkIcon size={14} className="ml-1" />
+                        </a>{" "}
+                        for self-hosting.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
+
+              <div className="grid gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="dataUrl">Data URL</Label>
+                  <Textarea
+                    id="dataUrl"
+                    name="dataUrl"
+                    value={formData.dataUrl}
+                    onChange={handleChange}
+                    placeholder={`Valid URL (max ${MAX_URL_LENGTH} chars)`}
+                    required
+                    className={`min-h-[80px] ${errors.dataUrl ? "border-red-500" : ""}`}
+                    disabled={!isCustomizingUrls}
+                  />
+                  {errors.dataUrl && (
+                    <p className="text-red-500 text-sm mt-1">{errors.dataUrl}</p>
+                  )}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="iwpsPortalUri">IWPS Portal URI</Label>
+                  <Textarea
+                    id="iwpsPortalUri"
+                    name="iwpsPortalUri"
+                    value={formData.iwpsPortalUri}
+                    onChange={handleChange}
+                    placeholder={`Valid URL (max ${MAX_URL_LENGTH} chars)`}
+                    required
+                    className={`min-h-[80px] ${errors.iwpsPortalUri ? "border-red-500" : ""}`}
+                    disabled={!isCustomizingUrls}
+                  />
+                  {errors.iwpsPortalUri && (
+                    <p className="text-red-500 text-sm mt-1">{errors.iwpsPortalUri}</p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex justify-center mt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={toggleUrlCustomization}
+                  className="flex items-center gap-1"
+                >
+                  {isCustomizingUrls ? "Use Defaults" : "Customize"}
+                  {!isCustomizingUrls && <EditIcon size={14} />}
+                </Button>
+              </div>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="iwpsPortalUri">IWPS Portal URI</Label>
-              <Input
-                id="iwpsPortalUri"
-                name="iwpsPortalUri"
-                type="url"
-                value={formData.iwpsPortalUri}
-                onChange={handleChange}
-                placeholder={`Valid URL (max ${MAX_URL_LENGTH} chars)`}
-                required
-                className={errors.iwpsPortalUri ? "border-red-500" : ""}
-              />
-              {errors.iwpsPortalUri && (
-                <p className="text-red-500 text-sm mt-1">{errors.iwpsPortalUri}</p>
-              )}
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="agentApiUri">Agent API URI</Label>
-              <Input
+              <div className="flex items-center justify-between">
+                <Label htmlFor="agentApiUri">Agent API URI (Optional)</Label>
+              </div>
+              <Textarea
                 id="agentApiUri"
                 name="agentApiUri"
-                type="url"
                 value={formData.agentApiUri}
                 onChange={handleChange}
                 placeholder={`Valid URL (max ${MAX_URL_LENGTH} chars)`}
-                required
-                className={errors.agentApiUri ? "border-red-500" : ""}
+                className={`min-h-[80px] ${errors.agentApiUri ? "border-red-500" : ""}`}
               />
               {errors.agentApiUri && (
                 <p className="text-red-500 text-sm mt-1">{errors.agentApiUri}</p>
@@ -366,12 +511,15 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
             <Button type="button" variant="outline" onClick={handleCloseMintModal} disabled={isSaving}>
               Cancel
             </Button>
-            <Button type="submit" disabled={Object.keys(errors).length > 0 || isSaving}>
-              {isSaving ? "Registering..." : "Register"}
+            <Button 
+              type="submit" 
+              disabled={Object.keys(errors).length > 0 || isSaving}
+            >
+              {isSaving ? "Registering..." : isStep1 && !isCustomizingUrls ? "Continue" : "Register"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 } 

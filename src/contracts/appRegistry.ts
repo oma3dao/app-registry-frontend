@@ -1,5 +1,5 @@
 import { getContract, readContract, sendTransaction, prepareContractCall } from "thirdweb";
-import { OMA3_APP_REGISTRY } from "@/config/contracts";
+import { OMA3_APP_REGISTRY, OMA3_APP_METADATA } from "@/config/contracts";
 import { client } from "@/app/client";
 import type { NFT } from "@/types/nft";
 import { Account } from "thirdweb/wallets";

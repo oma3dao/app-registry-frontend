@@ -1,6 +1,7 @@
 import { defineChain } from "thirdweb/chains";
 import { celoAlfajores } from "./chains";
 import appRegistryAbi from "../abi/appRegistry.json";
+import appMetadataAbi from "../abi/appMetadata.json";
 
 /**
  * Configuration for the OMA3 App Registry contract
@@ -38,4 +39,12 @@ export const OMA3_APP_REGISTRY = {
   chain: alfajoresChain,
   address: celoAlfajores.contracts.OMA3AppRegistry,
   abi: appRegistryAbi as any
+}; 
+
+// Alfajores testnet metadata contract
+export const OMA3_APP_METADATA = {
+  name: "OMA3 App Metadata",
+  chain: alfajoresChain,
+  address: celoAlfajores.contracts.OMA3AppMetadataV0,
+  abi: appMetadataAbi as any
 }; 
