@@ -42,7 +42,6 @@ import {
 import { ExternalLinkIcon, EditIcon, AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, ChevronDown } from "lucide-react"
 import { ImagePreview } from "@/components/image-preview"
 import { UrlValidator } from "@/components/url-validator"
-import { PlatformAvailability, MobilePlatform, DesktopPlatform, WebPlatform, VRPlatform, ConsolePlatform } from "@/types/metadata-contract"
 
 // Define type for wizard steps
 type WizardStep = 1 | 2 | 3 | 4 | 5;
@@ -52,7 +51,7 @@ const STEP_FIELDS = {
   1: ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri', 'agentApiUri', 'contractAddress'],
   2: ['metadata.descriptionUrl', 'metadata.marketingUrl', 'metadata.tokenContractAddress'],
   3: ['metadata.iconUrl', 'metadata.screenshotUrls'],
-  3: ['availability'], // Will add these fields later
+  4: ['availability'], // Will add these fields later
   5: ['final'] // Final confirmation step - no validation needed
 };
 
@@ -1035,129 +1034,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                 </div>
               </div>
             </div>
-            
-            {/* Platform Availability */}
-            {formData.metadata?.platformAvailability && Object.keys(formData.metadata.platformAvailability).length > 0 && (
-              <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold mb-2">Platform Availability</h3>
-                <div className="space-y-2 text-sm">
-                  {formData.metadata.platformAvailability.web && (
-                    <div>
-                      <span className="font-medium">Web:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Launch URL: {formData.metadata.platformAvailability.web.url_launch}</div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.metadata.platformAvailability.ios && (
-                    <div>
-                      <span className="font-medium">iOS:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Download URL: {formData.metadata.platformAvailability.ios.url_download}</div>
-                        {formData.metadata.platformAvailability.ios.url_launch && (
-                          <div>Launch URL: {formData.metadata.platformAvailability.ios.url_launch}</div>
-                        )}
-                        {formData.metadata.platformAvailability.ios.supported && formData.metadata.platformAvailability.ios.supported.length > 0 && (
-                          <div>Supported: {formData.metadata.platformAvailability.ios.supported.join(", ")}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.metadata.platformAvailability.android && (
-                    <div>
-                      <span className="font-medium">Android:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Download URL: {formData.metadata.platformAvailability.android.url_download}</div>
-                        {formData.metadata.platformAvailability.android.url_launch && (
-                          <div>Launch URL: {formData.metadata.platformAvailability.android.url_launch}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.metadata.platformAvailability.windows && (
-                    <div>
-                      <span className="font-medium">Windows:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Download URL: {formData.metadata.platformAvailability.windows.url_download}</div>
-                        {formData.metadata.platformAvailability.windows.url_launch && (
-                          <div>Launch URL: {formData.metadata.platformAvailability.windows.url_launch}</div>
-                        )}
-                        {formData.metadata.platformAvailability.windows.supported && formData.metadata.platformAvailability.windows.supported.length > 0 && (
-                          <div>Supported: {formData.metadata.platformAvailability.windows.supported.join(", ")}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.metadata.platformAvailability.macos && (
-                    <div>
-                      <span className="font-medium">macOS:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Download URL: {formData.metadata.platformAvailability.macos.url_download}</div>
-                        {formData.metadata.platformAvailability.macos.url_launch && (
-                          <div>Launch URL: {formData.metadata.platformAvailability.macos.url_launch}</div>
-                        )}
-                        {formData.metadata.platformAvailability.macos.supported && formData.metadata.platformAvailability.macos.supported.length > 0 && (
-                          <div>Supported: {formData.metadata.platformAvailability.macos.supported.join(", ")}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.metadata.platformAvailability.meta && (
-                    <div>
-                      <span className="font-medium">Meta Quest:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Download URL: {formData.metadata.platformAvailability.meta.url_download}</div>
-                        {formData.metadata.platformAvailability.meta.url_launch && (
-                          <div>Launch URL: {formData.metadata.platformAvailability.meta.url_launch}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.metadata.platformAvailability.ps5 && (
-                    <div>
-                      <span className="font-medium">PlayStation:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Download URL: {formData.metadata.platformAvailability.ps5.url_download}</div>
-                        {formData.metadata.platformAvailability.ps5.url_launch && (
-                          <div>Launch URL: {formData.metadata.platformAvailability.ps5.url_launch}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.metadata.platformAvailability.xbox && (
-                    <div>
-                      <span className="font-medium">Xbox:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Download URL: {formData.metadata.platformAvailability.xbox.url_download}</div>
-                        {formData.metadata.platformAvailability.xbox.url_launch && (
-                          <div>Launch URL: {formData.metadata.platformAvailability.xbox.url_launch}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {formData.metadata.platformAvailability.nintendo && (
-                    <div>
-                      <span className="font-medium">Nintendo Switch:</span> 
-                      <div className="pl-4 text-xs">
-                        <div>Download URL: {formData.metadata.platformAvailability.nintendo.url_download}</div>
-                        {formData.metadata.platformAvailability.nintendo.url_launch && (
-                          <div>Launch URL: {formData.metadata.platformAvailability.nintendo.url_launch}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
+                        
             {/* Transaction information */}
             <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700 text-sm">
               <p className="font-medium text-orange-600 dark:text-orange-400">
