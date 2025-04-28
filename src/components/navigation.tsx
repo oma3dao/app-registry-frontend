@@ -34,6 +34,7 @@ export function Navigation() {
             width={160}
             height={42}
             priority
+            className="w-auto h-10"
           />
         </Link>
         <div className="flex-1" />

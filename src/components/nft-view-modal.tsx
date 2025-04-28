@@ -22,8 +22,9 @@ import type { NFT } from "@/types/nft"
 import { APP_STATUSES, getStatusLabel, getStatusClasses } from "@/types/nft"
 import { useActiveAccount } from "thirdweb/react"
 import { TransactionAlert } from "@/components/ui/transaction-alert"
-import { isMobile } from "@/lib/utils"
+import { isMobile, buildVersionedDID } from "@/lib/utils"
 import { log } from "@/lib/log"
+import { getMetadata } from "@/contracts/appMetadata"
 
 interface NFTViewModalProps {
   isOpen: boolean
@@ -37,6 +38,8 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   const [selectedStatus, setSelectedStatus] = useState<number>(0)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showTxAlert, setShowTxAlert] = useState(false)
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
+  const [metadataExists, setMetadataExists] = useState(false)
   
   // Get the connected wallet address to check if user is the minter
   const account = useActiveAccount();
@@ -61,12 +64,43 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     }
   }
   
-  // Update selected status when NFT changes
+  // Update selected status and check for metadata when NFT changes or modal opens
   useEffect(() => {
-    if (nft) {
-      setSelectedStatus(nft.status)
+    if (isOpen && nft) {
+      setSelectedStatus(nft.status); // Update status selector
+      
+      // Reset metadata check state
+      setIsLoadingMetadata(true);
+      setMetadataExists(false);
+      
+      const checkMetadata = async () => {
+        try {
+          const versionedDid = buildVersionedDID(nft.did, nft.version);
+          log(`[NFTViewModal] Checking metadata for versioned DID: ${versionedDid}`);
+          const metadataJson = await getMetadata(versionedDid);
+          if (metadataJson !== null) {
+            log("[NFTViewModal] Metadata found.");
+            setMetadataExists(true);
+          } else {
+            log("[NFTViewModal] Metadata not found.");
+          }
+        } catch (error) {
+          // Error building versioned DID or other unexpected issue
+          console.error("[NFTViewModal] Error checking metadata:", error);
+          setMetadataExists(false); // Assume no metadata on error
+        } finally {
+          setIsLoadingMetadata(false);
+        }
+      };
+      
+      checkMetadata();
+      
+    } else {
+       // Reset state if modal is closed or no NFT
+       setIsLoadingMetadata(false);
+       setMetadataExists(false);
     }
-  }, [nft])
+  }, [nft, isOpen]); // Rerun when modal opens or NFT changes
 
   const handleStatusChange = async () => {
     if (!nft || !canEditStatus || !statusChanged) return
@@ -226,23 +260,36 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           </div>
         </div>
         
-        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between">
-          {isEditingStatus && statusChanged && canEditStatus && (
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+          {/* Spacer to push buttons right, or adjust justify-content above */} 
+          <div className="flex-grow"></div> 
+          
+          {/* Edit Metadata Button - Enabled based on metadata check */}
+          <Button 
+            variant="secondary" 
+            onClick={() => log('Edit Metadata clicked - Placeholder')} 
+            disabled={isLoadingMetadata || !metadataExists}
+            className="order-first sm:order-none" 
+          >
+            {isLoadingMetadata ? "Checking Metadata..." : "Edit Metadata"}
+          </Button>
+          
+          {isEditingStatus && statusChanged && canEditStatus ? (
+              <Button 
+                onClick={handleStatusChange}
+                disabled={isUpdating}
+              >
+                {isUpdating ? "Saving..." : "Save changes"}
+              </Button>
+          ) : (
             <Button 
-              onClick={handleStatusChange}
+              variant="outline" 
+              onClick={handleCloseViewModal}
               disabled={isUpdating}
-              className="w-full sm:w-auto"
             >
-              {isUpdating ? "Saving..." : "Save Status Changes"}
+              Close
             </Button>
           )}
-          <Button 
-            onClick={handleCloseViewModal} 
-            variant={isEditingStatus && statusChanged && canEditStatus ? "outline" : "default"}
-            className="w-full sm:w-auto"
-          >
-            Close
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

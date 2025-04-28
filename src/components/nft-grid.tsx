@@ -11,12 +11,12 @@ interface NFTGridProps {
   onNFTCardClick: (nft: NFT) => void
   onOpenMintModal: () => void
   isLoading?: boolean
+  showStatus?: boolean
   className?: string
 }
 
-export default function NFTGrid({ nfts, onNFTCardClick, onOpenMintModal, isLoading = false, className = "" }: NFTGridProps) {
-  // Debug log all NFTs
-  log("NFTs received:", nfts);
+export default function NFTGrid({ nfts, onNFTCardClick, onOpenMintModal, isLoading = false, showStatus = true, className = "" }: NFTGridProps) {
+  log("NFTGrid rendering", { nftCount: nfts.length, isLoading, showStatus });
   
   // Filter out duplicate NFTs by creating a unique key from DID and version
   const uniqueNfts = nfts.reduce<NFT[]>((acc, nft) => {
@@ -86,7 +86,7 @@ export default function NFTGrid({ nfts, onNFTCardClick, onOpenMintModal, isLoadi
   return (
     <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ${className}`}>
       {uniqueNfts.map((nft) => (
-        <NFTCard key={`${nft.did}-${nft.version}`} nft={nft} onNFTCardClick={onNFTCardClick} />
+        <NFTCard key={`${nft.did}-${nft.version}`} nft={nft} onNFTCardClick={onNFTCardClick} showStatus={showStatus} />
       ))}
     </div>
   )

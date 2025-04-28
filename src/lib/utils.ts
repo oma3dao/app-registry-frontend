@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { log } from '@/lib/log'
 
 /**
  * Utility function for conditionally joining class names
@@ -83,4 +84,41 @@ export function normalizeAndValidateVersion(version: string): string {
   //   throw new Error("Invalid version format. Major and minor parts must be numeric.");
   // }
   return `${parts[0]}.${parts[1]}`;
+}
+
+/**
+ * Fetches metadata from the API route and extracts the image URL.
+ * @param dataUrl The URL to fetch metadata from.
+ * @returns The image URL string if found, otherwise null.
+ */
+export async function fetchMetadataImage(dataUrl: string): Promise<string | null> {
+  if (!dataUrl) return null;
+  try {
+    log("[fetchMetadataImage] Fetching for dataUrl:", dataUrl);
+    // Use absolute path for API route call within server/client components
+    const apiUrl = `/api/fetch-metadata?url=${encodeURIComponent(dataUrl)}`;
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+      log("[fetchMetadataImage] API response not OK:", response.status, response.statusText);
+      return null; // API route failed
+    }
+    const data = await response.json();
+    log("[fetchMetadataImage] Received data:", data);
+    
+    if (data.error) {
+      log("[fetchMetadataImage] Error in API response:", data.error);
+      return null; // Error reported by API (fetch failed, parse failed, image not found)
+    }
+    // Ensure imageUrl is a string and not empty before returning
+    if (typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') {
+       return data.imageUrl;
+    } else {
+       log("[fetchMetadataImage] imageUrl missing or not a non-empty string:", data.imageUrl);
+       return null;
+    }
+  } catch (error) {
+    log("[fetchMetadataImage] Error calling API route:", error);
+    return null;
+  }
 }

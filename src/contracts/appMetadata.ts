@@ -209,38 +209,44 @@ export async function setMetadata(nft: NFT, account: Account): Promise<boolean> 
 
 /**
  * Get metadata for an NFT
- * @param did The DID of the NFT
- * @returns Metadata JSON string
+ * @param versionedDid The versioned DID of the NFT
+ * @returns Metadata JSON string or null if not found/error
  */
-export async function getMetadata(did: string): Promise<string> {
+export async function getMetadata(versionedDid: string): Promise<string | null> {
   try {
-    log(`Getting metadata for DID: ${did}`);
+    log(`Getting metadata for versioned DID: ${versionedDid}`);
     const contract = getAppMetadataContract();
     log("Metadata contract obtained successfully");
     
-    // Read the metadata from the contract
-    log(`Reading metadata for DID: ${did}`);
+    // Read the metadata from the contract using the versioned DID
+    log(`Reading metadata for key: ${versionedDid}`);
     const metadata = await readContract({
       contract,
-      method: "getMetadataJson",
-      params: [did]
+      method: "function getMetadataJson(string) view returns (string)", // Explicit view function signature
+      params: [versionedDid]
     });
     
     const metadataStr = metadata as string;
+    // Check if metadata is essentially empty (contract might return empty string for unset keys)
+    if (!metadataStr || metadataStr.trim() === "") { 
+      log(`Metadata not found or empty for key: ${versionedDid}`);
+      return null;
+    }
+    
     log(`Metadata retrieved successfully, length: ${metadataStr.length}`);
-    
     return metadataStr;
+    
   } catch (error) {
-    console.error(`Error getting metadata for DID ${did}:`, error);
-    
-    // Safely extract error information
+    // Check if error indicates "not found" (this depends on the thirdweb/RPC error structure)
+    // For now, treat most errors as "not found" or inaccessible
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorName = error instanceof Error ? error.constructor.name : 'Unknown';
-    
-    log("Error type:", errorName);
-    log("Error message:", errorMessage);
-    
-    return "";
+    if (errorMessage.includes("not found") || errorMessage.includes("invalid") || errorMessage.includes("reverted")) {
+        log(`Metadata not found or error reading for ${versionedDid}:`, errorMessage);
+    } else {
+        console.error(`Error getting metadata for ${versionedDid}:`, error);
+        log(`Error getting metadata for ${versionedDid}:`, errorMessage);
+    }
+    return null;
   }
 }
 

@@ -13,6 +13,10 @@ export interface NFT {
     
     // Metadata fields
     metadata?: MetadataContractData;
+    
+    // Optional flags added by frontend processing
+    hasError?: boolean; 
+    errorMessage?: string;
 }
 
 /**

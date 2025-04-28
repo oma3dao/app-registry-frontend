@@ -11,64 +11,80 @@ import { getAppsByMinter, registerApp, updateStatus } from "@/contracts/appRegis
 import { useActiveAccount } from "thirdweb/react"
 import { setMetadata } from "@/contracts/appMetadata"
 import { log } from "@/lib/log"
+import { fetchMetadataImage } from "@/lib/utils"
 
 export default function Dashboard() {
-  log("Dashboard component rendering");
+  log("Component rendering");
   const account = useActiveAccount();
   const connectedAddress = account?.address;
   const [nfts, setNfts] = useState<NFT[]>([])
   const [isMintModalOpen, setIsMintModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingNFTs, setIsLoadingNFTs] = useState(true)
 
   // Fetch registered apps by the connected wallet
   useEffect(() => {
     const fetchApps = async () => {
       try {
-        setIsLoading(true)
+        setIsLoadingNFTs(true);
         log("Fetching apps from contract...")
         
         if (connectedAddress) {
           log("Fetching apps created by:", connectedAddress);
           const apps = await getAppsByMinter(connectedAddress);
           
-          // Validate NFTs before setting them in state
           if (!apps || !Array.isArray(apps)) {
             console.error("Invalid apps data received:", apps);
             setNfts([]);
+            setIsLoadingNFTs(false);
             return;
           }
-          
-          // Log the apps we received
-          log("Apps fetched successfully:", apps);
-          log("Number of apps:", apps.length);
-          
-          // Filter out invalid NFTs
-          const validApps = apps.filter(app => {
-            if (!app) {
-              console.warn("Null or undefined app found");
-              return false;
+          log(`Apps fetched: ${apps.length}`);
+
+          // Augment apps with fetched metadata images
+          const augmentedAppsPromises = apps.map(async (app) => {
+            if (app && app.dataUrl) {
+              const imageUrl = await fetchMetadataImage(app.dataUrl);
+              if (imageUrl) {
+                 const metadata = app.metadata || {}; 
+                 return { 
+                   ...app, 
+                   metadata: { ...metadata, iconUrl: imageUrl } 
+                 };
+              }
             }
-            
-            if (!app.did) {
-              console.warn("App missing DID:", app);
-              return false;
-            }
-            
-            if (!app.version) {
-              console.warn("App missing version:", app);
-              return false;
-            }
-            
-            return true;
+            return app; // Return original app if no dataUrl or fetch fails
           });
+
+          // Wait for all metadata fetches to settle
+          const augmentedAppsResults = await Promise.allSettled(augmentedAppsPromises);
           
-          // Log filtering results
-          log(`Filtered apps: ${validApps.length} valid out of ${apps.length} total`);
+          const finalApps = augmentedAppsResults
+             .filter(result => result.status === 'fulfilled') // Keep successfully processed apps
+             .map(result => (result as PromiseFulfilledResult<NFT>).value);
+
+          // Instead of filtering, flag apps with missing DID or Version
+          const appsWithFlags = finalApps.map(app => {
+             let hasError = false;
+             let errorMessage = "";
+             if (!app) { // Handle potential null/undefined apps from augmentation results
+                console.warn("Null/undefined app encountered after augmentation");
+                // Depending on requirements, either skip or flag
+                // Skipping for now, as we can't display anything useful
+                return null; 
+             } 
+             if (!app.did || !app.version) {
+               console.warn("App missing DID or Version after augmentation:", app);
+               hasError = true;
+               errorMessage = "Missing essential DID or Version information.";
+             }
+             // Return the app object, potentially adding error flags
+             return { ...app, hasError, errorMessage }; 
+          }).filter(app => app !== null) as (NFT & { hasError: boolean, errorMessage: string })[]; // Filter out nulls and assert type
           
-          // Set only valid apps in state
-          setNfts(validApps);
+          log(`Setting ${appsWithFlags.length} apps (including potentially invalid) in state`);
+          setNfts(appsWithFlags);
         } else {
           log("No wallet connected, showing empty list");
           setNfts([]);
@@ -77,7 +93,7 @@ export default function Dashboard() {
         console.error("Error fetching apps:", error)
         setNfts([])
       } finally {
-        setIsLoading(false)
+        setIsLoadingNFTs(false);
       }
     }
 
@@ -173,20 +189,20 @@ export default function Dashboard() {
         return Promise.reject(new Error(errorMsg));
       }
 
-      log(`Dashboard: Updating status for ${nft.did} from ${nft.status} to ${newStatus}`);
-      log(`Dashboard: Calling updateStatus function in appRegistry.ts`);
+      log(`Updating status for ${nft.did} from ${nft.status} to ${newStatus}`);
+      log(`Calling updateStatus function in appRegistry.ts`);
       
       // Update the NFT with the new status - this should trigger wallet transaction
       const updatedNft = await updateStatus({...nft, status: newStatus}, account);
       
-      log(`Dashboard: Status update successful, updating UI`);
+      log(`Status update successful, updating UI`);
       
       // Update the local state with the updated NFT
       setNfts(prev => prev.map(item => (item.did === updatedNft.did ? updatedNft : item)));
       
       return Promise.resolve();
     } catch (error) {
-      console.error("Dashboard: Error updating status:", error);
+      console.error("Error updating status:", error);
       return Promise.reject(error);
     }
   }
@@ -216,7 +232,8 @@ export default function Dashboard() {
         nfts={nfts} 
         onNFTCardClick={handleOpenViewModal} 
         onOpenMintModal={() => handleOpenMintModal()} 
-        isLoading={isLoading} 
+        isLoading={isLoadingNFTs} 
+        showStatus={true}
       />
 
       {/* Mint Modal - Used only for registering new apps */}

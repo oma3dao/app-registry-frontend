@@ -8,6 +8,7 @@ import type { NFT } from "@/types/nft"
 import { LANDING_PAGE_NUM_APPS } from "@/config/app-config"
 import NFTViewModal from "@/components/nft-view-modal"
 import { log } from "@/lib/log"
+import { fetchMetadataImage } from "@/lib/utils"
 
 export default function LandingPage() {
   const [latestApps, setLatestApps] = useState<NFT[]>([])
@@ -36,10 +37,32 @@ export default function LandingPage() {
             // Always use pagination to fetch the exact apps we need
             const apps = await getAppsWithPagination(startIndex, LANDING_PAGE_NUM_APPS)
             
-            // Reverse the array to show newest first
-            const reversedApps = apps.reverse()
+            // Augment apps with fetched metadata images
+            const augmentedAppsPromises = apps.map(async (app) => {
+              if (app && app.dataUrl) {
+                const imageUrl = await fetchMetadataImage(app.dataUrl);
+                if (imageUrl) {
+                   // Create a new object to avoid direct state mutation worries
+                   // Ensure metadata object exists
+                   const metadata = app.metadata || {}; 
+                   return { 
+                     ...app, 
+                     metadata: { ...metadata, iconUrl: imageUrl } 
+                   };
+                }
+              }
+              return app; // Return original app if no dataUrl or fetch fails
+            });
+
+            // Wait for all metadata fetches to settle
+            const augmentedAppsResults = await Promise.allSettled(augmentedAppsPromises);
             
-            log(`Showing the latest ${reversedApps.length} apps`)
+            const finalApps = augmentedAppsResults
+               .filter(result => result.status === 'fulfilled') // Keep only successfully processed apps
+               .map(result => (result as PromiseFulfilledResult<NFT>).value);
+
+            const reversedApps = finalApps.reverse(); // Reverse after augmentation
+            log(`Showing the latest ${reversedApps.length} augmented apps`);
             setLatestApps(reversedApps)
           } catch (getAppsError) {
             log("Error fetching apps:", getAppsError)
@@ -47,9 +70,11 @@ export default function LandingPage() {
           }
         } else {
           log("No apps registered yet or couldn't get total count")
+          setLatestApps([]) // Ensure empty array if no apps
         }
       } catch (error) {
         log("Error fetching latest apps:", error)
+        setLatestApps([]) // Ensure empty array on error
       } finally {
         setIsLoading(false)
       }
@@ -125,6 +150,7 @@ export default function LandingPage() {
             onNFTCardClick={handleOpenViewModal}
             onOpenMintModal={handleOpenMintModal}
             isLoading={isLoading}
+            showStatus={false}
             className="sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
           />
         </div>
