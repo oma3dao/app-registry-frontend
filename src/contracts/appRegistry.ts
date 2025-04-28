@@ -528,15 +528,6 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
       console.error("Error type:", errorName);
       console.error("Error message:", errorMessage);
       
-      // For common transaction errors, provide more context
-      if (errorMessage.includes("user rejected")) {
-        console.error("User rejected the transaction in their wallet");
-      } else if (errorMessage.includes("insufficient funds")) {
-        console.error("Wallet has insufficient funds to complete the transaction");
-      } else if (errorMessage.includes("nonce")) {
-        console.error("Nonce issue - there might be pending transactions");
-      }
-      
       console.error("Error details:", JSON.stringify(mintError, null, 2));
       throw mintError;
     }

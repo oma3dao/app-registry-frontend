@@ -45,3 +45,17 @@ export function debounce<T extends (...args: any[]) => any>(
     }, ms)
   }
 }
+
+/**
+ * Builds a versioned DID string in the format DID/v/[version]
+ * @param did The base DID string
+ * @param version The version
+ * @returns The versioned DID string
+ * @throws Error if version is undefined
+ */
+export function buildVersionedDID(did: string, version: string): string {
+  if (version === undefined) {
+    throw new Error('Version is required');
+  }
+  return `${did}/v/${version}`
+}

@@ -39,7 +39,7 @@ import {
   IWPS_PORTAL_BASE_URL,
   SELF_HOSTING_DOCS_URL
 } from '@/config/app-config'
-import { ExternalLinkIcon, EditIcon, AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, ChevronDown } from "lucide-react"
+import { ExternalLinkIcon, EditIcon, AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, ChevronDown, InfoIcon } from "lucide-react"
 import { ImagePreview } from "@/components/image-preview"
 import { UrlValidator } from "@/components/url-validator"
 
@@ -437,7 +437,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
       });
       
       if (!hasAtLeastOneUrl) {
-        stepErrors['metadata.platformAvailability'] = "At least one platform URL must be provided";
+        stepErrors['metadata.platformAvailability'] = "At least one platform URL must be provided before proceeding.";
       }
     }
     
@@ -573,6 +573,35 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
 
   // Handle next button click - validate current step before proceeding
   const handleNextStep = () => {
+    // Special check when moving from step 4 to step 5
+    if (currentStep === 4) {
+      // Check if at least one platform URL is provided
+      const urlFields = [
+        'web_url_launch',
+        'ios_url_download', 'ios_url_launch',
+        'android_url_download', 'android_url_launch',
+        'windows_url_download', 'windows_url_launch',
+        'macos_url_download', 'macos_url_launch',
+        'meta_url_download', 'meta_url_launch',
+        'ps5_url_download',
+        'xbox_url_download',
+        'nintendo_url_download'
+      ];
+      
+      const hasAtLeastOneUrl = urlFields.some(field => {
+        const value = formData.metadata?.[field as keyof typeof formData.metadata];
+        return typeof value === 'string' && value.trim() !== '';
+      });
+      
+      if (!hasAtLeastOneUrl) {
+        setErrors(prev => ({
+          ...prev,
+          'metadata.platformAvailability': "At least one platform URL must be provided before proceeding."
+        }));
+        return;
+      }
+    }
+    
     if (validateStep(currentStep)) {
       setCurrentStep(prev => {
         const nextStep = prev + 1;
@@ -629,7 +658,12 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
       setTxError(null);
       
       try {
-        await onSave(wizardFormToNft(formData));
+        // Create the NFT object with the custom URLs flag
+        const nftToSubmit = wizardFormToNft(formData);
+        // Add isCustomUrls flag to indicate if user is using custom URLs
+        (nftToSubmit as any).isCustomUrls = isCustomizingUrls;
+        
+        await onSave(nftToSubmit);
       } catch (error) {
         console.error("Error registering app:", error);
         setShowTxAlert(false);
@@ -1094,15 +1128,21 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         return (
           <div className="space-y-4">
             <p className="font-medium mb-2">Platform Availability</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-              Configure which platforms your application is available on. At least one platform URL is required.
-            </p>
+            <div className="p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md mb-4">
+              <div className="flex gap-2 items-start text-amber-700 dark:text-amber-400">
+                <InfoIcon size={18} className="mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium">Important!</p>
+                  <p>You must configure at least one platform URL to register your app. This is a required field.</p>
+                </div>
+              </div>
+            </div>
             
             {errors['metadata.platformAvailability'] && (
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-md">
                 <div className="flex gap-2 items-start text-red-700 dark:text-red-400">
                   <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
-                  <p className="text-sm">{errors['metadata.platformAvailability']}</p>
+                  <p className="text-sm font-medium">{errors['metadata.platformAvailability']}</p>
                 </div>
               </div>
             )}
@@ -1124,6 +1164,15 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                         web_url_launch: e.target.value
                       }
                     }));
+                    
+                    // Clear platform availability error when user adds a URL
+                    if (e.target.value.trim() !== '') {
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors['metadata.platformAvailability'];
+                        return newErrors;
+                      });
+                    }
                   }}
                   onBlur={() => {
                     const url = formData.metadata?.web_url_launch || '';
@@ -1170,6 +1219,15 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                           ios_url_download: e.target.value
                         }
                       }));
+                      
+                      // Clear platform availability error when user adds a URL
+                      if (e.target.value.trim() !== '') {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.platformAvailability'];
+                          return newErrors;
+                        });
+                      }
                     }}
                     onBlur={() => {
                       const url = formData.metadata?.ios_url_download || '';
@@ -1211,6 +1269,15 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                           ios_url_launch: e.target.value
                         }
                       }));
+                      
+                      // Clear platform availability error when user adds a URL
+                      if (e.target.value.trim() !== '') {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.platformAvailability'];
+                          return newErrors;
+                        });
+                      }
                     }}
                     onBlur={() => {
                       const url = formData.metadata?.ios_url_launch || '';
@@ -1282,6 +1349,15 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                           android_url_download: e.target.value
                         }
                       }));
+                      
+                      // Clear platform availability error when user adds a URL
+                      if (e.target.value.trim() !== '') {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.platformAvailability'];
+                          return newErrors;
+                        });
+                      }
                     }}
                     onBlur={() => {
                       const url = formData.metadata?.android_url_download || '';
@@ -1969,9 +2045,12 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                 You will need to sign two separate transactions:
               </p>
               <ol className="list-decimal list-inside mt-1">
-                <li className="mb-1">Registry contract: To register your app identity</li>
-                <li>Metadata contract: To store your app's metadata</li>
+                <li className="mb-1">Registry transaction: To register your app identity and basic information</li>
+                <li>Metadata transaction: To store your app's additional metadata (descriptions, images, platform availability)</li>
               </ol>
+              <p className="text-xs text-slate-500 mt-2">
+                Note: These will happen as separate signature requests. Please approve both to complete the registration process.
+              </p>
             </div>
           </div>
         );

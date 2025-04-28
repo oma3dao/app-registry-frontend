@@ -9,6 +9,7 @@ import NFTViewModal from "@/components/nft-view-modal"
 import type { NFT } from "@/types/nft"
 import { getAppsByMinter, registerApp, updateStatus } from "@/contracts/appRegistry"
 import { useActiveAccount } from "thirdweb/react"
+import { setMetadata } from "@/contracts/appMetadata"
 import { log } from "@/lib/log"
 
 export default function Dashboard() {
@@ -121,12 +122,35 @@ export default function Dashboard() {
         return Promise.reject(new Error("No wallet connected"));
       }
 
+      // Extract and remove the isCustomUrls flag
+      const isCustomUrls = 'isCustomUrls' in nft && (nft as any).isCustomUrls;
+      if ('isCustomUrls' in nft) {
+        delete (nft as any).isCustomUrls;
+      }
+
       // Mint modal should only be used for new app registration
       log("Registering new app:", nft);
-      const registeredNft = await registerApp(nft, account)
-      setNfts([...nfts, registeredNft])
       
-      handleCloseMintModal()
+      // Step 1: Register app in the registry contract
+      const registeredNft = await registerApp(nft, account);
+      
+      // Step 2: Only set metadata if not using custom URLs and metadata exists
+      if (!isCustomUrls && registeredNft && registeredNft.metadata) {
+        try {
+          log("Setting metadata for app:", registeredNft.did);
+          await setMetadata(registeredNft, account);
+          log("Metadata successfully set");
+        } catch (metadataError) {
+          console.error("Error setting metadata:", metadataError);
+          // We don't reject the promise here because the app registration was successful
+          // The user can try setting metadata again later
+        }
+      } else if (isCustomUrls) {
+        log("Using custom URLs - skipping metadata setting");
+      }
+      
+      setNfts([...nfts, registeredNft]);
+      handleCloseMintModal();
       return Promise.resolve();
     } catch (error) {
       console.error("Error registering app:", error)
