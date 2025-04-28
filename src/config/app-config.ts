@@ -51,7 +51,7 @@ export const NAME_ERROR_MESSAGE = `Name must be between 1 and ${MAX_NAME_LENGTH}
 export const NAME_PLACEHOLDER = `Maximum of ${MAX_NAME_LENGTH} characters`;
 
 // Version validation related messages
-export const VERSION_ERROR_MESSAGE = `Version must be in format X.Y.Z or X.Y where X, Y, and Z are numbers`;
+export const VERSION_ERROR_MESSAGE = `Version must be in format x.y.z or x.y where x, x, and z are numbers`;
 export const VERSION_PLACEHOLDER = `Format: x.y.z or x.y (numbers only)`;
 
 // Contract address validation related messages
@@ -62,12 +62,13 @@ export const CONTRACT_PLACEHOLDER = `CAIP-2 compliant contract address`;
  * Metadata JSON keys
  */
 // Top-level keys
+export const METADATA_JSON_NAME_KEY = "name";
 export const METADATA_JSON_DESCRIPTION_URL_KEY = "descriptionUrl";
-export const METADATA_JSON_MARKETING_URL_KEY = "marketingUrl";
+export const METADATA_JSON_MARKETING_URL_KEY = "external_url";
 export const METADATA_JSON_TOKEN_CONTRACT_KEY = "token";
-export const METADATA_JSON_ICON_URL_KEY = "iconUrl";
+export const METADATA_JSON_ICON_URL_KEY = "image";
 export const METADATA_JSON_SCREENSHOTS_URLS_KEY = "screenshotsUrls";
-export const METADATA_JSON_PLATFORM_KEY = "iwps";
+export const METADATA_JSON_PLATFORM_KEY = "platforms";
 
 // Platform keys
 export const METADATA_JSON_WEB_KEY = "web";

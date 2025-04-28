@@ -4,7 +4,7 @@ import { client } from "@/app/client";
 import type { NFT } from "@/types/nft";
 import { Account } from "thirdweb/wallets";
 import { MetadataContractData } from "@/types/metadata-contract";
-import { validateUrl } from "@/lib/validation";
+import { validateUrl, validateDid } from "@/lib/validation";
 import { log } from "@/lib/log";
 import { buildVersionedDID } from "@/lib/utils";
 import {
@@ -61,98 +61,58 @@ export function getAppMetadataContract() {
  * @returns Metadata JSON string
  */
 export function buildMetadataJSON(nft: NFT): string {
-  // Build the metadata object based on the NFT data
-  const metadata: any = {
-    name: nft.name,
-    // Use properties from metadata if they exist
-    description: nft.metadata?.descriptionUrl || "",
-    image: nft.metadata?.iconUrl || "",
-    external_url: nft.metadata?.marketingUrl || "",
-    // Add any other metadata fields as needed
+  // Initialize metadata object using constants for OMA3 fields
+  // Use standard keys directly where appropriate (name, image, external_url)
+  const metadata: { [key: string]: any } = {
+    name: nft.name || "", // Standard name key
+    [METADATA_JSON_ICON_URL_KEY]: nft.metadata?.iconUrl || "", // Now uses "image" key directly via constant
+    [METADATA_JSON_MARKETING_URL_KEY]: nft.metadata?.marketingUrl || "", // Now uses "external_url" key directly via constant
+    [METADATA_JSON_DESCRIPTION_URL_KEY]: nft.metadata?.descriptionUrl || "",
+    [METADATA_JSON_TOKEN_CONTRACT_KEY]: nft.metadata?.tokenContractAddress || "",
+    [METADATA_JSON_SCREENSHOTS_URLS_KEY]: nft.metadata?.screenshotUrls?.filter(url => !!url) || [],
   };
 
-  // Add platform availability if it exists
+  // NOTE: We are intentionally omitting the standard "description" key
+  // as OMA3 uses METADATA_JSON_DESCRIPTION_URL_KEY
+
+  // Build platform availability data using constants
+  const platformData: { [key: string]: any } = {};
+
+  // Platform configuration map
+  const platformConfigs = [
+    { key: METADATA_JSON_WEB_KEY,       launchField: 'web_url_launch' },
+    { key: METADATA_JSON_IOS_KEY,       downloadField: 'ios_url_download', launchField: 'ios_url_launch', supportedField: 'ios_supported' },
+    { key: METADATA_JSON_ANDROID_KEY,   downloadField: 'android_url_download', launchField: 'android_url_launch' },
+    { key: METADATA_JSON_WINDOWS_KEY,   downloadField: 'windows_url_download', launchField: 'windows_url_launch', supportedField: 'windows_supported' },
+    { key: METADATA_JSON_MACOS_KEY,     downloadField: 'macos_url_download', launchField: 'macos_url_launch' },
+    { key: METADATA_JSON_META_KEY,      downloadField: 'meta_url_download', launchField: 'meta_url_launch' },
+    { key: METADATA_JSON_PS5_KEY,       downloadField: 'ps5_url_download' },
+    { key: METADATA_JSON_XBOX_KEY,      downloadField: 'xbox_url_download' },
+    { key: METADATA_JSON_NINTENDO_KEY,  downloadField: 'nintendo_url_download' },
+  ];
+
   if (nft.metadata) {
-    const platformData: any = {};
-    
-    // Web platform
-    if (nft.metadata.web_url_launch) {
-      platformData.web = { 
-        url_launch: nft.metadata.web_url_launch 
-      };
-    }
-    
-    // iOS platform
-    if (nft.metadata.ios_url_download || nft.metadata.ios_url_launch || (nft.metadata.ios_supported && nft.metadata.ios_supported.length > 0)) {
-      platformData.ios = {};
-      if (nft.metadata.ios_url_download) platformData.ios.url_download = nft.metadata.ios_url_download;
-      if (nft.metadata.ios_url_launch) platformData.ios.url_launch = nft.metadata.ios_url_launch;
-      if (nft.metadata.ios_supported && nft.metadata.ios_supported.length > 0) {
-        platformData.ios.supported = nft.metadata.ios_supported;
+    platformConfigs.forEach(config => {
+      const entry: { [key: string]: any } = {};
+      const downloadUrl = config.downloadField ? nft.metadata![config.downloadField as keyof MetadataContractData] : undefined;
+      const launchUrl = config.launchField ? nft.metadata![config.launchField as keyof MetadataContractData] : undefined;
+      const supported = config.supportedField ? nft.metadata![config.supportedField as keyof MetadataContractData] : undefined;
+
+      if (downloadUrl) entry[METADATA_JSON_URL_DOWNLOAD_KEY] = downloadUrl;
+      if (launchUrl) entry[METADATA_JSON_URL_LAUNCH_KEY] = launchUrl;
+      if (Array.isArray(supported) && supported.length > 0) entry[METADATA_JSON_SUPPORTED_KEY] = supported;
+
+      // Add platform entry only if it has at least one value
+      if (Object.keys(entry).length > 0) {
+        platformData[config.key] = entry;
       }
-    }
-    
-    // Android platform
-    if (nft.metadata.android_url_download || nft.metadata.android_url_launch) {
-      platformData.android = {};
-      if (nft.metadata.android_url_download) platformData.android.url_download = nft.metadata.android_url_download;
-      if (nft.metadata.android_url_launch) platformData.android.url_launch = nft.metadata.android_url_launch;
-    }
-    
-    // Windows platform
-    if (nft.metadata.windows_url_download || nft.metadata.windows_url_launch || (nft.metadata.windows_supported && nft.metadata.windows_supported.length > 0)) {
-      platformData.windows = {};
-      if (nft.metadata.windows_url_download) platformData.windows.url_download = nft.metadata.windows_url_download;
-      if (nft.metadata.windows_url_launch) platformData.windows.url_launch = nft.metadata.windows_url_launch;
-      if (nft.metadata.windows_supported && nft.metadata.windows_supported.length > 0) {
-        platformData.windows.supported = nft.metadata.windows_supported;
-      }
-    }
-    
-    // macOS platform
-    if (nft.metadata.macos_url_download || nft.metadata.macos_url_launch) {
-      platformData.macos = {};
-      if (nft.metadata.macos_url_download) platformData.macos.url_download = nft.metadata.macos_url_download;
-      if (nft.metadata.macos_url_launch) platformData.macos.url_launch = nft.metadata.macos_url_launch;
-    }
-    
-    // Meta Quest platform
-    if (nft.metadata.meta_url_download || nft.metadata.meta_url_launch) {
-      platformData.meta = {};
-      if (nft.metadata.meta_url_download) platformData.meta.url_download = nft.metadata.meta_url_download;
-      if (nft.metadata.meta_url_launch) platformData.meta.url_launch = nft.metadata.meta_url_launch;
-    }
-    
-    // PlayStation 5
-    if (nft.metadata.ps5_url_download) {
-      platformData.ps5 = {
-        url_download: nft.metadata.ps5_url_download
-      };
-    }
-    
-    // Xbox
-    if (nft.metadata.xbox_url_download) {
-      platformData.xbox = {
-        url_download: nft.metadata.xbox_url_download
-      };
-    }
-    
-    // Nintendo Switch
-    if (nft.metadata.nintendo_url_download) {
-      platformData.nintendo = {
-        url_download: nft.metadata.nintendo_url_download
-      };
-    }
-    
-    // Add platform data to metadata
-    if (Object.keys(platformData).length > 0) {
-      metadata.platform_availability = platformData;
-    } else {
-      log("Warning: No platform availability data found in NFT metadata");
-    }
+    });
   }
 
-  // Convert to JSON string
+  // Always include the platform availability key
+  metadata[METADATA_JSON_PLATFORM_KEY] = platformData;
+
+  // Convert the complete metadata object to a JSON string
   return JSON.stringify(metadata);
 }
 
@@ -198,22 +158,19 @@ export async function setMetadata(nft: NFT, account: Account): Promise<boolean> 
     log("Contract type:", typeof contract);
     log("Contract keys:", Object.keys(contract));
 
-    // Use buildVersionedDID utility for versioned DID
-    if (!nft.version) {
-      throw new Error('Version is required');
-    }
-         
+    // Use buildVersionedDID utility for versioned DID.
+    // It handles validation, normalization (e.g., 1.2.3 -> 1.0), and lowercasing the base DID.
     const versionedDID = buildVersionedDID(nft.did, nft.version);
-    log(`Using versioned DID: ${versionedDID} (version: ${nft.version})`);
+    log(`Using versioned DID for contract key: ${versionedDID} (from input version: ${nft.version})`);
 
     // Prepare the contract call using prepareContractCall
     log("Preparing contract call for setMetadataJson function");
-    log(`Setting metadata for DID: ${versionedDID}, metadata size: ${metadata.length} bytes`);
+    log(`Setting metadata for DID key: ${versionedDID}, metadata size: ${metadata.length} bytes`);
     
     const transaction = prepareContractCall({
       contract,
       method: "function setMetadataJson(string, string)",
-      params: [versionedDID, metadata]
+      params: [versionedDID, metadata] // Pass the versioned DID string as the key
     });
     
     log("Transaction prepared:", {
@@ -232,7 +189,7 @@ export async function setMetadata(nft: NFT, account: Account): Promise<boolean> 
     });
     
     log("Metadata transaction sent successfully with hash:", result.transactionHash);
-    log(`Successfully set metadata for app with DID: ${versionedDID}`);
+    log(`Successfully set metadata for app with DID key: ${versionedDID}`);
     
     return true;
   } catch (error) {

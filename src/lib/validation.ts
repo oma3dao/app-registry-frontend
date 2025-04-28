@@ -10,16 +10,26 @@ export const MAX_NAME_LENGTH = 32;
 
 // Regular expressions for validation
 export const VERSION_REGEX = /^\d+\.\d+(\.\d+)?$/;
-export const DID_REGEX = /^did:[a-z0-9]+:[a-zA-Z0-9.%-]+$/;
+export const DID_REGEX = /^did:[a-z0-9]+:[a-zA-Z0-9.%-:_]+$/;
 export const URL_REGEX = /^(https?:\/\/)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?$/;
 
 /**
  * Validates a version string in format x.y.z or x.y
  * @param version The version string to validate
- * @returns True if the version is valid
+ * @returns True if valid, false otherwise
  */
 export function validateVersion(version: string): boolean {
-  return VERSION_REGEX.test(version);
+  if (!version) {
+    return false;
+  }
+  const parts = version.split('.');
+  // Must have at least major.minor (parts[0] and parts[1] must exist and be non-empty)
+  // Allow optional patch version (parts[2])
+  if (parts.length < 2 || !parts[0] || !parts[1]) {
+    return false;
+  }
+  // Check if all provided parts are numeric
+  return parts.every(part => /^[0-9]+$/.test(part));
 }
 
 /**

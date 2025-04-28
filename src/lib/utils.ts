@@ -47,15 +47,40 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 /**
- * Builds a versioned DID string in the format DID/v/[version]
+ * Builds a versioned DID string in the format did/v/version
  * @param did The base DID string
- * @param version The version
- * @returns The versioned DID string
- * @throws Error if version is undefined
+ * @param version The version string (e.g., '1.0' or '1.0.5')
+ * @returns The versioned DID string (e.g., did/v/1.0)
+ * @throws Error if version format is invalid
  */
 export function buildVersionedDID(did: string, version: string): string {
-  if (version === undefined) {
-    throw new Error('Version is required');
+  if (!did) {
+    throw new Error("DID is required");
   }
-  return `${did}/v/${version}`
+  const normalizedVersion = normalizeAndValidateVersion(version);
+  // Ensure the base DID part is lowercase for consistent key generation
+  const lowercaseDid = did.toLowerCase(); 
+  return `${lowercaseDid}/v/${normalizedVersion}`
+}
+
+/**
+ * Validates and normalizes a version string to major.minor format.
+ * @param version The input version string (e.g., '1.0', '1.2.3')
+ * @returns The normalized version string (e.g., '1.0', '1.2')
+ * @throws Error if the version format is invalid (less than x.y)
+ */
+export function normalizeAndValidateVersion(version: string): string {
+  if (!version) {
+    throw new Error("Version is required");
+  }
+  const parts = version.split(".");
+  // Ensure at least major and minor parts exist and are not empty strings
+  if (parts.length < 2 || !parts[0] || !parts[1]) {
+    throw new Error("Invalid version format. Please specify at least major.minor (e.g., '1.0')");
+  }
+  // Optionally check if parts are numeric if needed, but requirement is just format
+  // if (isNaN(parseInt(parts[0])) || isNaN(parseInt(parts[1]))) {
+  //   throw new Error("Invalid version format. Major and minor parts must be numeric.");
+  // }
+  return `${parts[0]}.${parts[1]}`;
 }
