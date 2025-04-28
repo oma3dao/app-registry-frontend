@@ -1,3 +1,5 @@
+import { MetadataContractData } from './metadata-contract';
+
 export interface NFT {
     did: string   // Primary identifier
     name: string
@@ -8,6 +10,9 @@ export interface NFT {
     contractAddress?: string
     status: number // 0: Active, 1: Deprecated, 2: Replaced
     minter: string // Ethereum address of the app creator
+    
+    // Metadata fields
+    metadata?: MetadataContractData;
 }
 
 /**

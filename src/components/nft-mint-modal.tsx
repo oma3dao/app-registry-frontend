@@ -51,7 +51,17 @@ const STEP_FIELDS = {
   1: ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri', 'agentApiUri', 'contractAddress'],
   2: ['metadata.descriptionUrl', 'metadata.marketingUrl', 'metadata.tokenContractAddress'],
   3: ['metadata.iconUrl', 'metadata.screenshotUrls'],
-  4: ['availability'], // Will add these fields later
+  4: [
+    'metadata.web_url_launch',
+    'metadata.ios_url_download', 'metadata.ios_url_launch', 'metadata.ios_supported',
+    'metadata.android_url_download', 'metadata.android_url_launch',
+    'metadata.windows_url_download', 'metadata.windows_url_launch', 'metadata.windows_supported',
+    'metadata.macos_url_download', 'metadata.macos_url_launch',
+    'metadata.meta_url_download', 'metadata.meta_url_launch',
+    'metadata.ps5_url_download',
+    'metadata.xbox_url_download',
+    'metadata.nintendo_url_download'
+  ],
   5: ['final'] // Final confirmation step - no validation needed
 };
 
@@ -87,11 +97,28 @@ const nftToWizardForm = (nft: NFT): WizardFormData => {
     
     // Metadata fields with defaults
     metadata: {
-      descriptionUrl: "",
-      marketingUrl: "",
-      tokenContractAddress: "",
-      iconUrl: "",
-      screenshotUrls: ["", "", "", "", ""]
+      descriptionUrl: nft.metadata?.descriptionUrl || "",
+      marketingUrl: nft.metadata?.marketingUrl || "",
+      tokenContractAddress: nft.metadata?.tokenContractAddress || "",
+      iconUrl: nft.metadata?.iconUrl || "",
+      screenshotUrls: nft.metadata?.screenshotUrls || ["", "", "", "", ""],
+      // Platform availability fields
+      web_url_launch: nft.metadata?.web_url_launch || "",
+      ios_url_download: nft.metadata?.ios_url_download || "",
+      ios_url_launch: nft.metadata?.ios_url_launch || "",
+      ios_supported: nft.metadata?.ios_supported || [],
+      android_url_download: nft.metadata?.android_url_download || "",
+      android_url_launch: nft.metadata?.android_url_launch || "",
+      windows_url_download: nft.metadata?.windows_url_download || "",
+      windows_url_launch: nft.metadata?.windows_url_launch || "",
+      windows_supported: nft.metadata?.windows_supported || [],
+      macos_url_download: nft.metadata?.macos_url_download || "",
+      macos_url_launch: nft.metadata?.macos_url_launch || "",
+      meta_url_download: nft.metadata?.meta_url_download || "",
+      meta_url_launch: nft.metadata?.meta_url_launch || "",
+      ps5_url_download: nft.metadata?.ps5_url_download || "",
+      xbox_url_download: nft.metadata?.xbox_url_download || "",
+      nintendo_url_download: nft.metadata?.nintendo_url_download || ""
     }
   };
 };
@@ -102,7 +129,10 @@ const wizardFormToNft = (formData: WizardFormData): NFT => {
   const { metadata, ...registryFields } = formData;
   
   // Return as NFT
-  return registryFields as NFT;
+  return {
+    ...registryFields,
+    metadata: metadata ? { ...metadata } : undefined
+  } as NFT;
 };
 
 export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft }: NFTMintModalProps) {
@@ -124,7 +154,24 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
       marketingUrl: "",
       tokenContractAddress: "",
       iconUrl: "",
-      screenshotUrls: ["", "", "", "", ""]
+      screenshotUrls: ["", "", "", "", ""],
+      // Platform availability fields
+      web_url_launch: "",
+      ios_url_download: "",
+      ios_url_launch: "",
+      ios_supported: [],
+      android_url_download: "",
+      android_url_launch: "",
+      windows_url_download: "",
+      windows_url_launch: "",
+      windows_supported: [],
+      macos_url_download: "",
+      macos_url_launch: "",
+      meta_url_download: "",
+      meta_url_launch: "",
+      ps5_url_download: "",
+      xbox_url_download: "",
+      nintendo_url_download: ""
     }
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -184,7 +231,24 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
           marketingUrl: "",
           tokenContractAddress: "",
           iconUrl: "",
-          screenshotUrls: ["", "", "", "", ""]
+          screenshotUrls: ["", "", "", "", ""],
+          // Platform availability fields
+          web_url_launch: "",
+          ios_url_download: "",
+          ios_url_launch: "",
+          ios_supported: [],
+          android_url_download: "",
+          android_url_launch: "",
+          windows_url_download: "",
+          windows_url_launch: "",
+          windows_supported: [],
+          macos_url_download: "",
+          macos_url_launch: "",
+          meta_url_download: "",
+          meta_url_launch: "",
+          ps5_url_download: "",
+          xbox_url_download: "",
+          nintendo_url_download: ""
         }
       };
       setFormData(emptyNft);
@@ -352,6 +416,31 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     const stepFieldsToValidate = STEP_FIELDS[step];
     const stepErrors: Record<string, string> = {};
     
+    // For platform availability, validate that at least one URL field is provided
+    if (step === 4) {
+      const urlFields = [
+        'metadata.web_url_launch',
+        'metadata.ios_url_download', 'metadata.ios_url_launch',
+        'metadata.android_url_download', 'metadata.android_url_launch',
+        'metadata.windows_url_download', 'metadata.windows_url_launch',
+        'metadata.macos_url_download', 'metadata.macos_url_launch',
+        'metadata.meta_url_download', 'metadata.meta_url_launch',
+        'metadata.ps5_url_download',
+        'metadata.xbox_url_download',
+        'metadata.nintendo_url_download'
+      ];
+      
+      const hasAtLeastOneUrl = urlFields.some(field => {
+        const parts = field.split('.');
+        const value = formData.metadata?.[parts[1] as keyof typeof formData.metadata];
+        return typeof value === 'string' && value.trim() !== '';
+      });
+      
+      if (!hasAtLeastOneUrl) {
+        stepErrors['metadata.platformAvailability'] = "At least one platform URL must be provided";
+      }
+    }
+    
     // Validate each field in the current step
     stepFieldsToValidate.forEach(field => {
       // Handle nested fields (metadata.field)
@@ -396,6 +485,33 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                 stepErrors[`metadata.screenshotUrls.${index + 1}`] = URL_ERROR_MESSAGE;
               }
             });
+            break;
+            
+          // Platform availability URL validations
+          // Only validate fields that start with "http" to allow platform-specific schemes
+          case 'web_url_launch':
+          case 'ios_url_download':
+          case 'ios_url_launch':
+          case 'android_url_download':
+          case 'android_url_launch':
+          case 'windows_url_download':
+          case 'windows_url_launch':
+          case 'macos_url_download':
+          case 'macos_url_launch':
+          case 'meta_url_download':
+          case 'meta_url_launch':
+          case 'ps5_url_download':
+          case 'xbox_url_download':
+          case 'nintendo_url_download':
+            const value = formData.metadata?.[metadataField as keyof typeof formData.metadata];
+            if (
+              typeof value === 'string' && 
+              value.trim() !== '' && 
+              value.startsWith('http') && 
+              !validateUrl(value)
+            ) {
+              stepErrors[`metadata.${metadataField}`] = URL_ERROR_MESSAGE;
+            }
             break;
         }
       } else {
@@ -979,31 +1095,703 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
           <div className="space-y-4">
             <p className="font-medium mb-2">Platform Availability</p>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-              Configure which platforms your application is available on.
+              Configure which platforms your application is available on. At least one platform URL is required.
             </p>
             
+            {errors['metadata.platformAvailability'] && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-md">
+                <div className="flex gap-2 items-start text-red-700 dark:text-red-400">
+                  <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">{errors['metadata.platformAvailability']}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Web Platform */}
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
+              <h3 className="text-sm font-semibold mb-3">Web Platform</h3>
+              <div className="grid gap-2">
+                <Label htmlFor="web_url_launch">Launch URL</Label>
+                <Textarea
+                  id="web_url_launch"
+                  name="web_url_launch"
+                  value={formData.metadata?.web_url_launch || ''}
+                  onChange={(e) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      metadata: {
+                        ...prev.metadata!,
+                        web_url_launch: e.target.value
+                      }
+                    }));
+                  }}
+                  onBlur={() => {
+                    const url = formData.metadata?.web_url_launch || '';
+                    if (url && url.startsWith('http') && !validateUrl(url)) {
+                      setErrors(prev => ({ 
+                        ...prev, 
+                        'metadata.web_url_launch': URL_ERROR_MESSAGE
+                      }));
+                    } else {
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors['metadata.web_url_launch'];
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  placeholder="https://example.com/app"
+                  className={`min-h-[70px] ${errors['metadata.web_url_launch'] ? "border-red-500" : ""}`}
+                />
+                {errors['metadata.web_url_launch'] && (
+                  <p className="text-red-500 text-sm mt-1">{errors['metadata.web_url_launch']}</p>
+                )}
+                <p className="text-xs text-slate-500">
+                  URL to launch your web application
+                </p>
+              </div>
+            </div>
+            
+            {/* iOS Platform */}
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
+              <h3 className="text-sm font-semibold mb-3">iOS Platform</h3>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="ios_url_download">Download URL</Label>
+                  <Textarea
+                    id="ios_url_download"
+                    name="ios_url_download"
+                    value={formData.metadata?.ios_url_download || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          ios_url_download: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.ios_url_download || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.ios_url_download': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.ios_url_download'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://apps.apple.com/app/id123456789"
+                    className={`min-h-[70px] ${errors['metadata.ios_url_download'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.ios_url_download'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.ios_url_download']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    App Store URL to download your iOS app
+                  </p>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="ios_url_launch">Launch URL (Optional)</Label>
+                  <Textarea
+                    id="ios_url_launch"
+                    name="ios_url_launch"
+                    value={formData.metadata?.ios_url_launch || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          ios_url_launch: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.ios_url_launch || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.ios_url_launch': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.ios_url_launch'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://example.com/app or custom-scheme://"
+                    className={`min-h-[70px] ${errors['metadata.ios_url_launch'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.ios_url_launch'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.ios_url_launch']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    Deep link or URL to launch your iOS app
+                  </p>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="ios_supported">Supported Devices (Optional)</Label>
+                  <Input
+                    id="ios_supported"
+                    name="ios_supported"
+                    value={(formData.metadata?.ios_supported || []).join(', ')}
+                    onChange={(e) => {
+                      const devices = e.target.value.split(',').map(device => device.trim()).filter(Boolean);
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          ios_supported: devices
+                        }
+                      }));
+                    }}
+                    placeholder="iPhone, iPad, VisionPro"
+                    className={errors['metadata.ios_supported'] ? "border-red-500" : ""}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Comma-separated list of supported iOS devices
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Android Platform */}
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
+              <h3 className="text-sm font-semibold mb-3">Android Platform</h3>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="android_url_download">Download URL</Label>
+                  <Textarea
+                    id="android_url_download"
+                    name="android_url_download"
+                    value={formData.metadata?.android_url_download || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          android_url_download: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.android_url_download || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.android_url_download': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.android_url_download'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://play.google.com/store/apps/details?id=com.example.app"
+                    className={`min-h-[70px] ${errors['metadata.android_url_download'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.android_url_download'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.android_url_download']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    Google Play Store URL to download your Android app
+                  </p>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="android_url_launch">Launch URL (Optional)</Label>
+                  <Textarea
+                    id="android_url_launch"
+                    name="android_url_launch"
+                    value={formData.metadata?.android_url_launch || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          android_url_launch: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.android_url_launch || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.android_url_launch': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.android_url_launch'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://example.com/app or app://launch"
+                    className={`min-h-[70px] ${errors['metadata.android_url_launch'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.android_url_launch'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.android_url_launch']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    Deep link or URL to launch your Android app
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Windows Platform */}
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
+              <h3 className="text-sm font-semibold mb-3">Windows Platform</h3>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="windows_url_download">Download URL</Label>
+                  <Textarea
+                    id="windows_url_download"
+                    name="windows_url_download"
+                    value={formData.metadata?.windows_url_download || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          windows_url_download: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.windows_url_download || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.windows_url_download': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.windows_url_download'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://apps.microsoft.com/store/detail/yourapp/XXXXXXXX"
+                    className={`min-h-[70px] ${errors['metadata.windows_url_download'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.windows_url_download'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.windows_url_download']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    Microsoft Store or website URL to download your Windows app
+                  </p>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="windows_url_launch">Launch URL (Optional)</Label>
+                  <Textarea
+                    id="windows_url_launch"
+                    name="windows_url_launch"
+                    value={formData.metadata?.windows_url_launch || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          windows_url_launch: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.windows_url_launch || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.windows_url_launch': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.windows_url_launch'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="oma3://launch"
+                    className={`min-h-[70px] ${errors['metadata.windows_url_launch'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.windows_url_launch'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.windows_url_launch']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    Protocol handler or URL to launch your Windows app
+                  </p>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="windows_supported">Supported Architectures (Optional)</Label>
+                  <Input
+                    id="windows_supported"
+                    name="windows_supported"
+                    value={(formData.metadata?.windows_supported || []).join(', ')}
+                    onChange={(e) => {
+                      const architectures = e.target.value.split(',').map(arch => arch.trim()).filter(Boolean);
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          windows_supported: architectures
+                        }
+                      }));
+                    }}
+                    placeholder="x64, arm64"
+                    className={errors['metadata.windows_supported'] ? "border-red-500" : ""}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Comma-separated list of supported Windows architectures
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* macOS Platform */}
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
+              <h3 className="text-sm font-semibold mb-3">macOS Platform</h3>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="macos_url_download">Download URL</Label>
+                  <Textarea
+                    id="macos_url_download"
+                    name="macos_url_download"
+                    value={formData.metadata?.macos_url_download || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          macos_url_download: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.macos_url_download || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.macos_url_download': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.macos_url_download'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://apps.apple.com/app/id123456789?mt=12"
+                    className={`min-h-[70px] ${errors['metadata.macos_url_download'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.macos_url_download'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.macos_url_download']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    Mac App Store or website URL to download your macOS app
+                  </p>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="macos_url_launch">Launch URL (Optional)</Label>
+                  <Textarea
+                    id="macos_url_launch"
+                    name="macos_url_launch"
+                    value={formData.metadata?.macos_url_launch || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          macos_url_launch: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.macos_url_launch || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.macos_url_launch': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.macos_url_launch'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="oma3://launch"
+                    className={`min-h-[70px] ${errors['metadata.macos_url_launch'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.macos_url_launch'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.macos_url_launch']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    Protocol handler or URL to launch your macOS app
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Meta Quest Platform */}
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
+              <h3 className="text-sm font-semibold mb-3">Meta Quest Platform</h3>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="meta_url_download">Download URL</Label>
+                  <Textarea
+                    id="meta_url_download"
+                    name="meta_url_download"
+                    value={formData.metadata?.meta_url_download || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          meta_url_download: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.meta_url_download || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.meta_url_download': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.meta_url_download'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://www.meta.com/experiences/1234567890"
+                    className={`min-h-[70px] ${errors['metadata.meta_url_download'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.meta_url_download'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.meta_url_download']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    Meta Quest Store URL to download your VR app
+                  </p>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="meta_url_launch">Launch URL (Optional)</Label>
+                  <Textarea
+                    id="meta_url_launch"
+                    name="meta_url_launch"
+                    value={formData.metadata?.meta_url_launch || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          meta_url_launch: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.meta_url_launch || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.meta_url_launch': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.meta_url_launch'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="oculus://store/1234567890"
+                    className={`min-h-[70px] ${errors['metadata.meta_url_launch'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.meta_url_launch'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.meta_url_launch']}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    URI to launch your Meta Quest app
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Game Consoles Section */}
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
+              <h3 className="text-sm font-semibold mb-3">Game Console Platforms</h3>
+              
+              {/* PlayStation */}
+              <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-medium mb-2">PlayStation</h4>
+                <div className="grid gap-2">
+                  <Label htmlFor="ps5_url_download">Download URL</Label>
+                  <Textarea
+                    id="ps5_url_download"
+                    name="ps5_url_download"
+                    value={formData.metadata?.ps5_url_download || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          ps5_url_download: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.ps5_url_download || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.ps5_url_download': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.ps5_url_download'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://store.playstation.com/en-us/product/UP9000-CUSA12345_00-YOURGAME0000000"
+                    className={`min-h-[70px] ${errors['metadata.ps5_url_download'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.ps5_url_download'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.ps5_url_download']}</p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Xbox */}
+              <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-medium mb-2">Xbox</h4>
+                <div className="grid gap-2">
+                  <Label htmlFor="xbox_url_download">Download URL</Label>
+                  <Textarea
+                    id="xbox_url_download"
+                    name="xbox_url_download"
+                    value={formData.metadata?.xbox_url_download || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          xbox_url_download: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.xbox_url_download || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.xbox_url_download': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.xbox_url_download'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://www.microsoft.com/store/apps/9NBLGGH4R315"
+                    className={`min-h-[70px] ${errors['metadata.xbox_url_download'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.xbox_url_download'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.xbox_url_download']}</p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Nintendo Switch */}
+              <div>
+                <h4 className="text-sm font-medium mb-2">Nintendo Switch</h4>
+                <div className="grid gap-2">
+                  <Label htmlFor="nintendo_url_download">Download URL</Label>
+                  <Textarea
+                    id="nintendo_url_download"
+                    name="nintendo_url_download"
+                    value={formData.metadata?.nintendo_url_download || ''}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        metadata: {
+                          ...prev.metadata!,
+                          nintendo_url_download: e.target.value
+                        }
+                      }));
+                    }}
+                    onBlur={() => {
+                      const url = formData.metadata?.nintendo_url_download || '';
+                      if (url && url.startsWith('http') && !validateUrl(url)) {
+                        setErrors(prev => ({ 
+                          ...prev, 
+                          'metadata.nintendo_url_download': URL_ERROR_MESSAGE
+                        }));
+                      } else {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors['metadata.nintendo_url_download'];
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    placeholder="https://www.nintendo.com/store/products/your-game-name-switch/"
+                    className={`min-h-[70px] ${errors['metadata.nintendo_url_download'] ? "border-red-500" : ""}`}
+                  />
+                  {errors['metadata.nintendo_url_download'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.nintendo_url_download']}</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         );
         
       case 5:
         return (
-          <div className="p-4 border rounded-md bg-slate-50 dark:bg-slate-900">
+          <div className="p-2 sm:p-4 border rounded-md bg-slate-50 dark:bg-slate-900 text-sm">
             <p className="font-medium mb-2">Review your app details</p>
             
             {/* Registry information */}
             <div className="mb-4">
               <h3 className="text-sm font-semibold mb-2">Registry Information</h3>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2">
                 <div><span className="font-medium">Name:</span> {formData.name}</div>
                 <div><span className="font-medium">Version:</span> {formData.version}</div>
                 <div><span className="font-medium">DID:</span> {formData.did}</div>
-                <div><span className="font-medium">Data URL:</span> {formData.dataUrl}</div>
-                <div><span className="font-medium">IWPS Portal URI:</span> {formData.iwpsPortalUri}</div>
+                <div className="break-all"><span className="font-medium">Data URL:</span> {formData.dataUrl}</div>
+                <div className="break-all"><span className="font-medium">IWPS Portal URI:</span> {formData.iwpsPortalUri}</div>
                 {formData.agentApiUri && (
-                  <div><span className="font-medium">Agent API URI:</span> {formData.agentApiUri}</div>
+                  <div className="break-all"><span className="font-medium">Agent API URI:</span> {formData.agentApiUri}</div>
                 )}
                 {formData.contractAddress && (
-                  <div><span className="font-medium">Contract Address:</span> {formData.contractAddress}</div>
+                  <div className="break-all"><span className="font-medium">Contract Address:</span> {formData.contractAddress}</div>
                 )}
               </div>
             </div>
@@ -1011,22 +1799,22 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
             {/* Metadata information */}
             <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-sm font-semibold mb-2">Metadata Information</h3>
-              <div className="space-y-2 text-sm">
-                <div><span className="font-medium">Description URL:</span> {formData.metadata?.descriptionUrl || "None"}</div>
-                <div><span className="font-medium">Marketing URL:</span> {formData.metadata?.marketingUrl || "None"}</div>
+              <div className="space-y-2">
+                <div className="break-all"><span className="font-medium">Description URL:</span> {formData.metadata?.descriptionUrl || "None"}</div>
+                <div className="break-all"><span className="font-medium">Marketing URL:</span> {formData.metadata?.marketingUrl || "None"}</div>
                 {formData.metadata?.tokenContractAddress && (
-                  <div><span className="font-medium">Token Contract Address:</span> {formData.metadata?.tokenContractAddress}</div>
+                  <div className="break-all"><span className="font-medium">Token Contract Address:</span> {formData.metadata?.tokenContractAddress}</div>
                 )}
-                <div><span className="font-medium">Icon URL:</span> {formData.metadata?.iconUrl || "None"}</div>
+                <div className="break-all"><span className="font-medium">Icon URL:</span> {formData.metadata?.iconUrl || "None"}</div>
                 
                 {/* Screenshot URLs */}
                 <div className="mt-2">
                   <div className="font-medium">Screenshot URLs:</div>
-                  <ol className="list-decimal list-inside mt-1 pl-2">
+                  <ol className="list-decimal list-inside mt-1">
                     {formData.metadata?.screenshotUrls.map((url, index) => (
                       url ? (
-                        <li key={index} className="text-xs truncate">
-                          {url}
+                        <li key={index} className="overflow-hidden my-1">
+                          <div className="break-all text-xs">{url}</div>
                         </li>
                       ) : null
                     ))}
@@ -1034,13 +1822,153 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                 </div>
               </div>
             </div>
-                        
+            
+            {/* Platform Availability */}
+            <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold mb-2">Platform Availability</h3>
+              <div className="space-y-3">
+                {/* Web */}
+                {formData.metadata?.web_url_launch && (
+                  <div>
+                    <span className="font-medium">Web:</span> 
+                    <div className="mt-1">
+                      <div className="break-all text-xs">Launch URL: {formData.metadata.web_url_launch}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* iOS */}
+                {(formData.metadata?.ios_url_download || formData.metadata?.ios_url_launch) && (
+                  <div>
+                    <span className="font-medium">iOS:</span> 
+                    <div className="mt-1 space-y-1">
+                      {formData.metadata?.ios_url_download && (
+                        <div className="break-all text-xs">Download URL: {formData.metadata.ios_url_download}</div>
+                      )}
+                      {formData.metadata?.ios_url_launch && (
+                        <div className="break-all text-xs">Launch URL: {formData.metadata.ios_url_launch}</div>
+                      )}
+                      {formData.metadata?.ios_supported && formData.metadata.ios_supported.length > 0 && (
+                        <div className="break-all text-xs">Supported: {formData.metadata.ios_supported.join(", ")}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Android */}
+                {(formData.metadata?.android_url_download || formData.metadata?.android_url_launch) && (
+                  <div>
+                    <span className="font-medium">Android:</span> 
+                    <div className="mt-1 space-y-1">
+                      {formData.metadata?.android_url_download && (
+                        <div className="break-all text-xs">Download URL: {formData.metadata.android_url_download}</div>
+                      )}
+                      {formData.metadata?.android_url_launch && (
+                        <div className="break-all text-xs">Launch URL: {formData.metadata.android_url_launch}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Windows */}
+                {(formData.metadata?.windows_url_download || formData.metadata?.windows_url_launch) && (
+                  <div>
+                    <span className="font-medium">Windows:</span> 
+                    <div className="mt-1 space-y-1">
+                      {formData.metadata?.windows_url_download && (
+                        <div className="break-all text-xs">Download URL: {formData.metadata.windows_url_download}</div>
+                      )}
+                      {formData.metadata?.windows_url_launch && (
+                        <div className="break-all text-xs">Launch URL: {formData.metadata.windows_url_launch}</div>
+                      )}
+                      {formData.metadata?.windows_supported && formData.metadata.windows_supported.length > 0 && (
+                        <div className="break-all text-xs">Supported: {formData.metadata.windows_supported.join(", ")}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* macOS */}
+                {(formData.metadata?.macos_url_download || formData.metadata?.macos_url_launch) && (
+                  <div>
+                    <span className="font-medium">macOS:</span> 
+                    <div className="mt-1 space-y-1">
+                      {formData.metadata?.macos_url_download && (
+                        <div className="break-all text-xs">Download URL: {formData.metadata.macos_url_download}</div>
+                      )}
+                      {formData.metadata?.macos_url_launch && (
+                        <div className="break-all text-xs">Launch URL: {formData.metadata.macos_url_launch}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Meta Quest */}
+                {(formData.metadata?.meta_url_download || formData.metadata?.meta_url_launch) && (
+                  <div>
+                    <span className="font-medium">Meta Quest:</span> 
+                    <div className="mt-1 space-y-1">
+                      {formData.metadata?.meta_url_download && (
+                        <div className="break-all text-xs">Download URL: {formData.metadata.meta_url_download}</div>
+                      )}
+                      {formData.metadata?.meta_url_launch && (
+                        <div className="break-all text-xs">Launch URL: {formData.metadata.meta_url_launch}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* PlayStation */}
+                {formData.metadata?.ps5_url_download && (
+                  <div>
+                    <span className="font-medium">PlayStation:</span> 
+                    <div className="mt-1">
+                      <div className="break-all text-xs">Download URL: {formData.metadata.ps5_url_download}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Xbox */}
+                {formData.metadata?.xbox_url_download && (
+                  <div>
+                    <span className="font-medium">Xbox:</span> 
+                    <div className="mt-1">
+                      <div className="break-all text-xs">Download URL: {formData.metadata.xbox_url_download}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Nintendo Switch */}
+                {formData.metadata?.nintendo_url_download && (
+                  <div>
+                    <span className="font-medium">Nintendo Switch:</span> 
+                    <div className="mt-1">
+                      <div className="break-all text-xs">Download URL: {formData.metadata.nintendo_url_download}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* No platforms message */}
+                {!formData.metadata?.web_url_launch &&
+                 !formData.metadata?.ios_url_download && !formData.metadata?.ios_url_launch &&
+                 !formData.metadata?.android_url_download && !formData.metadata?.android_url_launch &&
+                 !formData.metadata?.windows_url_download && !formData.metadata?.windows_url_launch &&
+                 !formData.metadata?.macos_url_download && !formData.metadata?.macos_url_launch &&
+                 !formData.metadata?.meta_url_download && !formData.metadata?.meta_url_launch &&
+                 !formData.metadata?.ps5_url_download &&
+                 !formData.metadata?.xbox_url_download &&
+                 !formData.metadata?.nintendo_url_download && (
+                  <div className="text-gray-500 italic">No platform availability information provided</div>
+                )}
+              </div>
+            </div>
+            
             {/* Transaction information */}
             <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700 text-sm">
               <p className="font-medium text-orange-600 dark:text-orange-400">
                 You will need to sign two separate transactions:
               </p>
-              <ol className="list-decimal list-inside mt-1 pl-2">
+              <ol className="list-decimal list-inside mt-1">
                 <li className="mb-1">Registry contract: To register your app identity</li>
                 <li>Metadata contract: To store your app's metadata</li>
               </ol>
@@ -1073,7 +2001,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
 
   return (
     <Dialog open={isOpen} onOpenChange={isOpen ? handleCloseMintModal : undefined}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95%] max-w-[450px] sm:max-w-[550px] md:max-w-[650px] lg:max-w-[750px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Register New App</DialogTitle>
