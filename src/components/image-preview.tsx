@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ExternalLinkIcon, AlertCircleIcon, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { validateUrl } from '@/lib/validation'
+import { debounce } from '@/lib/utils'
 
 interface ImagePreviewProps {
   url: string
@@ -19,19 +20,33 @@ export function ImagePreview({ url, className = '', alt = 'Image preview' }: Ima
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null)
+  const [debouncedUrl, setDebouncedUrl] = useState<string>('')
   
-  // Reset state when URL changes
+  const updateDebouncedUrl = useCallback(
+    debounce((newUrl: string) => {
+      setDebouncedUrl(newUrl)
+    }, 800),
+    []
+  )
+  
+  useEffect(() => {
+    if (url && validateUrl(url)) {
+      updateDebouncedUrl(url)
+    } else {
+      setDebouncedUrl('')
+    }
+  }, [url, updateDebouncedUrl])
+  
   useEffect(() => {
     setIsLoading(true)
     setError(null)
     setDimensions(null)
     
-    if (!url || !validateUrl(url)) {
+    if (!debouncedUrl || !validateUrl(debouncedUrl)) {
       setIsLoading(false)
       return
     }
     
-    // We don't need to fetch via the API since images can be loaded directly
     const img = new Image()
     
     img.onload = () => {
@@ -40,15 +55,17 @@ export function ImagePreview({ url, className = '', alt = 'Image preview' }: Ima
         height: img.naturalHeight
       })
       setIsLoading(false)
+      setError(null)
     }
     
     img.onerror = () => {
       setError('Failed to load image')
       setIsLoading(false)
+      setDimensions(null)
     }
     
-    img.src = url
-  }, [url])
+    img.src = debouncedUrl
+  }, [debouncedUrl])
   
   if (!url || !validateUrl(url)) {
     return null
@@ -66,12 +83,12 @@ export function ImagePreview({ url, className = '', alt = 'Image preview' }: Ima
           <AlertCircleIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
-      ) : (
+      ) : debouncedUrl ? (
         <Card className="overflow-hidden border-slate-200">
           <CardContent className="p-3">
             <div className="rounded-md overflow-hidden border border-slate-200 bg-slate-50 dark:bg-slate-800">
               <img 
-                src={url} 
+                src={debouncedUrl} 
                 alt={alt}
                 className="max-h-[200px] w-auto mx-auto object-contain"
               />
@@ -84,7 +101,7 @@ export function ImagePreview({ url, className = '', alt = 'Image preview' }: Ima
             )}
             
             <a 
-              href={url} 
+              href={debouncedUrl || url} 
               target="_blank" 
               rel="noopener noreferrer" 
               className="text-blue-600 dark:text-blue-400 text-xs flex items-center mt-2 hover:underline"
@@ -93,7 +110,7 @@ export function ImagePreview({ url, className = '', alt = 'Image preview' }: Ima
             </a>
           </CardContent>
         </Card>
-      )}
+      ) : null}
     </div>
   )
 } 

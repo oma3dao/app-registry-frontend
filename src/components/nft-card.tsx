@@ -11,7 +11,6 @@ import {
 import type { NFT } from "@/types/nft"
 import { getStatusLabel, getStatusClasses } from "@/types/nft"
 import { log } from "@/lib/log"
-import Image from 'next/image' // Use Next.js Image for optimization
 import {
   Globe,
   Apple,
@@ -57,12 +56,13 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
   const externalUrl = nft.metadata?.marketingUrl || ""; // Maps to "external_url" key
   const status = typeof nft.status === 'number' ? nft.status : 0;
 
-  // Determine available platforms
-  const availablePlatforms = !nft.hasError && nft.metadata ? Object.entries(platformIcons).filter(([platformKey]) => {
-    const platformData = nft.metadata?.[`${platformKey}_url_download` as keyof NFT['metadata']] || 
-                         nft.metadata?.[`${platformKey}_url_launch` as keyof NFT['metadata']];
-    return !!platformData;
-  }).map(([key]) => key) : [];
+  // Determine available platforms by checking the nested structure
+  const availablePlatforms = !nft.hasError && nft.metadata?.platforms 
+    ? Object.keys(platformIcons).filter(platformKey => 
+        // Check if the platform key exists in the nft's metadata.platforms object
+        nft.metadata!.platforms!.hasOwnProperty(platformKey)
+      )
+    : [];
 
   const handleCardClick = () => {
     if (!nft.hasError) {
@@ -83,12 +83,13 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
           {nft.hasError ? (
             <AlertTriangleIcon size={24} className="text-red-600 dark:text-red-400" />
           ) : imageUrl ? (
-            <Image 
-              src={imageUrl} 
-              alt={`${name} icon`} 
-              width={40} 
-              height={40} 
+            <img
+              src={imageUrl}
+              alt={`${name} icon`}
+              width="40"
+              height="40"
               className="rounded object-contain"
+              loading="lazy"
             />
           ) : (
             <ImageIcon size={24} className="text-slate-400 dark:text-slate-600" aria-hidden="true" />

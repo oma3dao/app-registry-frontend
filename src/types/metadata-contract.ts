@@ -1,4 +1,39 @@
 /**
+ * Describes the details for a single platform where the application is available.
+ */
+export interface PlatformDetails {
+  /**
+   * URL for downloading the application (e.g., App Store, Google Play, website).
+   */
+  url_download?: string;
+  /**
+   * URL or scheme for launching the application directly (e.g., deep link).
+   */
+  url_launch?: string;
+  /**
+   * Optional list of supported devices or architectures (e.g., ["iPhone", "iPad"], ["x64", "arm64"]).
+   */
+  supported?: string[];
+}
+
+/**
+ * Defines the structure for platform availability information,
+ * mapping platform keys (like "ios", "web") to their details.
+ */
+export interface Platforms {
+  web?: PlatformDetails;
+  ios?: PlatformDetails;
+  android?: PlatformDetails;
+  windows?: PlatformDetails;
+  macos?: PlatformDetails;
+  meta?: PlatformDetails; // For Meta Quest
+  ps5?: PlatformDetails; // For PlayStation 5
+  xbox?: PlatformDetails; // For Xbox
+  nintendo?: PlatformDetails; // For Nintendo Switch
+  // Add other platforms as needed
+}
+
+/**
  * Metadata contract data structure
  * Contains all fields that are stored in the app metadata contract
  * This structure is useful for developers integrating directly with the metadata contract
@@ -32,82 +67,8 @@ export interface MetadataContractData {
   screenshotUrls: string[];
   
   /**
-   * Web platform launch URL
+   * Nested object containing details for each supported platform.
+   * Matches the "platforms" key used in the final JSON.
    */
-  web_url_launch?: string;
-  
-  /**
-   * iOS platform download URL
-   */
-  ios_url_download?: string;
-  
-  /**
-   * iOS platform launch URL
-   */
-  ios_url_launch?: string;
-  
-  /**
-   * iOS supported devices
-   */
-  ios_supported?: string[];
-  
-  /**
-   * Android platform download URL
-   */
-  android_url_download?: string;
-  
-  /**
-   * Android platform launch URL
-   */
-  android_url_launch?: string;
-  
-  /**
-   * Windows platform download URL
-   */
-  windows_url_download?: string;
-  
-  /**
-   * Windows platform launch URL
-   */
-  windows_url_launch?: string;
-  
-  /**
-   * Windows supported architectures
-   */
-  windows_supported?: string[];
-  
-  /**
-   * macOS platform download URL
-   */
-  macos_url_download?: string;
-  
-  /**
-   * macOS platform launch URL
-   */
-  macos_url_launch?: string;
-  
-  /**
-   * Meta Quest platform download URL
-   */
-  meta_url_download?: string;
-  
-  /**
-   * Meta Quest platform launch URL
-   */
-  meta_url_launch?: string;
-  
-  /**
-   * PlayStation platform download URL
-   */
-  ps5_url_download?: string;
-  
-  /**
-   * Xbox platform download URL
-   */
-  xbox_url_download?: string;
-  
-  /**
-   * Nintendo Switch platform download URL
-   */
-  nintendo_url_download?: string;
+  platforms?: Platforms;
 } 

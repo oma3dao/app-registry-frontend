@@ -29,8 +29,8 @@ export function UrlValidator({ url, className = '' }: UrlValidatorProps) {
       return
     }
     
-    setIsLoading(true)
     setError(null)
+    setHostname('')
     
     try {
       // Extract hostname for display
@@ -59,8 +59,6 @@ export function UrlValidator({ url, className = '' }: UrlValidatorProps) {
       setIsValid(false)
       setError('Failed to validate URL')
       console.error('Error validating URL:', err)
-    } finally {
-      setIsLoading(false)
     }
   }
   
@@ -73,9 +71,11 @@ export function UrlValidator({ url, className = '' }: UrlValidatorProps) {
   
   // Reset and check when URL changes
   useEffect(() => {
-    // Reset states
+    // Reset states immediately
     setIsValid(null)
     setError(null)
+    setHostname('')
+    setIsLoading(false)
     
     if (url && validateUrl(url)) {
       debouncedCheck(url)
@@ -83,12 +83,10 @@ export function UrlValidator({ url, className = '' }: UrlValidatorProps) {
       // URL present but invalid format
       setIsValid(false)
       setError('Invalid URL format')
-      setIsLoading(false)
     } else {
       // Empty URL
       setIsValid(null)
       setError(null)
-      setIsLoading(false)
     }
   }, [url, debouncedCheck])
   

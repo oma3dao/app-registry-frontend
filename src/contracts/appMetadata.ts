@@ -3,7 +3,7 @@ import { OMA3_APP_METADATA } from "@/config/contracts";
 import { client } from "@/app/client";
 import type { NFT } from "@/types/nft";
 import { Account } from "thirdweb/wallets";
-import { MetadataContractData } from "@/types/metadata-contract";
+import type { Platforms, PlatformDetails, MetadataContractData } from "@/types/metadata-contract";
 import { validateUrl, validateDid } from "@/lib/validation";
 import { log } from "@/lib/log";
 import { buildVersionedDID } from "@/lib/utils";
@@ -61,56 +61,76 @@ export function getAppMetadataContract() {
  * @returns Metadata JSON string
  */
 export function buildMetadataJSON(nft: NFT): string {
-  // Initialize metadata object using constants for OMA3 fields
-  // Use standard keys directly where appropriate (name, image, external_url)
   const metadata: { [key: string]: any } = {
     name: nft.name || "", // Standard name key
-    [METADATA_JSON_ICON_URL_KEY]: nft.metadata?.iconUrl || "", // Now uses "image" key directly via constant
-    [METADATA_JSON_MARKETING_URL_KEY]: nft.metadata?.marketingUrl || "", // Now uses "external_url" key directly via constant
+    [METADATA_JSON_ICON_URL_KEY]: nft.metadata?.iconUrl || "",
+    [METADATA_JSON_MARKETING_URL_KEY]: nft.metadata?.marketingUrl || "",
     [METADATA_JSON_DESCRIPTION_URL_KEY]: nft.metadata?.descriptionUrl || "",
     [METADATA_JSON_TOKEN_CONTRACT_KEY]: nft.metadata?.tokenContractAddress || "",
     [METADATA_JSON_SCREENSHOTS_URLS_KEY]: nft.metadata?.screenshotUrls?.filter(url => !!url) || [],
   };
 
-  // NOTE: We are intentionally omitting the standard "description" key
-  // as OMA3 uses METADATA_JSON_DESCRIPTION_URL_KEY
+  // Build platform availability data using constants for output keys
+  const outputPlatformData: { [key: string]: any } = {};
 
-  // Build platform availability data using constants
-  const platformData: { [key: string]: any } = {};
+  // Map internal platform keys (web, ios) to JSON keys (oma3_platforms_web, etc.)
+  const platformKeyMap: { [key in keyof Platforms]?: string } = {
+      web: METADATA_JSON_WEB_KEY,
+      ios: METADATA_JSON_IOS_KEY,
+      android: METADATA_JSON_ANDROID_KEY,
+      windows: METADATA_JSON_WINDOWS_KEY,
+      macos: METADATA_JSON_MACOS_KEY,
+      meta: METADATA_JSON_META_KEY,
+      ps5: METADATA_JSON_PS5_KEY,
+      xbox: METADATA_JSON_XBOX_KEY,
+      nintendo: METADATA_JSON_NINTENDO_KEY,
+  };
 
-  // Platform configuration map
-  const platformConfigs = [
-    { key: METADATA_JSON_WEB_KEY,       launchField: 'web_url_launch' },
-    { key: METADATA_JSON_IOS_KEY,       downloadField: 'ios_url_download', launchField: 'ios_url_launch', supportedField: 'ios_supported' },
-    { key: METADATA_JSON_ANDROID_KEY,   downloadField: 'android_url_download', launchField: 'android_url_launch' },
-    { key: METADATA_JSON_WINDOWS_KEY,   downloadField: 'windows_url_download', launchField: 'windows_url_launch', supportedField: 'windows_supported' },
-    { key: METADATA_JSON_MACOS_KEY,     downloadField: 'macos_url_download', launchField: 'macos_url_launch' },
-    { key: METADATA_JSON_META_KEY,      downloadField: 'meta_url_download', launchField: 'meta_url_launch' },
-    { key: METADATA_JSON_PS5_KEY,       downloadField: 'ps5_url_download' },
-    { key: METADATA_JSON_XBOX_KEY,      downloadField: 'xbox_url_download' },
-    { key: METADATA_JSON_NINTENDO_KEY,  downloadField: 'nintendo_url_download' },
-  ];
+  // Map internal detail keys (url_download) to JSON keys (oma3_platform_url_download)
+  const detailKeyMap: { [key in keyof PlatformDetails]?: string } = {
+      url_download: METADATA_JSON_URL_DOWNLOAD_KEY,
+      url_launch: METADATA_JSON_URL_LAUNCH_KEY,
+      supported: METADATA_JSON_SUPPORTED_KEY,
+  };
 
-  if (nft.metadata) {
-    platformConfigs.forEach(config => {
-      const entry: { [key: string]: any } = {};
-      const downloadUrl = config.downloadField ? nft.metadata![config.downloadField as keyof MetadataContractData] : undefined;
-      const launchUrl = config.launchField ? nft.metadata![config.launchField as keyof MetadataContractData] : undefined;
-      const supported = config.supportedField ? nft.metadata![config.supportedField as keyof MetadataContractData] : undefined;
+  if (nft.metadata?.platforms) {
+    // Iterate over the platforms present in the input NFT metadata
+    for (const platformKey in nft.metadata.platforms) {
+        // Ensure it's a valid platform key we know how to map
+        if (platformKeyMap.hasOwnProperty(platformKey)) {
+            // Add type annotation for inputPlatformDetails
+            const inputPlatformDetails: PlatformDetails | undefined = nft.metadata.platforms[platformKey as keyof Platforms];
+            const outputJsonKey = platformKeyMap[platformKey as keyof Platforms]!; // Get the JSON key (e.g., oma3_platforms_ios)
+            const outputPlatformDetailsJson: { [key: string]: any } = {};
 
-      if (downloadUrl) entry[METADATA_JSON_URL_DOWNLOAD_KEY] = downloadUrl;
-      if (launchUrl) entry[METADATA_JSON_URL_LAUNCH_KEY] = launchUrl;
-      if (Array.isArray(supported) && supported.length > 0) entry[METADATA_JSON_SUPPORTED_KEY] = supported;
+            if (inputPlatformDetails) {
+                // Iterate over the details for this platform
+                // Add type annotation for detailKey
+                for (const detailKeyString in inputPlatformDetails) {
+                    const detailKey = detailKeyString as keyof PlatformDetails;
+                    // Ensure it's a valid detail key we know how to map
+                    if (detailKeyMap.hasOwnProperty(detailKey)) {
+                         const inputDetailValue = inputPlatformDetails[detailKey]; // Use the typed key
+                         const outputDetailJsonKey = detailKeyMap[detailKey]!; // Get the detail JSON key (e.g., oma3_platform_url_download)
 
-      // Add platform entry only if it has at least one value
-      if (Object.keys(entry).length > 0) {
-        platformData[config.key] = entry;
-      }
-    });
+                         // Only add non-empty values
+                         if (inputDetailValue && (!Array.isArray(inputDetailValue) || inputDetailValue.length > 0)) {
+                            outputPlatformDetailsJson[outputDetailJsonKey] = inputDetailValue;
+                         }
+                    }
+                }
+            }
+
+            // Add the platform entry to the output only if it has details
+            if (Object.keys(outputPlatformDetailsJson).length > 0) {
+                outputPlatformData[outputJsonKey] = outputPlatformDetailsJson;
+            }
+        }
+    }
   }
 
-  // Always include the platform availability key
-  metadata[METADATA_JSON_PLATFORM_KEY] = platformData;
+  // Add the built platform data to the main metadata object
+  metadata[METADATA_JSON_PLATFORM_KEY] = outputPlatformData;
 
   // Convert the complete metadata object to a JSON string
   return JSON.stringify(metadata);
@@ -281,40 +301,38 @@ export function validateMetadata(metadata: MetadataContractData): void {
     }
   });
   
-  // At least one platform availability is required
-  const hasPlatform = metadata.web_url_launch ||
-    metadata.ios_url_download || metadata.ios_url_launch ||
-    metadata.android_url_download || metadata.android_url_launch ||
-    metadata.windows_url_download || metadata.windows_url_launch ||
-    metadata.macos_url_download || metadata.macos_url_launch ||
-    metadata.meta_url_download || metadata.meta_url_launch ||
-    metadata.ps5_url_download ||
-    metadata.xbox_url_download ||
-    metadata.nintendo_url_download;
-  
-  if (!hasPlatform) {
-    throw new Error("At least one platform availability URL is required");
+  // At least one platform availability URL is required
+  let hasPlatformUrl = false;
+  if (metadata.platforms) {
+      for (const platformKey in metadata.platforms) {
+          // Use type assertion for safety when accessing details
+          const details = metadata.platforms[platformKey as keyof Platforms];
+          if (details && (details.url_download || details.url_launch)) {
+              hasPlatformUrl = true;
+              break; // Found at least one, no need to check further
+          }
+      }
+  }
+  if (!hasPlatformUrl) {
+    throw new Error("At least one platform availability URL (Download or Launch) is required");
   }
   
-  // Validate HTTP URLs
+  // Validate HTTP URLs within platforms
   const validateHttpUrl = (url: string | undefined, fieldName: string) => {
     if (url && url.startsWith('http') && !validateUrl(url)) {
       throw new Error(`Invalid ${fieldName}`);
     }
   };
   
-  validateHttpUrl(metadata.web_url_launch, 'web launch URL');
-  validateHttpUrl(metadata.ios_url_download, 'iOS download URL');
-  validateHttpUrl(metadata.ios_url_launch, 'iOS launch URL');
-  validateHttpUrl(metadata.android_url_download, 'Android download URL');
-  validateHttpUrl(metadata.android_url_launch, 'Android launch URL');
-  validateHttpUrl(metadata.windows_url_download, 'Windows download URL');
-  validateHttpUrl(metadata.windows_url_launch, 'Windows launch URL');
-  validateHttpUrl(metadata.macos_url_download, 'macOS download URL');
-  validateHttpUrl(metadata.macos_url_launch, 'macOS launch URL');
-  validateHttpUrl(metadata.meta_url_download, 'Meta Quest download URL');
-  validateHttpUrl(metadata.meta_url_launch, 'Meta Quest launch URL');
-  validateHttpUrl(metadata.ps5_url_download, 'PlayStation download URL');
-  validateHttpUrl(metadata.xbox_url_download, 'Xbox download URL');
-  validateHttpUrl(metadata.nintendo_url_download, 'Nintendo Switch download URL');
-} 
+  if (metadata.platforms) {
+      for (const platformKey in metadata.platforms) {
+          // Use type assertion for safety when accessing details
+          const details = metadata.platforms[platformKey as keyof Platforms];
+          if (details) {
+              validateHttpUrl(details.url_download, `${platformKey} download URL`);
+              validateHttpUrl(details.url_launch, `${platformKey} launch URL`);
+              // Note: 'supported' is an array of strings, not a URL, so no validation needed here.
+          }
+      }
+  }
+}
