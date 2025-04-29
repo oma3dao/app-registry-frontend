@@ -12,6 +12,7 @@ import { useActiveAccount } from "thirdweb/react"
 import { setMetadata } from "@/contracts/appMetadata"
 import { log } from "@/lib/log"
 import { fetchMetadataImage } from "@/lib/utils"
+import { toast } from "sonner"
 
 export default function Dashboard() {
   log("Component rendering");
@@ -166,6 +167,10 @@ export default function Dashboard() {
       }
       
       setNfts([...nfts, registeredNft]);
+      
+      // Show success toast before closing - Use generic message
+      toast.success("Transaction successful")
+      
       handleCloseMintModal();
       return Promise.resolve();
     } catch (error) {

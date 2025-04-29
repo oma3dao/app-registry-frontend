@@ -7,7 +7,8 @@ import {
   DialogDescription, 
   DialogFooter, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogClose
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -664,6 +665,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         (nftToSubmit as any).isCustomUrls = isCustomizingUrls;
         
         await onSave(nftToSubmit);
+        setShowTxAlert(false); // Explicitly clear alert state on success
       } catch (error) {
         console.error("Error registering app:", error);
         setShowTxAlert(false);
@@ -2143,14 +2145,15 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
             </div>
             
             <div className="flex gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleCloseMintModal} 
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
+              <DialogClose asChild>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+              </DialogClose>
               
               <Button 
                 type="submit" 

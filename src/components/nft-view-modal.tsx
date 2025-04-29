@@ -1,5 +1,6 @@
 "use client"
 
+import React from 'react';
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,6 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -25,6 +27,8 @@ import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile, buildVersionedDID } from "@/lib/utils"
 import { log } from "@/lib/log"
 import { getMetadata } from "@/contracts/appMetadata"
+import { AlertCircleIcon } from 'lucide-react';
+import { toast } from "sonner"
 
 interface NFTViewModalProps {
   isOpen: boolean
@@ -38,6 +42,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   const [selectedStatus, setSelectedStatus] = useState<number>(0)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showTxAlert, setShowTxAlert] = useState(false)
+  const [txError, setTxError] = useState<string | null>(null)
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
   const [metadataExists, setMetadataExists] = useState(false)
   
@@ -58,9 +63,15 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
       handleCloseViewModal()
       setIsEditingStatus(false)
       setShowTxAlert(false)
+      setTxError(null)
     } else if (nft) {
-      // Initialize with current NFT status
       setSelectedStatus(nft.status)
+      setShowTxAlert(false)
+      setTxError(null)
+    } else {
+       // Reset state if modal is closed or no NFT
+       // setIsLoadingMetadata(false); // These might not be needed if checkMetadata is elsewhere or not used
+       // setMetadataExists(false);
     }
   }
   
@@ -114,6 +125,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
       
       setIsUpdating(true)
       setShowTxAlert(true)
+      setTxError(null)
       
       // Create updated NFT with new status
       const updatedNft: NFT = {
@@ -124,12 +136,29 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
       log(`Updating ${nft.did} status from ${nft.status} to ${selectedStatus}`)
       await onUpdateStatus(updatedNft, selectedStatus)
       setIsEditingStatus(false)
+      setShowTxAlert(false)
+      
+      // Show success toast before closing
+      toast.success("Status updated successfully!")
       
       // Close the modal after successful update
       handleCloseViewModal()
     } catch (error) {
-      console.error("Error updating status:", error)
-      setShowTxAlert(false)
+      // Use log() instead of console.error for transaction errors
+      log("Error updating status:", error)
+      setShowTxAlert(false) // Hide pending alert
+      
+      // Extract and set error message for display
+      let errorMessage = "Failed to update status";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      setTxError(errorMessage);
+      
     } finally {
       setIsUpdating(false)
     }
@@ -150,12 +179,26 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           </DialogDescription>
         </DialogHeader>
         
+        {/* Pending Transaction Alert */}
         {showTxAlert && (
           <TransactionAlert 
             title="Status Update Transaction" 
             description="Please approve the transaction in your wallet to update the app status."
             isMobile={isMobile()}
           />
+        )}
+        
+        {/* Error Display Box */}
+        {txError && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-md">
+            <div className="flex gap-2 items-start text-red-700 dark:text-red-400">
+              <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium mb-1">Status Update Error</p>
+                <p>{txError}</p>
+              </div>
+            </div>
+          </div>
         )}
         
         <div className="grid gap-6 py-4">
@@ -282,13 +325,14 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 {isUpdating ? "Saving..." : "Save changes"}
               </Button>
           ) : (
-            <Button 
-              variant="outline" 
-              onClick={handleCloseViewModal}
-              disabled={isUpdating}
-            >
-              Close
-            </Button>
+            <DialogClose asChild>
+              <Button 
+                variant="outline" 
+                disabled={isUpdating}
+              >
+                Close
+              </Button>
+            </DialogClose>
           )}
         </DialogFooter>
       </DialogContent>
