@@ -9,14 +9,25 @@ import { LANDING_PAGE_NUM_APPS } from "@/config/app-config"
 import NFTViewModal from "@/components/nft-view-modal"
 import { log } from "@/lib/log"
 import { fetchMetadataImage } from "@/lib/utils"
+import { useActiveAccount } from "thirdweb/react"
 
 export default function LandingPage() {
   const [latestApps, setLatestApps] = useState<NFT[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
+  const account = useActiveAccount()
+  const [shouldLoadNFTs, setShouldLoadNFTs] = useState(false)
   
   useEffect(() => {
+    if (account) {
+      // Redirect to dashboard if wallet is connected
+      window.location.href = "/dashboard";
+      return;
+    }
+
+    setShouldLoadNFTs(true);
+
     const fetchLatestApps = async () => {
       try {
         setIsLoading(true)
@@ -80,8 +91,10 @@ export default function LandingPage() {
       }
     }
     
-    fetchLatestApps()
-  }, [])
+    if (shouldLoadNFTs) {
+      fetchLatestApps()
+    }
+  }, [account, shouldLoadNFTs])
 
   // Opens the view modal for an NFT
   const handleOpenViewModal = (nft: NFT) => {
@@ -143,17 +156,19 @@ export default function LandingPage() {
           </div>
         </div>
         
-        <div className="pt-16 w-full">
-          <h1 className="text-3xl font-bold mb-8 text-left">Latest Registered Apps</h1>
-          <NFTGrid 
-            nfts={latestApps} 
-            onNFTCardClick={handleOpenViewModal}
-            onOpenMintModal={handleOpenMintModal}
-            isLoading={isLoading}
-            showStatus={false}
-            className="sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
-          />
-        </div>
+        {shouldLoadNFTs && (
+          <div className="pt-16 w-full">
+            <h1 className="text-3xl font-bold mb-8 text-left">Latest Registered Apps</h1>
+            <NFTGrid 
+              nfts={latestApps} 
+              onNFTCardClick={handleOpenViewModal}
+              onOpenMintModal={handleOpenMintModal}
+              isLoading={isLoading}
+              showStatus={false}
+              className="sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
+            />
+          </div>
+        )}
       </div>
 
       {/* View Modal - Used for viewing app details */}
