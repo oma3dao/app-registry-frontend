@@ -47,17 +47,17 @@ export interface MetadataContractData {
   /**
    * URL to marketing materials
    */
-  marketingUrl: string;
+  external_url: string;
   
   /**
    * Token contract address (optional)
    */
-  tokenContractAddress?: string;
+  token?: string;
   
   /**
    * URL to app icon (1024x1024)
    */
-  iconUrl: string;
+  image: string;
   
   /**
    * URLs to app screenshots (max 5)

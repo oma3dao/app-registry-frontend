@@ -15,16 +15,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { NFT } from "@/types/nft"
-import { 
-  validateUrl, 
-  validateVersion, 
+import type { MetadataContractData } from '@/types/metadata-contract'
+import type { WizardFormData } from '@/types/form'
+import {
+  validateUrl,
+  validateVersion,
   validateDid, 
   validateName, 
   validateCaipAddress
 } from "@/lib/validation"
-import type { WizardFormData } from "@/types/form"
+import { isMobile, normalizeMetadata } from "@/lib/utils"
 import { TransactionAlert } from "@/components/ui/transaction-alert"
-import { isMobile } from "@/lib/utils"
+import { ExternalLinkIcon, EditIcon, AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, InfoIcon } from "lucide-react"
+import { ImagePreview } from "@/components/image-preview"
+import { UrlValidator } from "@/components/url-validator"
+import type { Platforms, PlatformDetails } from "@/types/metadata-contract"
+import { log } from "@/lib/log"
 import { 
   URL_ERROR_MESSAGE, 
   URL_PLACEHOLDER, 
@@ -40,22 +46,34 @@ import {
   IWPS_PORTAL_BASE_URL,
   SELF_HOSTING_DOCS_URL
 } from '@/config/app-config'
-import { ExternalLinkIcon, EditIcon, AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, ChevronDown, InfoIcon } from "lucide-react"
-import { ImagePreview } from "@/components/image-preview"
-import { UrlValidator } from "@/components/url-validator"
-import type { Platforms, PlatformDetails } from "@/types/metadata-contract"
-import { log } from "@/lib/log"
 
 // Define type for wizard steps
-type WizardStep = 1 | 2 | 3 | 4 | 5;
+export type WizardStep = 1 | 2 | 3 | 4 | 5;
 
-// Group form fields by step for validation
-const STEP_FIELDS = {
-  1: ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri', 'agentApiUri', 'contractAddress'],
-  2: ['metadata.descriptionUrl', 'metadata.marketingUrl', 'metadata.tokenContractAddress'],
-  3: ['metadata.iconUrl', 'metadata.screenshotUrls'],
-  4: ['platform_availability'], // Special key for Step 4 check
-  5: ['final'] // Final confirmation step - no validation needed
+// Define a type for the keys of STEP_FIELDS
+const STEP_FIELDS: Record<WizardStep, FieldDescriptor[]> = {
+  1: [
+    { name: 'name', isRequired: true },
+    { name: 'version', isRequired: true },
+    { name: 'did', isRequired: true },
+    { name: 'dataUrl', isRequired: true },
+    { name: 'iwpsPortalUri', isRequired: true },
+    { name: 'agentApiUri', isRequired: false },
+    { name: 'contractAddress', isRequired: false }
+  ],
+  2: [
+    { name: 'metadata.descriptionUrl', isRequired: true },
+    { name: 'metadata.external_url', isRequired: true },
+    { name: 'metadata.token', isRequired: false }
+  ],
+  3: [
+    { name: 'metadata.image', isRequired: true },
+    { name: 'metadata.screenshotUrls', isRequired: true }
+  ],
+  4: [
+    { name: 'metadata.platforms', isRequired: true }
+  ],
+  5: [] // No specific fields required for step 5
 };
 
 // Step titles for the wizard
@@ -70,8 +88,11 @@ const stepTitles = {
 interface NFTMintModalProps {
   isOpen: boolean
   handleCloseMintModal: () => void
-  onSave: (nft: NFT) => Promise<void>
+  onSave: (nft: NFT, currentStep: number) => Promise<void>
   nft: NFT | null
+  initialMetadata?: Record<string, any> | null
+  currentStep: WizardStep
+  onStepChange: (step: WizardStep) => void
 }
 
 // Helper function to convert from NFT to WizardFormData
@@ -104,6 +125,9 @@ const nftToWizardForm = (nft: NFT): WizardFormData => {
       }
   });
 
+  // Normalize the metadata using our helper function, but preserve the platforms we just processed
+  const normalizedMetadata = normalizeMetadata(nft.metadata);
+  
   return {
     // Registry fields
     did: nft.did,
@@ -116,15 +140,11 @@ const nftToWizardForm = (nft: NFT): WizardFormData => {
     status: nft.status || 0,
     minter: nft.minter || "",
     
-    // Metadata fields with defaults & nested platforms
+    // Use normalized metadata but override platforms with our processed version
     metadata: {
-      descriptionUrl: nft.metadata?.descriptionUrl || "",
-      marketingUrl: nft.metadata?.marketingUrl || "",
-      tokenContractAddress: nft.metadata?.tokenContractAddress || "",
-      iconUrl: nft.metadata?.iconUrl || "",
-      screenshotUrls: nft.metadata?.screenshotUrls || ["", "", "", "", ""],
-      platforms: platformAvailability // Use the constructed nested object
-    }
+      ...normalizedMetadata,
+      platforms: platformAvailability
+    } as MetadataContractData
   };
 };
 
@@ -141,7 +161,111 @@ const wizardFormToNft = (formData: WizardFormData): NFT => {
   } as NFT;
 };
 
-export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft }: NFTMintModalProps) {
+// Define a type for field descriptors
+interface FieldDescriptor {
+  name: string;
+  isRequired: boolean;
+}
+
+// Utility function to validate fields
+const validateFields = (fields: FieldDescriptor[], formData: WizardFormData) => {
+  const errors: Record<string, string> = {};
+  fields.forEach(({ name, isRequired }) => {
+    // Handle nested fields (metadata.field)
+    const value = name.includes('.') ? formData.metadata?.[name.split('.')[1] as keyof typeof formData.metadata] : formData[name as keyof WizardFormData];
+    
+    // Special handling for platforms
+    if (name === 'metadata.platforms') {
+      const platforms = value as Platforms;
+      log("[validateFields] Checking platforms:", platforms);
+
+      const hasAtLeastOnePlatform = platforms && Object.keys(platforms).length > 0 && 
+        Object.values(platforms).some(details => 
+          (details?.url_download && details.url_download.trim() !== '') || 
+          (details?.url_launch && details.url_launch.trim() !== '')
+        );
+
+      if (!hasAtLeastOnePlatform) {
+        errors['metadata.platforms'] = "At least one platform URL (Download or Launch) must be provided.";
+      }
+
+      // Validate individual platform URLs (only if http/https)
+      else if (platforms) {
+        Object.entries(platforms).forEach(([platformKey, details]) => {
+          const pKey = platformKey as keyof Platforms; // Type assertion
+          if (details?.url_download && details.url_download.startsWith('http') && !validateUrl(details.url_download)) {
+            errors[`metadata.platforms.${pKey}.url_download`] = URL_ERROR_MESSAGE;
+          }
+          if (details?.url_launch && details.url_launch.startsWith('http') && !validateUrl(details.url_launch)) {
+            errors[`metadata.platforms.${pKey}.url_launch`] = URL_ERROR_MESSAGE;
+          }
+        });
+      }
+      
+      log("[validateFields] Platform validation result:", hasAtLeastOnePlatform);
+      log("[validateFields] Platform errors:", errors);
+      
+    } else if (isRequired && !value) {
+      errors[name] = `${name} is required.`;
+    } else if (value) {
+      let error = '';
+      switch (name) {
+        case 'version':
+          if (!validateVersion(value as string)) error = VERSION_ERROR_MESSAGE;
+          break;
+        case 'dataUrl':
+        case 'iwpsPortalUri':
+        case 'agentApiUri':
+        case 'metadata.descriptionUrl':
+        case 'metadata.external_url':
+        case 'metadata.image':
+          if (!validateUrl(value as string)) error = URL_ERROR_MESSAGE;
+          break;
+        case 'did':
+          if (!validateDid(value as string)) error = DID_ERROR_MESSAGE;
+          break;
+        case 'name':
+          if (!validateName(value as string)) error = NAME_ERROR_MESSAGE;
+          break;
+        case 'contractAddress':
+        case 'metadata.token':
+          if (!validateCaipAddress(value as string)) error = CONTRACT_ERROR_MESSAGE;
+          break;
+      }
+      if (error) {
+        errors[name] = error;
+      }
+    }
+  });
+
+  log("[validateFields] Validation errors:", errors);
+  return errors;
+};
+
+// Function to validate registration fields
+const validateRegistration = (formData: WizardFormData) => {
+  return validateFields(STEP_FIELDS[1], formData);
+};
+
+// Function to validate metadata fields
+const validateMetadata = (formData: WizardFormData) => {
+  const metadataErrors: Record<string, string> = {};
+  for (let step = 2; step <= 4; step++) {
+    const stepErrors = validateFields(STEP_FIELDS[step as WizardStep], formData);
+    Object.assign(metadataErrors, stepErrors);
+  }
+  return metadataErrors;
+};
+
+export default function NFTMintModal({ 
+  isOpen, 
+  handleCloseMintModal, 
+  onSave, 
+  nft, 
+  initialMetadata,
+  currentStep,
+  onStepChange
+}: NFTMintModalProps) {
   const [formData, setFormData] = useState<WizardFormData>({
     // Registry fields (direct properties)
     did: "",
@@ -157,9 +281,9 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     // Metadata fields (nested under metadata)
     metadata: {
       descriptionUrl: "",
-      marketingUrl: "",
-      tokenContractAddress: "",
-      iconUrl: "",
+      external_url: "",
+      token: "",
+      image: "",
       screenshotUrls: ["", "", "", "", ""],
       // Initialize with empty platforms object
       platforms: {}
@@ -169,7 +293,6 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
   const [isSaving, setIsSaving] = useState(false)
   const [showTxAlert, setShowTxAlert] = useState(false)
   const [txError, setTxError] = useState<string | null>(null)
-  const [currentStep, setCurrentStep] = useState<WizardStep>(1)
   const [isCustomizingUrls, setIsCustomizingUrls] = useState(false)
   
   // Function to generate default URLs based on DID and version
@@ -202,12 +325,33 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
   useEffect(() => {
     if (nft) {
       // Existing NFT - use its values
-      setFormData(nftToWizardForm(nft));
+      const baseFormData = nftToWizardForm(nft);
+      
+      // If initialMetadata is provided, merge it with the existing metadata
+      if (initialMetadata) {
+        log("Setting form data with initialMetadata:", initialMetadata);
+        // Normalize the metadata to ensure it has all required fields
+        const normalizedMetadata = normalizeMetadata(initialMetadata);
+        
+        setFormData({
+          ...baseFormData,
+          metadata: {
+            ...baseFormData.metadata,
+            ...normalizedMetadata
+          } as MetadataContractData
+        });
+      } else {
+        setFormData(baseFormData);
+      }
+      
       // Clear errors when opening with existing NFT
       setErrors({});
     } else {
       // For new NFT, set default values
-      const emptyNft = {
+      // Normalize the metadata to ensure it has all required fields
+      const normalizedMetadata = normalizeMetadata(initialMetadata);
+      
+      const emptyNft: WizardFormData = {
         did: "",
         name: "",
         version: "",
@@ -219,29 +363,15 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         minter: "",
         metadata: {
           descriptionUrl: "",
-          marketingUrl: "",
-          tokenContractAddress: "",
-          iconUrl: "",
+          external_url: "",
+          token: "",
+          image: "",
           screenshotUrls: ["", "", "", "", ""],
-          // Platform availability fields
-          web_url_launch: "",
-          ios_url_download: "",
-          ios_url_launch: "",
-          ios_supported: [],
-          android_url_download: "",
-          android_url_launch: "",
-          windows_url_download: "",
-          windows_url_launch: "",
-          windows_supported: [],
-          macos_url_download: "",
-          macos_url_launch: "",
-          meta_url_download: "",
-          meta_url_launch: "",
-          ps5_url_download: "",
-          xbox_url_download: "",
-          nintendo_url_download: ""
-        }
+          platforms: {},
+          ...normalizedMetadata
+        } as MetadataContractData
       };
+      
       setFormData(emptyNft);
       // Clear errors when opening empty form
       setErrors({});
@@ -250,9 +380,8 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     setIsSaving(false);
     setShowTxAlert(false);
     setTxError(null);
-    setCurrentStep(1);
     setIsCustomizingUrls(false);
-  }, [nft, isOpen]);
+  }, [nft, isOpen, initialMetadata]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -321,7 +450,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
        }
 
     } else if (name.startsWith('metadata.')) {
-       // Handle other nested metadata fields (descriptionUrl, marketingUrl, etc.)
+       // Handle other nested metadata fields (descriptionUrl, external_url, image, etc.)
        const metadataField = name.split('.')[1];
        setFormData(prev => ({
          ...prev,
@@ -332,9 +461,9 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
        }));
        // Add specific validation for these fields if needed (like in validateStep)
        // Simplified validation on change for example:
-       if ((metadataField === 'descriptionUrl' || metadataField === 'marketingUrl' || metadataField === 'iconUrl') && value && !validateUrl(value)) {
+       if ((metadataField === 'descriptionUrl' || metadataField === 'external_url' || metadataField === 'image') && value && !validateUrl(value)) {
           setErrors(prev => ({ ...prev, [name]: URL_ERROR_MESSAGE }));
-       } else if (metadataField === 'tokenContractAddress' && value && !validateCaipAddress(value)) {
+       } else if (metadataField === 'token' && value && !validateCaipAddress(value)) {
           setErrors(prev => ({ ...prev, [name]: CONTRACT_ERROR_MESSAGE }));
        } else {
           setErrors(prev => { const newErrors = { ...prev }; delete newErrors[name]; return newErrors; });
@@ -483,216 +612,100 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
     }
   };
 
-  // Validate fields for the current step
-  const validateStep = (step: WizardStep): boolean => {
-    const stepFieldsToValidate = STEP_FIELDS[step]; // STEP_FIELDS might need adjustment if field names changed drastically
-    const stepErrors: Record<string, string> = {};
-    
-    // Special validation for Step 4: Platform Availability
-    if (step === 4) {
-      const platforms = formData.metadata?.platforms;
-      log("[validateStep 4] Platforms data:", platforms); // Use log()
-
-      const hasAtLeastOnePlatform = platforms && Object.keys(platforms).length > 0 && 
-        Object.values(platforms).some(details => 
-          (details?.url_download && details.url_download.trim() !== '') || 
-          (details?.url_launch && details.url_launch.trim() !== '')
-        );
-
-      if (!hasAtLeastOnePlatform) {
-        // Use a general key for this step-level error
-        stepErrors['metadata.platforms'] = "At least one platform URL (Download or Launch) must be provided.";
-      }
-
-      // Validate individual platform URLs (only if http/https)
-      if (platforms) {
-        Object.entries(platforms).forEach(([platformKey, details]) => {
-          const pKey = platformKey as keyof Platforms; // Type assertion
-          if (details?.url_download && details.url_download.startsWith('http') && !validateUrl(details.url_download)) {
-            stepErrors[`metadata.platforms.${pKey}.url_download`] = URL_ERROR_MESSAGE;
-          }
-          if (details?.url_launch && details.url_launch.startsWith('http') && !validateUrl(details.url_launch)) {
-            stepErrors[`metadata.platforms.${pKey}.url_launch`] = URL_ERROR_MESSAGE;
-          }
-          // Add validation for 'supported' field format if necessary
-        });
-      }
-
-      log("[validateStep 4] hasAtLeastOnePlatform:", hasAtLeastOnePlatform); // Use log()
-      log("[validateStep 4] Calculated stepErrors:", stepErrors); // Use log()
-
-    }
-    
-    // Validate each field listed in STEP_FIELDS (excluding step 4 fields handled above)
-    if (step !== 4) {
-      stepFieldsToValidate.forEach(field => {
-         // Handle nested fields (metadata.field)
-        if (field.startsWith('metadata.')) {
-          const metadataField = field.split('.')[1];
-          const value = formData.metadata?.[metadataField as keyof typeof formData.metadata];
-
-          // Simplified validation based on field name
-          switch(metadataField) {
-            case 'descriptionUrl':
-            case 'marketingUrl':
-            case 'iconUrl':
-              if (!value || !validateUrl(value as string)) {
-                stepErrors[field] = URL_ERROR_MESSAGE;
-              }
-              break;
-            case 'tokenContractAddress':
-              if (value && !validateCaipAddress(value as string)) {
-                stepErrors[field] = CONTRACT_ERROR_MESSAGE;
-              }
-              break;
-            case 'screenshotUrls':
-              const screenshots = value as string[];
-              if (!screenshots?.[0] || !validateUrl(screenshots[0])) {
-                stepErrors['metadata.screenshotUrls.0'] = URL_ERROR_MESSAGE; // Use specific key for first error
-              }
-              screenshots?.slice(1).forEach((url, index) => {
-                if (url && !validateUrl(url)) {
-                  stepErrors[`metadata.screenshotUrls.${index + 1}`] = URL_ERROR_MESSAGE;
-                }
-              });
-              break;
-             // Platform fields are handled in the step === 4 block above
-          }
-        } else {
-           // Validate registry fields (top level)
-          const value = formData[field as keyof WizardFormData];
-          switch(field) {
-            case 'name':
-              if (!validateName(value as string)) stepErrors.name = NAME_ERROR_MESSAGE;
-              break;
-            case 'version':
-              if (!validateVersion(value as string)) stepErrors.version = VERSION_ERROR_MESSAGE;
-              break;
-            case 'did':
-              if (!validateDid(value as string)) stepErrors.did = DID_ERROR_MESSAGE;
-              break;
-            case 'dataUrl':
-            case 'iwpsPortalUri':
-              if (!validateUrl(value as string)) stepErrors[field] = URL_ERROR_MESSAGE;
-              break;
-            case 'agentApiUri':
-              if (value && !validateUrl(value as string)) stepErrors.agentApiUri = URL_ERROR_MESSAGE;
-              break;
-            case 'contractAddress':
-              if (value && !validateCaipAddress(value as string)) stepErrors.contractAddress = CONTRACT_ERROR_MESSAGE;
-              break;
-          }
-        }
-      });
-    }
-    
-    // Update errors state with current step errors
-    setErrors(stepErrors);
-    
-    // Return true if there are no errors for the current step
-    const isValid = Object.keys(stepErrors).length === 0;
-    log(`[validateStep ${step}] Returning:`, isValid); // Use log()
-    return isValid;
-  };
-
   // Handle next button click - validate current step before proceeding
-  const handleNextStep = () => {
-    log(`[handleNextStep] Called for step ${currentStep}`); // Use log()
-    
-    log(`[handleNextStep] Calling validateStep(${currentStep})`);
-    log(`[handleNextStep] Calling validateStep(${currentStep})`); // Use log()
-    if (validateStep(currentStep)) {
-      log(`[handleNextStep] validateStep(${currentStep}) returned true, advancing step.`); // Use log()
-      setCurrentStep(prev => {
-        const nextStep = prev + 1;
-        return (nextStep > 5 ? 5 : nextStep) as WizardStep;
-      });
-    }
-    else {
-      log(`[handleNextStep] validateStep(${currentStep}) returned false, not advancing.`); // Use log()
-    }
-  };
+  const handleNextStep = async () => {
+    log(`[handleNextStep] Called for step ${currentStep}`);
 
-  // Handle back button click
-  const handlePrevStep = () => {
-    setCurrentStep(prev => {
-      const prevStep = prev - 1;
-      return (prevStep < 1 ? 1 : prevStep) as WizardStep;
-    });
+    // Validate fields for the current step
+    const stepErrors = validateFields(STEP_FIELDS[currentStep], formData);
+    log(`[handleNextStep] Validation errors for step ${currentStep}:`, stepErrors);
+    if (Object.keys(stepErrors).length > 0) {
+      log(`[handleNextStep] validateFields returned errors for step ${currentStep}, not advancing.`);
+      setErrors(stepErrors);
+      return;
+    }
+
+    // Move to the next step
+    log(`[handleNextStep] No validation errors for step ${currentStep}, advancing to next step.`);
+    const nextStep = currentStep + 1;
+    log(`[handleNextStep] Advancing to step ${nextStep}`);
+    onStepChange(nextStep > 5 ? 5 : nextStep as WizardStep);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log(`[handleSubmit] formData:`, JSON.stringify(formData, null, 2));
+    console.log(`[handleSubmit] Current step:`, currentStep);
     e.preventDefault();
     
-    // If on step 1 and not customizing URLs, move to the next step
-    if (currentStep === 1 && !isCustomizingUrls) {
+    // Validate fields for the current step
+    if (currentStep === 1) {
+      // Validate step 1 fields using validateRegistration
+      const registrationErrors = validateRegistration(formData);
+      if (Object.keys(registrationErrors).length > 0) {
+        log(`[handleSubmit] validateRegistration returned errors, not submitting.`);
+        setErrors(registrationErrors);
+        return;
+      }
+    } else if (currentStep === 5) {
+      // Validate steps 2, 3, and 4 fields using validateMetadata
+      const metadataErrors = validateMetadata(formData);
+      if (Object.keys(metadataErrors).length > 0) {
+        setErrors(metadataErrors);
+        return;
+      }
+    } else {
+      log('handleSubmit called with currentStep != 1 or 5, not submitting and calling handleNextStep instead.');
       handleNextStep();
       return;
     }
     
-    // In step 1 with customized URLs, or in final step, proceed with registration
-    if (currentStep === 1 || currentStep === 5) {
-      // Validate fields for the current step
-      if (!validateStep(currentStep)) {
-        return;
-      }
-      
-      // If we're at step 1 with custom URLs, validate all required fields manually
-      if (currentStep === 1) {
-        // Required fields for registration (agentApiUri is optional)
-        const requiredFields = ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri'];
-        const missingRequired = requiredFields.filter(field => !formData[field as keyof WizardFormData]);
-        
-        if (missingRequired.length > 0) {
-          console.error(`Missing required fields: ${missingRequired.join(', ')}`);
-          return;
-        }
-        
-        // Check for validation errors in the current step
-        const fieldsToValidate = STEP_FIELDS[1];
-        const hasErrors = fieldsToValidate.some(field => field in errors);
-        if (hasErrors) {
-          return;
-        }
-      }
-      
-      setIsSaving(true);
-      setShowTxAlert(true);
-      setTxError(null);
-      
-      try {
-        // Create the NFT object with the custom URLs flag
-        const nftToSubmit = wizardFormToNft(formData);
-        // Add isCustomUrls flag to indicate if user is using custom URLs
-        (nftToSubmit as any).isCustomUrls = isCustomizingUrls;
-        
-        await onSave(nftToSubmit);
-        setShowTxAlert(false); // Explicitly clear alert state on success
-      } catch (error) {
-        console.error("Error registering app:", error);
-        setShowTxAlert(false);
-        
-        // Display the error to the user
-        let errorMessage = "Failed to register app";
-        
-        // Extract error message if available
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        } else if (error && typeof error === 'object' && 'message' in error) {
-          errorMessage = String(error.message);
-        }
-        
-        setTxError(errorMessage);
-      } finally {
-        setIsSaving(false);
-      }
-      return;
-    }
+    // Prepare the NFT data for registration
+    const nftToSubmit = wizardFormToNft(formData);
+    (nftToSubmit as any).isCustomUrls = isCustomizingUrls;
     
-    // For other steps, just move to the next step
-    handleNextStep();
+    setIsSaving(true);
+    setShowTxAlert(true);
+    setTxError(null);
+    
+    try {
+      // Perform the registration logic
+      await onSave(nftToSubmit, currentStep);
+      setShowTxAlert(false); // Explicitly clear alert state on success
+      
+      // Determine the next action based on the current step
+      if (currentStep === 1 && !isCustomizingUrls) {
+        // Move to step 2 if using default URLs
+        onStepChange(2);
+      } else {
+        // Close the modal if registration is complete
+        handleCloseMintModal();
+      }
+    } catch (error) {
+      console.error("Error sending transaction:", error);
+      setShowTxAlert(false);
+      
+      // Display the error to the user
+      let errorMessage = "Transaction failed";
+      
+      // Extract error message if available
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      
+      setTxError(errorMessage);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // Handle previous step navigation
+  const handlePrevStep = () => {
+    const prevStep = currentStep - 1;
+    onStepChange(prevStep < 1 ? 1 : prevStep as WizardStep);
   };
 
   // Render the current step content
@@ -919,75 +932,75 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
 
             {/* Marketing URL */}
             <div className="grid gap-2">
-              <Label htmlFor="marketingUrl">Marketing URL</Label>
+              <Label htmlFor="external_url">Marketing URL</Label>
               <Textarea
-                id="marketingUrl"
-                name="metadata.marketingUrl"
-                value={formData.metadata?.marketingUrl || ""}
+                id="external_url"
+                name="metadata.external_url"
+                value={formData.metadata?.external_url || ""}
                 onChange={(e) => {
                   setFormData(prev => ({
                     ...prev,
                     metadata: {
                       ...prev.metadata!,
-                      marketingUrl: e.target.value
+                      external_url: e.target.value
                     }
                   }));
                 }}
                 onBlur={() => {
                   // Validation happens on blur
-                  if (formData.metadata?.marketingUrl && !validateUrl(formData.metadata.marketingUrl)) {
+                  if (formData.metadata?.external_url && !validateUrl(formData.metadata.external_url)) {
                     setErrors(prev => ({ 
                       ...prev, 
-                      'metadata.marketingUrl': URL_ERROR_MESSAGE
+                      'metadata.external_url': URL_ERROR_MESSAGE
                     }));
-                  } else if (formData.metadata?.marketingUrl) {
+                  } else if (formData.metadata?.external_url) {
                     setErrors(prev => {
                       const newErrors = { ...prev };
-                      delete newErrors['metadata.marketingUrl'];
+                      delete newErrors['metadata.external_url'];
                       return newErrors;
                     });
                   }
                 }}
                 placeholder={URL_PLACEHOLDER}
                 required
-                className={`min-h-[80px] ${errors['metadata.marketingUrl'] ? "border-red-500" : ""}`}
+                className={`min-h-[80px] ${errors['metadata.external_url'] ? "border-red-500" : ""}`}
               />
-              {errors['metadata.marketingUrl'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['metadata.marketingUrl']}</p>
+              {errors['metadata.external_url'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['metadata.external_url']}</p>
               )}
               <p className="text-xs text-slate-500">
                 Link to your app's website, landing page, or marketing materials.
               </p>
               
               {/* URL Validator for Marketing */}
-              {validateUrl(formData.metadata?.marketingUrl || '') && (
+              {validateUrl(formData.metadata?.external_url || '') && (
                 <UrlValidator 
-                  url={formData.metadata?.marketingUrl || ''} 
+                  url={formData.metadata?.external_url || ''} 
                 />
               )}
             </div>
 
             {/* Token Contract Address */}
             <div className="grid gap-2">
-              <Label htmlFor="tokenContractAddress">Token Contract Address (Optional)</Label>
+              <Label htmlFor="token">Token Contract Address (Optional)</Label>
               <Input
-                id="tokenContractAddress"
-                name="metadata.tokenContractAddress"
-                value={formData.metadata?.tokenContractAddress || ""}
+                id="token"
+                name="metadata.token"
+                value={formData.metadata?.token || ""}
                 onChange={(e) => {
                   setFormData(prev => ({
                     ...prev,
                     metadata: {
                       ...prev.metadata!,
-                      tokenContractAddress: e.target.value
+                      token: e.target.value
                     }
                   }));
                 }}
                 placeholder={CONTRACT_PLACEHOLDER}
-                className={errors['metadata.tokenContractAddress'] ? "border-red-500" : ""}
+                className={errors['metadata.token'] ? "border-red-500" : ""}
               />
-              {errors['metadata.tokenContractAddress'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['metadata.tokenContractAddress']}</p>
+              {errors['metadata.token'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['metadata.token']}</p>
               )}
               <p className="text-xs text-slate-500">
                 If your app uses a token, enter its contract address here.
@@ -1001,54 +1014,54 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
           <div className="grid gap-4">
             {/* Icon URL */}
             <div className="grid gap-2 mb-4">
-              <Label htmlFor="iconUrl">Icon URL</Label>
+              <Label htmlFor="image">Icon URL</Label>
               <Textarea
-                id="iconUrl"
-                name="metadata.iconUrl"
-                value={formData.metadata?.iconUrl || ""}
+                id="image"
+                name="metadata.image"
+                value={formData.metadata?.image || ""}
                 onChange={(e) => {
                   setFormData(prev => ({
                     ...prev,
                     metadata: {
                       ...prev.metadata!,
-                      iconUrl: e.target.value
+                      image: e.target.value
                     }
                   }));
                 }}
                 onBlur={() => {
                   // Validation happens on blur
-                  if (formData.metadata?.iconUrl && !validateUrl(formData.metadata.iconUrl)) {
+                  if (formData.metadata?.image && !validateUrl(formData.metadata.image)) {
                     setErrors(prev => ({ 
                       ...prev, 
-                      'metadata.iconUrl': URL_ERROR_MESSAGE
+                      'metadata.image': URL_ERROR_MESSAGE
                     }));
-                  } else if (formData.metadata?.iconUrl) {
+                  } else if (formData.metadata?.image) {
                     setErrors(prev => {
                       const newErrors = { ...prev };
-                      delete newErrors['metadata.iconUrl'];
+                      delete newErrors['metadata.image'];
                       return newErrors;
                     });
                   }
                 }}
                 placeholder={URL_PLACEHOLDER}
                 required
-                className={`min-h-[80px] ${errors['metadata.iconUrl'] ? "border-red-500" : ""}`}
+                className={`min-h-[80px] ${errors['metadata.image'] ? "border-red-500" : ""}`}
               />
-              {errors['metadata.iconUrl'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['metadata.iconUrl']}</p>
+              {errors['metadata.image'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['metadata.image']}</p>
               )}
               <p className="text-xs text-slate-500">
                 Link to your app's icon image. Square format (1024x1024) is recommended.
               </p>
               
               {/* Icon URL Validator and Preview */}
-              {validateUrl(formData.metadata?.iconUrl || '') && (
+              {validateUrl(formData.metadata?.image || '') && (
                 <>
                   <UrlValidator 
-                    url={formData.metadata?.iconUrl || ''} 
+                    url={formData.metadata?.image || ''} 
                   />
                   <ImagePreview 
-                    url={formData.metadata?.iconUrl || ''} 
+                    url={formData.metadata?.image || ''} 
                     alt="App icon preview"
                   />
                 </>
@@ -1102,12 +1115,13 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                     placeholder={URL_PLACEHOLDER}
                     required={index === 0}
                     className={`min-h-[80px] ${errors[`metadata.screenshotUrls.${index}`] ? "border-red-500" : ""}`}
+                    aria-describedby={`screenshot${index}-help`}
                   />
                   {errors[`metadata.screenshotUrls.${index}`] && (
                     <p className="text-red-500 text-sm mt-1">{errors[`metadata.screenshotUrls.${index}`]}</p>
                   )}
                   {index === 0 && (
-                    <p className="text-xs text-slate-500">
+                    <p id={`screenshot${index}-help`} className="text-xs text-slate-500">
                       Main screenshot of your app. This will be displayed prominently in app listings.
                     </p>
                   )}
@@ -1146,7 +1160,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-md">
                 <div className="flex gap-2 items-start text-red-700 dark:text-red-400">
                   <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
-                  <p className="text-sm font-medium">{errors['metadata.platforms']}</p>
+                  <p id="platforms-error" className="text-sm font-medium">{errors['metadata.platforms']}</p>
                 </div>
               </div>
             )}
@@ -1163,11 +1177,12 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                   onChange={handleChange}
                   placeholder="https://example.com/app"
                   className={`min-h-[70px] ${errors['metadata.platforms.web.url_launch'] ? "border-red-500" : ""}`}
+                  aria-describedby={`web_url_launch-help ${errors['metadata.platforms.web.url_launch'] ? 'web_url_launch-error' : ''} ${errors['metadata.platforms'] ? 'platforms-error' : ''}`}
                 />
                 {errors['metadata.platforms.web.url_launch'] && (
-                  <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.web.url_launch']}</p>
+                  <p id="web_url_launch-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.web.url_launch']}</p>
                 )}
-                <p className="text-xs text-slate-500">
+                <p id="web_url_launch-help" className="text-xs text-slate-500">
                   URL to launch your web application
                 </p>
               </div>
@@ -1186,11 +1201,12 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                     onChange={handleChange}
                     placeholder="https://apps.apple.com/app/id123456789"
                     className={`min-h-[70px] ${errors['metadata.platforms.ios.url_download'] ? "border-red-500" : ""}`}
+                    aria-describedby={`ios_url_download-help ${errors['metadata.platforms.ios.url_download'] ? 'ios_url_download-error' : ''}`}
                   />
                    {errors['metadata.platforms.ios.url_download'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ios.url_download']}</p>
+                    <p id="ios_url_download-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ios.url_download']}</p>
                   )}
-                  <p className="text-xs text-slate-500">
+                  <p id="ios_url_download-help" className="text-xs text-slate-500">
                     App Store URL to download your iOS app
                   </p>
                 </div>
@@ -1204,11 +1220,12 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                     onChange={handleChange}
                     placeholder="https://example.com/app or custom-scheme://"
                     className={`min-h-[70px] ${errors['metadata.platforms.ios.url_launch'] ? "border-red-500" : ""}`}
+                    aria-describedby={`ios_url_launch-help ${errors['metadata.platforms.ios.url_launch'] ? 'ios_url_launch-error' : ''}`}
                   />
                   {errors['metadata.platforms.ios.url_launch'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ios.url_launch']}</p>
+                    <p id="ios_url_launch-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ios.url_launch']}</p>
                   )}
-                  <p className="text-xs text-slate-500">
+                  <p id="ios_url_launch-help" className="text-xs text-slate-500">
                     Deep link or URL to launch your iOS app
                   </p>
                 </div>
@@ -1217,13 +1234,14 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                   <Label htmlFor="ios_supported">Supported Devices (Optional)</Label>
                   <Input
                     id="ios_supported"
-                    name="ios_supported" // Name needs parsing in handleChange
+                    name="ios_supported" 
                     value={(formData.metadata?.platforms?.ios?.supported || []).join(', ')}
-                    onChange={handleChange} // Need special handling for array conversion
+                    onChange={handleChange}
                     placeholder="iPhone, iPad, VisionPro"
                     className={errors['metadata.platforms.ios.supported'] ? "border-red-500" : ""}
+                    aria-describedby={`ios_supported-help ${errors['metadata.platforms.ios.supported'] ? 'ios_supported-error' : ''}`}
                   />
-                  <p className="text-xs text-slate-500">
+                  <p id="ios_supported-help" className="text-xs text-slate-500">
                     Comma-separated list of supported iOS devices
                   </p>
                 </div>
@@ -1464,29 +1482,43 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
         const hasAnyPlatformData = Object.keys(platforms).length > 0;
         return (
           <div className="p-2 sm:p-4 border rounded-md bg-slate-50 dark:bg-slate-900 text-sm">
-            <p className="font-medium mb-2">Review your app details</p>
             
-            {/* Registry information */}
+            {/* App Identity */}
             <div className="mb-4">
-              <h3 className="text-sm font-semibold mb-2">Registry Information</h3>
               <div className="space-y-2">
-                <div><span className="font-medium">Name:</span> {formData.name}</div>
+                <div><span className="font-medium">App Name:</span> {formData.name}</div>
                 <div><span className="font-medium">Version:</span> {formData.version}</div>
                 <div><span className="font-medium">DID:</span> {formData.did}</div>
-                <div className="break-all"><span className="font-medium">Data URL:</span> {formData.dataUrl}</div>
-                <div className="break-all"><span className="font-medium">IWPS Portal URI:</span> {formData.iwpsPortalUri}</div>
-                {formData.agentApiUri && (
-                  <div className="break-all"><span className="font-medium">Agent API URI:</span> {formData.agentApiUri}</div>
-                )}
-                {formData.contractAddress && (
-                  <div className="break-all"><span className="font-medium">Contract Address:</span> {formData.contractAddress}</div>
-                )}
               </div>
             </div>
             
-            {/* Metadata information */} 
-             <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
-                {/* ... Other metadata fields ... */}
+            {/* App Metadata */}
+            <div className="mb-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold mb-2">App Metadata</h3>
+              <div className="space-y-2">
+                <div className="break-all"><span className="font-medium">Description URL:</span> {formData.metadata?.descriptionUrl}</div>
+                <div className="break-all"><span className="font-medium">External URL:</span> {formData.metadata?.external_url}</div>
+                <div className="break-all"><span className="font-medium">Icon URL:</span> {formData.metadata?.image}</div>
+                <div className="break-all"><span className="font-medium">Token:</span> {formData.metadata?.token || "None"}</div>
+                
+                {/* Screenshot URLs */}
+                <div className="mt-2">
+                  <span className="font-medium">Screenshots:</span>
+                  {formData.metadata?.screenshotUrls && formData.metadata.screenshotUrls.filter(Boolean).length > 0 ? (
+                    <div className="mt-1 space-y-1">
+                      {formData.metadata.screenshotUrls.map((url, index) => (
+                        url ? (
+                          <div key={index} className="break-all text-xs ml-2">
+                            {index + 1}. {url}
+                          </div>
+                        ) : null
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="ml-2 text-gray-500 italic">None</span>
+                  )}
+                </div>
+              </div>
             </div>
             
             {/* Platform Availability */}
@@ -1517,48 +1549,14 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
                 <div className="text-gray-500 italic">No platform availability information provided</div>
               )}
             </div>
-            
-            {/* Transaction information */}
-            <div className="mt-4 pt-2 border-t border-gray-200 dark:border-gray-700 text-sm">
-              <p className="font-medium text-orange-600 dark:text-orange-400">
-                You will need to sign two separate transactions:
-              </p>
-              <ol className="list-decimal list-inside mt-1">
-                <li className="mb-1">Registry transaction: To register your app identity and basic information</li>
-                <li>Metadata transaction: To store your app's additional metadata (descriptions, images, platform availability)</li>
-              </ol>
-              <p className="text-xs text-slate-500 mt-2">
-                Note: These will happen as separate signature requests. Please approve both to complete the registration process.
-              </p>
-            </div>
           </div>
         );
         
       default:
-        return null;
+        // Unexpected step, log an error
+        console.error(`Unexpected currentStep: ${currentStep}. This should not happen.`);
+        return;
     }
-  };
-
-  // Improved validation for current step
-  const isCurrentStepValid = () => {
-    
-    // For step 1, also check if required fields have values
-    if (currentStep === 1) {
-      const stepFieldsToCheck = STEP_FIELDS[1];
-      // Check for format errors in Step 1 fields
-      const hasValidationErrors = stepFieldsToCheck.some(field => field in errors);
-      
-      // Note: agentApiUri is NOT in the required fields list since it's optional
-      const requiredFields = ['name', 'version', 'did', 'dataUrl', 'iwpsPortalUri'];
-      const hasEmptyRequiredField = requiredFields.some(field => !formData[field as keyof WizardFormData]);
-      
-      // Disable button if Step 1 has format errors OR missing required fields
-      return !hasValidationErrors && !hasEmptyRequiredField;
-    }
-    
-    // For steps 2, 3, 4, 5, always return true (don't disable based on validation state here)
-    // Validation for these steps happens onClick via validateStep()
-    return true;
   };
 
   return (
@@ -1566,7 +1564,9 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
       <DialogContent className="w-[95%] max-w-[450px] sm:max-w-[550px] md:max-w-[650px] lg:max-w-[750px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Register New App</DialogTitle>
+            <DialogTitle>
+              {currentStep === 5 ? "Review and Submit App Metadata" : "Register New App"}
+            </DialogTitle>
             <DialogDescription>
               Step {currentStep} of 5: {stepTitles[currentStep]}
             </DialogDescription>
@@ -1587,8 +1587,8 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
 
           {showTxAlert && (
             <TransactionAlert
-              title="App Registration Transaction"
-              description="Please approve the transaction in your wallet to register your app."
+              title="Transaction Pending"
+              description="Please approve the transaction in your wallet to continue."
               isMobile={isMobile()}
             />
           )}
@@ -1598,7 +1598,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
               <div className="flex gap-2 items-start text-red-700 dark:text-red-400">
                 <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
-                  <p className="font-medium mb-1">Registration Error</p>
+                  <p className="font-medium mb-1">Transaction Error</p>
                   <p>{txError}</p>
                 </div>
               </div>
@@ -1611,7 +1611,7 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
 
           <DialogFooter className="flex justify-between">
             <div>
-              {currentStep > 1 && (
+              {currentStep > 1 && currentStep !== 2 && (
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -1638,7 +1638,6 @@ export default function NFTMintModal({ isOpen, handleCloseMintModal, onSave, nft
               
               <Button 
                 type="submit" 
-                disabled={!isCurrentStepValid() || isSaving}
                 className="flex items-center gap-1"
               >
                 {isSaving ? "Registering..." : 

@@ -27,6 +27,7 @@ import {
   METADATA_JSON_URL_DOWNLOAD_KEY,
   METADATA_JSON_SUPPORTED_KEY
 } from "@/config/app-config";
+import { normalizeMetadata } from '@/lib/utils';
 
 /**
  * Simple logger function
@@ -63,10 +64,10 @@ export function getAppMetadataContract() {
 export function buildMetadataJSON(nft: NFT): string {
   const metadata: { [key: string]: any } = {
     name: nft.name || "", // Standard name key
-    [METADATA_JSON_ICON_URL_KEY]: nft.metadata?.iconUrl || "",
-    [METADATA_JSON_MARKETING_URL_KEY]: nft.metadata?.marketingUrl || "",
+    [METADATA_JSON_ICON_URL_KEY]: nft.metadata?.image || "",
+    [METADATA_JSON_MARKETING_URL_KEY]: nft.metadata?.external_url || "",
     [METADATA_JSON_DESCRIPTION_URL_KEY]: nft.metadata?.descriptionUrl || "",
-    [METADATA_JSON_TOKEN_CONTRACT_KEY]: nft.metadata?.tokenContractAddress || "",
+    [METADATA_JSON_TOKEN_CONTRACT_KEY]: nft.metadata?.token || "",
     [METADATA_JSON_SCREENSHOTS_URLS_KEY]: nft.metadata?.screenshotUrls?.filter(url => !!url) || [],
   };
 
@@ -228,44 +229,66 @@ export async function setMetadata(nft: NFT, account: Account): Promise<boolean> 
 }
 
 /**
- * Get metadata for an NFT
- * @param versionedDid The versioned DID of the NFT
- * @returns Metadata JSON string or null if not found/error
+ * Parses and structures metadata from a JSON string.
+ * @param metadataJson The metadata JSON string.
+ * @returns A structured MetadataContractData object or null if invalid.
  */
-export async function getMetadata(versionedDid: string): Promise<string | null> {
+export function buildMetadataStructure(metadataJson: string): MetadataContractData | null {
+  try {
+    const metadata = JSON.parse(metadataJson);
+    
+    if (typeof metadata !== 'object' || metadata === null) {
+      return null;
+    }
+
+    // Use the shared normalizeMetadata utility function
+    const normalizedMetadata = normalizeMetadata(metadata);
+    
+    // Cast to MetadataContractData since normalizeMetadata returns Partial<MetadataContractData>
+    const structuredMetadata = normalizedMetadata as MetadataContractData;
+
+    // Validate URLs and log warnings if invalid
+    if (!validateUrl(structuredMetadata.descriptionUrl) || 
+        !validateUrl(structuredMetadata.external_url) || 
+        !validateUrl(structuredMetadata.image)) {
+      console.warn("Invalid URLs in metadata:", structuredMetadata);
+    }
+
+    return structuredMetadata;
+  } catch (error) {
+    console.error("Failed to parse metadata JSON:", error);
+    return null;
+  }
+}
+
+export async function getMetadata(versionedDid: string): Promise<MetadataContractData | null> {
   try {
     log(`Getting metadata for versioned DID: ${versionedDid}`);
     const contract = getAppMetadataContract();
     log("Metadata contract obtained successfully");
     
-    // Read the metadata from the contract using the versioned DID
-    log(`Reading metadata for key: ${versionedDid}`);
-    const metadata = await readContract({
+    const metadataJson = await readContract({
       contract,
-      method: "function getMetadataJson(string) view returns (string)", // Explicit view function signature
+      method: "function getMetadataJson(string) view returns (string)",
       params: [versionedDid]
     });
-    
-    const metadataStr = metadata as string;
-    // Check if metadata is essentially empty (contract might return empty string for unset keys)
-    if (!metadataStr || metadataStr.trim() === "") { 
+
+    if (!metadataJson || metadataJson.trim() === "") { 
       log(`Metadata not found or empty for key: ${versionedDid}`);
       return null;
     }
-    
-    log(`Metadata retrieved successfully, length: ${metadataStr.length}`);
-    return metadataStr;
+
+    const structuredMetadata = buildMetadataStructure(metadataJson);
+    if (!structuredMetadata) {
+      log("Invalid metadata structure");
+      return null;
+    }
+
+    log(`Metadata retrieved and structured successfully`);
+    return structuredMetadata;
     
   } catch (error) {
-    // Check if error indicates "not found" (this depends on the thirdweb/RPC error structure)
-    // For now, treat most errors as "not found" or inaccessible
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes("not found") || errorMessage.includes("invalid") || errorMessage.includes("reverted")) {
-        log(`Metadata not found or error reading for ${versionedDid}:`, errorMessage);
-    } else {
-        console.error(`Error getting metadata for ${versionedDid}:`, error);
-        log(`Error getting metadata for ${versionedDid}:`, errorMessage);
-    }
+    console.error(`Error getting metadata for ${versionedDid}:`, error);
     return null;
   }
 }
@@ -281,11 +304,11 @@ export function validateMetadata(metadata: MetadataContractData): void {
     throw new Error("Invalid description URL");
   }
   
-  if (!metadata.marketingUrl || !validateUrl(metadata.marketingUrl)) {
+  if (!metadata.external_url || !validateUrl(metadata.external_url)) {
     throw new Error("Invalid marketing URL");
   }
   
-  if (!metadata.iconUrl || !validateUrl(metadata.iconUrl)) {
+  if (!metadata.image || !validateUrl(metadata.image)) {
     throw new Error("Invalid icon URL");
   }
   

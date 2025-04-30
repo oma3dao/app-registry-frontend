@@ -52,8 +52,8 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
   const version = nft.version || "Unknown Version";
   const did = nft.did || "Unknown DID";
   // Get image/icon and marketing/external URL from metadata
-  const imageUrl = nft.metadata?.iconUrl || ""; // Maps to "image" key
-  const externalUrl = nft.metadata?.marketingUrl || ""; // Maps to "external_url" key
+  const imageUrl = nft.metadata?.image || ""; // Maps to "image" key
+  const externalUrl = nft.metadata?.external_url || ""; // Maps to "external_url" key
   const status = typeof nft.status === 'number' ? nft.status : 0;
 
   // Determine available platforms by checking the nested structure

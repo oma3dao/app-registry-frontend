@@ -67,7 +67,7 @@ export const METADATA_JSON_DESCRIPTION_URL_KEY = "descriptionUrl";
 export const METADATA_JSON_MARKETING_URL_KEY = "external_url";
 export const METADATA_JSON_TOKEN_CONTRACT_KEY = "token";
 export const METADATA_JSON_ICON_URL_KEY = "image";
-export const METADATA_JSON_SCREENSHOTS_URLS_KEY = "screenshotsUrls";
+export const METADATA_JSON_SCREENSHOTS_URLS_KEY = "screenshotUrls";
 export const METADATA_JSON_PLATFORM_KEY = "platforms";
 
 // Platform keys
@@ -85,3 +85,8 @@ export const METADATA_JSON_NINTENDO_KEY = "nintendo";
 export const METADATA_JSON_URL_LAUNCH_KEY = "url_launch";
 export const METADATA_JSON_URL_DOWNLOAD_KEY = "url_download";
 export const METADATA_JSON_SUPPORTED_KEY = "supported";
+
+/**
+ * Base URLs for metadata editing eligibility
+ */
+export const METADATA_EDIT_ELIGIBLE_BASE_URLS = ["appregistry.oma3.org"];

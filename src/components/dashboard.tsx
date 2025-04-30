@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { PlusIcon } from "lucide-react"
 import NFTGrid from "@/components/nft-grid"
-import NFTMintModal from "@/components/nft-mint-modal"
+import NFTMintModal, { WizardStep } from "@/components/nft-mint-modal"
 import NFTViewModal from "@/components/nft-view-modal"
 import type { NFT } from "@/types/nft"
 import { getAppsByMinter, registerApp, updateStatus } from "@/contracts/appRegistry"
@@ -23,6 +23,8 @@ export default function Dashboard() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
   const [isLoadingNFTs, setIsLoadingNFTs] = useState(true)
+  const [currentStep, setCurrentStep] = useState(1);
+  const [editMetadata, setEditMetadata] = useState<Record<string, any> | null>(null);
 
   // Fetch registered apps by the connected wallet
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function Dashboard() {
                  const metadata = app.metadata || {}; 
                  return { 
                    ...app, 
-                   metadata: { ...metadata, iconUrl: imageUrl } 
+                   metadata: { ...metadata, image: imageUrl } 
                  };
               }
             }
@@ -112,12 +114,26 @@ export default function Dashboard() {
     }
     
     setCurrentNft(null);
+    setEditMetadata(null);
+    setCurrentStep(1);
     setIsMintModalOpen(true);
+    log("Opening mint modal for new NFT");
+  }
+
+  // Opens the mint modal specifically for editing metadata (starts at step 2)
+  const handleOpenMintModalFromView = (metadata: Record<string, any>, nft: NFT) => {
+    log("Opening mint modal for editing metadata", { metadata, nft });
+    setCurrentNft(nft);
+    setEditMetadata(metadata);
+    setCurrentStep(2);
+    setIsViewModalOpen(false); // Close the view modal
+    setIsMintModalOpen(true);  // Open the mint modal
   }
 
   const handleCloseMintModal = () => {
     setIsMintModalOpen(false)
     setCurrentNft(null)
+    setEditMetadata(null)
   }
 
   // Opens the view modal - only for viewing and updating status of existing apps
@@ -132,7 +148,9 @@ export default function Dashboard() {
   }
 
   // Handles registering a new app from the mint modal
-  const handleRegisterApp = async (nft: NFT) => {
+  const handleRegisterApp = async (nft: NFT, currentStep: number) => {
+    log("handleRegisterApp called with currentStep:", currentStep);
+    log("NFT:", nft);
     try {
       if (!account) {
         console.error("No wallet connected");
@@ -145,39 +163,36 @@ export default function Dashboard() {
         delete (nft as any).isCustomUrls;
       }
 
-      // Mint modal should only be used for new app registration
-      log("Registering new app:", nft);
-      
-      // Step 1: Register app in the registry contract
-      const registeredNft = await registerApp(nft, account);
-      
-      // Step 2: Only set metadata if not using custom URLs and metadata exists
-      if (!isCustomUrls && registeredNft && registeredNft.metadata) {
-        try {
-          log("Setting metadata for app:", registeredNft.did);
-          await setMetadata(registeredNft, account);
-          log("Metadata successfully set");
-        } catch (metadataError) {
-          console.error("Error setting metadata:", metadataError);
-          // We don't reject the promise here because the app registration was successful
-          // The user can try setting metadata again later
+      // Only register app if in step 1
+      if (currentStep === 1) {
+        log("Registering new app:", nft);
+        const registeredNft = await registerApp(nft, account);
+
+        // Update NFTs list if registration is successful
+        if (registeredNft) {
+          setNfts([...nfts, registeredNft]);
+          toast.success("App registered successfully!");
         }
-      } else if (isCustomUrls) {
-        log("Using custom URLs - skipping metadata setting");
       }
-      
-      setNfts([...nfts, registeredNft]);
-      
-      // Show success toast before closing - Use generic message
-      toast.success("Transaction successful")
-      
-      handleCloseMintModal();
+
+      // Handle metadata setting if in step 5
+      if (currentStep === 5 && nft.metadata) {
+        log("Submitting metadata for app:", nft);
+        const result = await setMetadata(nft, account);
+        log("Metadata set result:", result);
+        if (result) {
+          toast.success("Metadata set successfully!");
+        } else {
+          toast.error("Failed to set metadata");
+        }
+      }
+
       return Promise.resolve();
     } catch (error) {
-      console.error("Error registering app:", error)
+      console.error("Error in handleRegisterApp:", error);
       return Promise.reject(error);
     }
-  }
+  };
 
   // Handles updating an app's status from the view modal
   const handleUpdateStatus = async (nft: NFT, newStatus: number) => {
@@ -241,12 +256,15 @@ export default function Dashboard() {
         showStatus={true}
       />
 
-      {/* Mint Modal - Used only for registering new apps */}
+      {/* Mint Modal - Used for registering new apps and editing metadata */}
       <NFTMintModal 
         isOpen={isMintModalOpen} 
         handleCloseMintModal={handleCloseMintModal} 
-        onSave={handleRegisterApp} 
-        nft={currentNft} 
+        onSave={(nft) => handleRegisterApp(nft, currentStep)} 
+        nft={currentNft}
+        initialMetadata={editMetadata}
+        currentStep={currentStep as WizardStep}
+        onStepChange={(step) => setCurrentStep(step)}
       />
 
       {/* View Modal - Used for viewing app details and updating status */}
@@ -254,7 +272,8 @@ export default function Dashboard() {
         isOpen={isViewModalOpen} 
         handleCloseViewModal={handleCloseViewModal} 
         nft={currentNft} 
-        onUpdateStatus={handleUpdateStatus} 
+        onUpdateStatus={handleUpdateStatus}
+        onEditMetadata={handleOpenMintModalFromView}
       />
     </div>
   )

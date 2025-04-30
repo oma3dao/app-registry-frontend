@@ -29,21 +29,22 @@ import { log } from "@/lib/log"
 import { getMetadata } from "@/contracts/appMetadata"
 import { AlertCircleIcon } from 'lucide-react';
 import { toast } from "sonner"
+import { METADATA_EDIT_ELIGIBLE_BASE_URLS } from "@/config/app-config";
 
 interface NFTViewModalProps {
   isOpen: boolean
   handleCloseViewModal: () => void
   nft: NFT | null
   onUpdateStatus: (nft: NFT, newStatus: number) => Promise<void>
+  onEditMetadata?: (metadata: Record<string, any>, nft: NFT) => void
 }
 
-export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpdateStatus }: NFTViewModalProps) {
+export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpdateStatus, onEditMetadata }: NFTViewModalProps) {
   const [isEditingStatus, setIsEditingStatus] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState<number>(0)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showTxAlert, setShowTxAlert] = useState(false)
   const [txError, setTxError] = useState<string | null>(null)
-  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
   const [metadataExists, setMetadataExists] = useState(false)
   
   // Get the connected wallet address to check if user is the minter
@@ -56,6 +57,13 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     
   // Determine if status has been changed from original
   const statusChanged = nft && selectedStatus !== nft.status;
+
+  // Check if the dataUrl base URL matches the eligible ones for editing metadata
+  const canEditMetadata = nft && METADATA_EDIT_ELIGIBLE_BASE_URLS.some(baseUrl => {
+    const isMatch = nft.dataUrl.includes(baseUrl);
+    log(`[NFTViewModal] Checking dataUrl: ${nft.dataUrl}, Base URL: ${baseUrl}, Match: ${isMatch}`);
+    return isMatch;
+  });
 
   // Reset state when modal opens with new NFT
   const handleOpenChange = (open: boolean) => {
@@ -75,41 +83,34 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     }
   }
   
-  // Update selected status and check for metadata when NFT changes or modal opens
+  const checkMetadata = async () => {
+    log('checkMetadata called');
+    if (!nft) return null;
+    try {
+      const versionedDid = buildVersionedDID(nft.did, nft.version);
+      log(`[NFTViewModal] Checking metadata for versioned DID: ${versionedDid}`);
+      const metadataJson = await getMetadata(versionedDid);
+      if (metadataJson !== null) {
+        log("[NFTViewModal] Metadata found.");
+        setMetadataExists(true);
+        return metadataJson;
+      } else {
+        log("[NFTViewModal] Metadata not found.");
+        setMetadataExists(false);
+        return null;
+      }
+    } catch (error) {
+      console.error("[NFTViewModal] Error checking metadata:", error);
+      setMetadataExists(false);
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (isOpen && nft) {
       setSelectedStatus(nft.status); // Update status selector
-      
-      // Reset metadata check state
-      setIsLoadingMetadata(true);
-      setMetadataExists(false);
-      
-      const checkMetadata = async () => {
-        try {
-          const versionedDid = buildVersionedDID(nft.did, nft.version);
-          log(`[NFTViewModal] Checking metadata for versioned DID: ${versionedDid}`);
-          const metadataJson = await getMetadata(versionedDid);
-          if (metadataJson !== null) {
-            log("[NFTViewModal] Metadata found.");
-            setMetadataExists(true);
-          } else {
-            log("[NFTViewModal] Metadata not found.");
-          }
-        } catch (error) {
-          // Error building versioned DID or other unexpected issue
-          console.error("[NFTViewModal] Error checking metadata:", error);
-          setMetadataExists(false); // Assume no metadata on error
-        } finally {
-          setIsLoadingMetadata(false);
-        }
-      };
-      
-      checkMetadata();
-      
     } else {
        // Reset state if modal is closed or no NFT
-       setIsLoadingMetadata(false);
-       setMetadataExists(false);
     }
   }, [nft, isOpen]); // Rerun when modal opens or NFT changes
 
@@ -164,6 +165,26 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     }
   }
 
+  // Log the conditions for enabling the Edit Metadata button
+  log(`[NFTViewModal] metadataExists: ${metadataExists}, canEditMetadata: ${canEditMetadata}`);
+
+  const buttonStyle = "bg-black text-white hover:bg-black/90";
+
+  const handleEditMetadata = async () => {
+    log('handleEditMetadata called');
+    const metadata = await checkMetadata();
+    // Convert metadata to an object if it's not already one
+    const metadataObject = (typeof metadata === 'object' && metadata !== null) ? metadata : {};
+
+    // Call the parent component's onEditMetadata function if provided
+    if (onEditMetadata && nft) {
+      onEditMetadata(metadataObject, nft);
+    } else {
+      log('onEditMetadata prop not provided or nft is null');
+      handleCloseViewModal();
+    }
+  };
+
   if (!nft) return null
 
   return (
@@ -204,7 +225,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
         <div className="grid gap-6 py-4">
           <div className="grid gap-2">
             <div className="flex justify-between items-center">
-              <Label className="text-base font-medium">Status</Label>
+              <Label htmlFor="status-select" id="status-label" className="text-base font-medium">Status</Label>
               
               {isEditingStatus && canEditStatus ? (
                 <div className="flex items-center gap-2">
@@ -212,7 +233,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                     value={selectedStatus.toString()} 
                     onValueChange={(value: string) => setSelectedStatus(parseInt(value))}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger id="status-select" className="w-[180px]" aria-labelledby="status-label">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -235,12 +256,12 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded-full text-sm ${getStatusClasses(nft.status)}`}>
+                  <span id="status" className={`px-2 py-1 rounded-full text-sm ${getStatusClasses(nft.status)}`}>
                     {getStatusLabel(nft.status)}
                   </span>
                   {canEditStatus && (
                     <Button 
-                      variant="outline" 
+                      className={buttonStyle} 
                       size="sm" 
                       onClick={() => setIsEditingStatus(true)}
                     >
@@ -253,15 +274,15 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           </div>
           
           <div className="grid gap-2">
-            <Label className="text-base font-medium">DID</Label>
-            <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
+            <Label htmlFor="did-display" className="text-base font-medium">DID</Label>
+            <div id="did-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
               {nft.did}
             </div>
           </div>
           
           <div className="grid gap-2">
-            <Label className="text-base font-medium">Data URL</Label>
-            <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
+            <Label htmlFor="data-url-display" className="text-base font-medium">Data URL</Label>
+            <div id="data-url-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
               <a href={nft.dataUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                 {nft.dataUrl}
               </a>
@@ -269,8 +290,8 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           </div>
           
           <div className="grid gap-2">
-            <Label className="text-base font-medium">IWPS Portal URI</Label>
-            <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
+            <Label htmlFor="iwps-portal-display" className="text-base font-medium">IWPS Portal URI</Label>
+            <div id="iwps-portal-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
               <a href={nft.iwpsPortalUri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                 {nft.iwpsPortalUri}
               </a>
@@ -278,8 +299,8 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           </div>
           
           <div className="grid gap-2">
-            <Label className="text-base font-medium">Agent Portal URI</Label>
-            <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
+            <Label htmlFor="agent-portal-display" className="text-base font-medium">Agent Portal URI</Label>
+            <div id="agent-portal-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
               <a href={nft.agentApiUri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                 {nft.agentApiUri}
               </a>
@@ -288,16 +309,16 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           
           {nft.contractAddress && (
             <div className="grid gap-2">
-              <Label className="text-base font-medium">Contract Address</Label>
-              <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
+              <Label htmlFor="contract-address-display" className="text-base font-medium">Contract Address</Label>
+              <div id="contract-address-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
                 {nft.contractAddress}
               </div>
             </div>
           )}
           
           <div className="grid gap-2">
-            <Label className="text-base font-medium">Minter</Label>
-            <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
+            <Label htmlFor="minter-display" className="text-base font-medium">Minter</Label>
+            <div id="minter-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
               {nft.minter}
             </div>
           </div>
@@ -309,12 +330,11 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           
           {/* Edit Metadata Button - Enabled based on metadata check */}
           <Button 
-            variant="secondary" 
-            onClick={() => log('Edit Metadata clicked - Placeholder')} 
-            disabled={isLoadingMetadata || !metadataExists}
-            className="order-first sm:order-none" 
+            className={`${buttonStyle} order-first sm:order-none`} 
+            onClick={handleEditMetadata} 
+            disabled={!canEditMetadata}
           >
-            {isLoadingMetadata ? "Checking Metadata..." : "Edit Metadata"}
+            Edit Metadata
           </Button>
           
           {isEditingStatus && statusChanged && canEditStatus ? (

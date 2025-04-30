@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { log } from '@/lib/log'
+import { MetadataContractData, Platforms } from '@/types/metadata-contract';
 
 /**
  * Utility function for conditionally joining class names
@@ -122,3 +123,21 @@ export async function fetchMetadataImage(dataUrl: string): Promise<string | null
     return null;
   }
 }
+
+/**
+ * Normalizes metadata to ensure it has all required fields with default values
+ * @param metadata Raw metadata object which might be missing fields
+ * @returns Normalized metadata with all required fields (using defaults where needed)
+ */
+export const normalizeMetadata = (metadata: Record<string, any> | null | undefined): Partial<MetadataContractData> => {
+  if (!metadata) return {};
+  
+  return {
+    descriptionUrl: metadata.descriptionUrl || "",
+    external_url: metadata.external_url || "",
+    token: metadata.token || "",
+    image: metadata.image || "",
+    screenshotUrls: Array.isArray(metadata.screenshotUrls) ? metadata.screenshotUrls : ["", "", "", "", ""],
+    platforms: metadata.platforms || {}
+  };
+};

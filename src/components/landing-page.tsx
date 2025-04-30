@@ -58,7 +58,7 @@ export default function LandingPage() {
                    const metadata = app.metadata || {}; 
                    return { 
                      ...app, 
-                     metadata: { ...metadata, iconUrl: imageUrl } 
+                     metadata: { ...metadata, image: imageUrl } 
                    };
                 }
               }
