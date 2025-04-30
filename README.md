@@ -30,11 +30,7 @@ Install the template using [thirdweb create](https://portal.thirdweb.com/cli/cre
 
 ### Environment Variables
 
-To run this project, you will need to add the following environment variables to your .env file:
-
-`CLIENT_ID`
-
-To learn how to create a client ID, refer to the [client documentation](https://portal.thirdweb.com/typescript/v5/client). 
+To run this project, copy .env.example into your .env.local file.
 
 ## Testing with Celo Alfajores Testnet
 
