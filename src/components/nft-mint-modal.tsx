@@ -969,7 +969,7 @@ export default function NFTMintModal({
                 <p className="text-red-500 text-sm mt-1">{errors['metadata.external_url']}</p>
               )}
               <p className="text-xs text-slate-500">
-                Link to your app's website, landing page, or marketing materials.
+                Link to your app website, landing page, or marketing materials.
               </p>
               
               {/* URL Validator for Marketing */}
@@ -1051,7 +1051,7 @@ export default function NFTMintModal({
                 <p className="text-red-500 text-sm mt-1">{errors['metadata.image']}</p>
               )}
               <p className="text-xs text-slate-500">
-                Link to your app's icon image. Square format (1024x1024) is recommended.
+                Link to your app icon image. Square format (1024x1024) is recommended.
               </p>
               
               {/* Icon URL Validator and Preview */}
