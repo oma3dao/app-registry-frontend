@@ -26,8 +26,6 @@ export default function LandingPage() {
       return;
     }
 
-    setShouldLoadNFTs(true);
-
     const fetchLatestApps = async () => {
       try {
         setIsLoading(true)
@@ -91,9 +89,17 @@ export default function LandingPage() {
       }
     }
     
+    // Add 1-second delay before loading NFTs to allow connect button to load first
+    const timer = setTimeout(() => {
+      setShouldLoadNFTs(true);
+    }, 1000);
+    
     if (shouldLoadNFTs) {
       fetchLatestApps()
     }
+
+    // Clean up the timer if component unmounts
+    return () => clearTimeout(timer);
   }, [account, shouldLoadNFTs])
 
   // Opens the view modal for an NFT
