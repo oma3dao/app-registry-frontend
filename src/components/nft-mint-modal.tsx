@@ -1011,7 +1011,7 @@ export default function NFTMintModal({
         
       case 3:
         return (
-          <div className="grid gap-4">
+          <div className="grid gap-4 py-4">
             {/* Icon URL */}
             <div className="grid gap-2 mb-4">
               <Label htmlFor="image">Icon URL</Label>
@@ -1562,7 +1562,7 @@ export default function NFTMintModal({
   return (
     <Dialog open={isOpen} onOpenChange={isOpen ? handleCloseMintModal : undefined}>
       <DialogContent className="w-[95%] max-w-[450px] sm:max-w-[550px] md:max-w-[650px] lg:max-w-[750px] max-h-[90vh] flex flex-col">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>
               {currentStep === 5 ? "Review and Submit App Metadata" : "Register New App"}
@@ -1609,7 +1609,7 @@ export default function NFTMintModal({
           )}
 
           {/* Scrollable content area */}
-          <div className="grid gap-4 py-4 overflow-y-auto pr-1 flex-grow">
+          <div className="overflow-y-auto pr-1 flex-grow min-h-0">
             {renderStepContent()}
           </div>
 
