@@ -1561,9 +1561,9 @@ export default function NFTMintModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={isOpen ? handleCloseMintModal : undefined}>
-      <DialogContent className="w-[95%] max-w-[450px] sm:max-w-[550px] md:max-w-[650px] lg:max-w-[750px] max-h-[90vh] overflow-y-auto">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
+      <DialogContent className="w-[95%] max-w-[450px] sm:max-w-[550px] md:max-w-[650px] lg:max-w-[750px] max-h-[90vh] flex flex-col">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>
               {currentStep === 5 ? "Review and Submit App Metadata" : "Register New App"}
             </DialogTitle>
@@ -1573,7 +1573,7 @@ export default function NFTMintModal({
           </DialogHeader>
 
           {/* Step Indicator */}
-          <div className="flex justify-between mb-4 mt-2">
+          <div className="flex justify-between mb-4 mt-2 flex-shrink-0">
             {[1, 2, 3, 4, 5].map((step) => (
               <div 
                 key={step} 
@@ -1585,16 +1585,19 @@ export default function NFTMintModal({
             ))}
           </div>
 
+          {/* Alerts - keep outside scrolling area */}
           {showTxAlert && (
-            <TransactionAlert
-              title="Transaction Pending"
-              description="Please approve the transaction in your wallet to continue."
-              isMobile={isMobile()}
-            />
+            <div className="flex-shrink-0">
+              <TransactionAlert
+                title="Transaction Pending"
+                description="Please approve the transaction in your wallet to continue."
+                isMobile={isMobile()}
+              />
+            </div>
           )}
 
           {txError && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-md">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-md flex-shrink-0">
               <div className="flex gap-2 items-start text-red-700 dark:text-red-400">
                 <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
@@ -1605,11 +1608,13 @@ export default function NFTMintModal({
             </div>
           )}
 
-          <div className="grid gap-4 py-4">
+          {/* Scrollable content area */}
+          <div className="grid gap-4 py-4 overflow-y-auto pr-1 flex-grow">
             {renderStepContent()}
           </div>
 
-          <DialogFooter className="flex justify-between">
+          {/* Static footer */}
+          <DialogFooter className="flex justify-between mt-4 pt-4 border-t flex-shrink-0">
             <div>
               {currentStep > 1 && currentStep !== 2 && (
                 <Button 

@@ -6,6 +6,7 @@ import { PreAlphaBanner } from "@/components/pre-alpha-banner";
 import { Navigation } from "@/components/navigation";
 import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
+import { NFTMetadataProvider } from "@/lib/nft-metadata-context";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -39,7 +40,9 @@ export default function RootLayout({
         <PreAlphaBanner />
         <ThirdwebProvider>
           <Navigation />
-          {children}
+          <NFTMetadataProvider>
+            {children}
+          </NFTMetadataProvider>
         </ThirdwebProvider>
         <Toaster position="top-center" richColors />
       </body>

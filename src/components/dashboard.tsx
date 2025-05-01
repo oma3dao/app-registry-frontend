@@ -48,12 +48,12 @@ export default function Dashboard() {
           // Augment apps with fetched metadata images
           const augmentedAppsPromises = apps.map(async (app) => {
             if (app && app.dataUrl) {
-              const imageUrl = await fetchMetadataImage(app.dataUrl);
-              if (imageUrl) {
+              const image = await fetchMetadataImage(app.dataUrl);
+              if (image) {
                  const metadata = app.metadata || {}; 
                  return { 
                    ...app, 
-                   metadata: { ...metadata, image: imageUrl } 
+                   metadata: { ...metadata, image } 
                  };
               }
             }

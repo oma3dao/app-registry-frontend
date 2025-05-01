@@ -11,6 +11,7 @@ import {
 import type { NFT } from "@/types/nft"
 import { getStatusLabel, getStatusClasses } from "@/types/nft"
 import { log } from "@/lib/log"
+import { useNFTMetadata } from "@/lib/nft-metadata-context"
 import {
   Globe,
   Apple,
@@ -43,6 +44,10 @@ const platformIcons: Record<string, React.ReactNode> = {
 };
 
 export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTCardProps) {
+  // Use the metadata context to get complete metadata
+  const { getNFTMetadata } = useNFTMetadata();
+  const nftMetadata = getNFTMetadata(nft);
+  
   // Debug log key generation
   const key = `${nft.did || 'unknown'}-${nft.version || 'unknown'}`;
   log(`NFTCard rendering with key: ${key}`, nft);
@@ -51,18 +56,31 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
   const name = nft.name || "Unnamed App";
   const version = nft.version || "Unknown Version";
   const did = nft.did || "Unknown DID";
-  // Get image/icon and marketing/external URL from metadata
-  const imageUrl = nft.metadata?.image || ""; // Maps to "image" key
-  const externalUrl = nft.metadata?.external_url || ""; // Maps to "external_url" key
+  
+  // Get image/icon from metadata context first, then fall back to NFT metadata
+  const image = nftMetadata?.displayData.image || nft.metadata?.image || "";
+  const isLoading = nftMetadata?.isLoading || false;
+  
+  // Determine if we have a valid image to display
+  const hasImage = !isLoading && image && image.trim() !== '';
+  
+  // Get marketing/external URL from metadata context first, then fall back to NFT metadata
+  const external_url = nftMetadata?.displayData.external_url || nft.metadata?.external_url || "";
   const status = typeof nft.status === 'number' ? nft.status : 0;
 
-  // Determine available platforms by checking the nested structure
-  const availablePlatforms = !nft.hasError && nft.metadata?.platforms 
-    ? Object.keys(platformIcons).filter(platformKey => 
-        // Check if the platform key exists in the nft's metadata.platforms object
-        nft.metadata!.platforms!.hasOwnProperty(platformKey)
-      )
+  // Determine available platforms from metadata context first, then fall back to NFT metadata
+  const availablePlatformsFromContext = nftMetadata 
+    ? Object.keys(nftMetadata.displayData.platforms)
     : [];
+  
+  // Fall back to NFT metadata platforms if context doesn't have any
+  const availablePlatforms = availablePlatformsFromContext.length > 0
+    ? availablePlatformsFromContext
+    : (!nft.hasError && nft.metadata?.platforms 
+        ? Object.keys(platformIcons).filter(platformKey => 
+            nft.metadata!.platforms!.hasOwnProperty(platformKey)
+          )
+        : []);
 
   const handleCardClick = () => {
     if (!nft.hasError) {
@@ -78,28 +96,67 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
       aria-label={nft.hasError ? `Invalid app data: ${nft.errorMessage}` : `View details for ${name} version ${version}`}
       aria-disabled={nft.hasError}
     >
-      <CardHeader className="p-4 pb-2 flex flex-row items-start gap-4">
-        <div className={`relative w-10 h-10 bg-slate-200 dark:bg-slate-800 flex items-center justify-center rounded flex-shrink-0 ${nft.hasError ? 'bg-red-100 dark:bg-red-900' : ''}`}>
-          {nft.hasError ? (
+      {/* Conditional rendering based on image availability */}
+      {nft.hasError ? (
+        // Error state layout
+        <CardHeader className="p-4 pb-2 flex flex-row items-start gap-4">
+          <div className="relative w-10 h-10 bg-red-100 dark:bg-red-900 flex items-center justify-center rounded flex-shrink-0">
             <AlertTriangleIcon size={24} className="text-red-600 dark:text-red-400" />
-          ) : imageUrl ? (
+          </div>
+          <div className="flex-grow min-w-0">
+            <div className="flex justify-between items-start gap-2">
+              <CardTitle className="text-lg truncate flex-grow text-red-700 dark:text-red-300" title="Invalid App Data">Invalid App Data</CardTitle>
+            </div>
+            <div className="flex justify-between items-center text-sm text-slate-600 dark:text-slate-400 mt-1">
+              <span>Version: {version}</span>
+            </div>
+          </div>
+        </CardHeader>
+      ) : hasImage ? (
+        // With-image layout
+        <CardHeader className="p-4 pb-2 flex flex-row items-start gap-4">
+          <div className="relative w-10 h-10 flex items-center justify-center rounded flex-shrink-0">
             <img
-              src={imageUrl}
+              src={image}
               alt={`${name} icon`}
               width="40"
               height="40"
               className="rounded object-contain"
               loading="lazy"
             />
-          ) : (
-            <ImageIcon size={24} className="text-slate-400 dark:text-slate-600" aria-hidden="true" />
-          )}
-        </div>
-
-        <div className="flex-grow min-w-0">
+          </div>
+          <div className="flex-grow min-w-0">
+            <div className="flex justify-between items-start gap-2">
+              <CardTitle className="text-lg truncate flex-grow" title={name}>{name}</CardTitle>
+              {showStatus && (
+                <span className={`text-xs px-2 py-1 rounded-full ${getStatusClasses(status)} flex-shrink-0`}>
+                  {getStatusLabel(status)}
+                </span>
+              )}
+            </div>
+            <div className="flex justify-between items-center text-sm text-slate-600 dark:text-slate-400 mt-1">
+              <span>Version: {version}</span>
+              {external_url && (
+                <a 
+                  href={external_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 ml-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
+                  aria-label={`Visit ${name} website (opens in new tab)`}
+                >
+                  <ExternalLinkIcon size={16} />
+                </a>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+      ) : (
+        // Text-only layout
+        <CardHeader className="p-4 pb-2">
           <div className="flex justify-between items-start gap-2">
-            <CardTitle className={`text-lg truncate flex-grow ${nft.hasError ? 'text-red-700 dark:text-red-300' : ''}`} title={name}> {nft.hasError ? 'Invalid App Data' : name} </CardTitle>
-            {!nft.hasError && showStatus && (
+            <CardTitle className="text-lg truncate flex-grow" title={name}>{name}</CardTitle>
+            {showStatus && (
               <span className={`text-xs px-2 py-1 rounded-full ${getStatusClasses(status)} flex-shrink-0`}>
                 {getStatusLabel(status)}
               </span>
@@ -107,9 +164,9 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
           </div>
           <div className="flex justify-between items-center text-sm text-slate-600 dark:text-slate-400 mt-1">
             <span>Version: {version}</span>
-            {externalUrl && (
+            {external_url && (
               <a 
-                href={externalUrl} 
+                href={external_url} 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 onClick={(e) => e.stopPropagation()}
@@ -120,8 +177,8 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
               </a>
             )}
           </div>
-        </div>
-      </CardHeader>
+        </CardHeader>
+      )}
 
       <CardContent className="p-4 pt-2 space-y-2 flex-grow">
          {/* Error Message Display */}

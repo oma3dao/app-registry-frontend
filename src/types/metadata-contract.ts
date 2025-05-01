@@ -45,6 +45,11 @@ export interface MetadataContractData {
   descriptionUrl: string;
   
   /**
+   * Full text description content (cached from descriptionUrl)
+   */
+  description?: string;
+  
+  /**
    * URL to marketing materials
    */
   external_url: string;

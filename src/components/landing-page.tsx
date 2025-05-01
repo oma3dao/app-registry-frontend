@@ -49,14 +49,14 @@ export default function LandingPage() {
             // Augment apps with fetched metadata images
             const augmentedAppsPromises = apps.map(async (app) => {
               if (app && app.dataUrl) {
-                const imageUrl = await fetchMetadataImage(app.dataUrl);
-                if (imageUrl) {
+                const image = await fetchMetadataImage(app.dataUrl);
+                if (image) {
                    // Create a new object to avoid direct state mutation worries
                    // Ensure metadata object exists
                    const metadata = app.metadata || {}; 
                    return { 
                      ...app, 
-                     metadata: { ...metadata, image: imageUrl } 
+                     metadata: { ...metadata, image } 
                    };
                 }
               }

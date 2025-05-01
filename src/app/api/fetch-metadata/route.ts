@@ -57,15 +57,15 @@ export async function GET(request: Request) {
     log(`[API fetch-metadata] JSON parsed successfully.`);
 
     // Extract the image URL (assuming standard 'image' key)
-    const imageUrl = metadata?.image;
+    const image = metadata?.image;
 
-    if (typeof imageUrl === 'string' && imageUrl.trim() !== '') {
-      log(`[API fetch-metadata] Found image URL: ${imageUrl}`);
-      // Optionally validate imageUrl format here if needed
-      return NextResponse.json({ imageUrl: imageUrl });
+    if (typeof image === 'string' && image.trim() !== '') {
+      log(`[API fetch-metadata] Found image URL: ${image}`);
+      // Optionally validate image format here if needed
+      return NextResponse.json({ image });
     } else {
       log(`[API fetch-metadata] Image URL not found or invalid in JSON for: ${dataUrl}`);
-      return NextResponse.json({ imageUrl: null, error: 'Image URL not found in metadata' });
+      return NextResponse.json({ image: null, error: 'Image URL not found in metadata' });
     }
 
   } catch (error: any) {
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     }
     
     // Return success response but with null image and error message
-    return NextResponse.json({ imageUrl: null, error: errorMessage }, { status: 200 }); 
+    return NextResponse.json({ image: null, error: errorMessage }, { status: 200 }); 
     // Or return server error:
     // return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
