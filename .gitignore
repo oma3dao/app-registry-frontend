@@ -43,3 +43,6 @@ next-env.d.ts
 # Editor config
 .vscode/
 .idea/
+
+# instructions
+/instructions
