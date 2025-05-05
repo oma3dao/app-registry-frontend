@@ -441,11 +441,11 @@ export async function mint(nft: NFT, account: Account): Promise<NFT> {
     };
     
     validateContractUrl(nft.dataUrl, "Data URL");
-    validateContractUrl(nft.iwpsPortalUri, "IWPS Portal URI");
+    validateContractUrl(nft.iwpsPortalUri, "IWPS Portal URL");
     
     // Agent API URI is optional - only validate if provided
     if (nft.agentApiUri && nft.agentApiUri.trim() !== "") {
-      validateContractUrl(nft.agentApiUri, "Agent API URI");
+      validateContractUrl(nft.agentApiUri, "Agent API URL");
     }
     
     // Optional CAIP address validation

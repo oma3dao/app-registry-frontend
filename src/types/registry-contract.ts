@@ -25,12 +25,12 @@ export interface RegistryContractData {
   dataUrl: string;
   
   /**
-   * IWPS Portal URI
+   * IWPS Portal URL
    */
   iwpsPortalUri: string;
   
   /**
-   * Agent API URI (optional)
+   * Agent API UR (optional)
    */
   agentApiUri: string;
   

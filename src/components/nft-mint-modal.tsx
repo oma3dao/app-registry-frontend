@@ -824,7 +824,7 @@ export default function NFTMintModal({
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="iwpsPortalUri">IWPS Portal URI</Label>
+                  <Label htmlFor="iwpsPortalUri">IWPS Portal URL</Label>
                   <Textarea
                     id="iwpsPortalUri"
                     name="iwpsPortalUri"
@@ -857,7 +857,7 @@ export default function NFTMintModal({
 
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="agentApiUri">Agent API URI (Optional)</Label>
+                <Label htmlFor="agentApiUri">Agent API URL (Optional)</Label>
               </div>
               <Textarea
                 id="agentApiUri"

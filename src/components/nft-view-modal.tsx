@@ -433,7 +433,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
             )}
             
             <div className="grid gap-2">
-              <Label htmlFor="iwps-portal-display" className="text-base font-medium">IWPS Portal URI</Label>
+              <Label htmlFor="iwps-portal-display" className="text-base font-medium">IWPS Portal URL</Label>
               <div id="iwps-portal-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
                 <a href={nft.iwpsPortalUri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                   {nft.iwpsPortalUri}
@@ -442,8 +442,8 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
             </div>
             
             <div className="grid gap-2">
-              <Label htmlFor="agent-portal-display" className="text-base font-medium">Agent Portal URI</Label>
-              <div id="agent-portal-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
+              <Label htmlFor="agent-api-display" className="text-base font-medium">Agent API URL</Label>
+              <div id="agent-api-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
                 <a href={nft.agentApiUri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                   {nft.agentApiUri}
                 </a>
