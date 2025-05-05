@@ -20,7 +20,7 @@ import {
   METADATA_JSON_WINDOWS_KEY,
   METADATA_JSON_MACOS_KEY,
   METADATA_JSON_META_KEY,
-  METADATA_JSON_PS5_KEY,
+  METADATA_JSON_PLAYSTATION_KEY,
   METADATA_JSON_XBOX_KEY,
   METADATA_JSON_NINTENDO_KEY,
   METADATA_JSON_URL_LAUNCH_KEY,
@@ -82,15 +82,15 @@ export function buildMetadataJSON(nft: NFT): string {
       windows: METADATA_JSON_WINDOWS_KEY,
       macos: METADATA_JSON_MACOS_KEY,
       meta: METADATA_JSON_META_KEY,
-      ps5: METADATA_JSON_PS5_KEY,
+      playstation: METADATA_JSON_PLAYSTATION_KEY,
       xbox: METADATA_JSON_XBOX_KEY,
       nintendo: METADATA_JSON_NINTENDO_KEY,
   };
 
-  // Map internal detail keys (url_download) to JSON keys (oma3_platform_url_download)
+  // Map internal detail keys (downloadUrl) to JSON keys (oma3_platform_downloadUrl)
   const detailKeyMap: { [key in keyof PlatformDetails]?: string } = {
-      url_download: METADATA_JSON_URL_DOWNLOAD_KEY,
-      url_launch: METADATA_JSON_URL_LAUNCH_KEY,
+      downloadUrl: METADATA_JSON_URL_DOWNLOAD_KEY,
+      launchUrl: METADATA_JSON_URL_LAUNCH_KEY,
       supported: METADATA_JSON_SUPPORTED_KEY,
   };
 
@@ -112,7 +112,7 @@ export function buildMetadataJSON(nft: NFT): string {
                     // Ensure it's a valid detail key we know how to map
                     if (detailKeyMap.hasOwnProperty(detailKey)) {
                          const inputDetailValue = inputPlatformDetails[detailKey]; // Use the typed key
-                         const outputDetailJsonKey = detailKeyMap[detailKey]!; // Get the detail JSON key (e.g., oma3_platform_url_download)
+                         const outputDetailJsonKey = detailKeyMap[detailKey]!; // Get the detail JSON key (e.g., oma3_platform_downloadUrl)
 
                          // Only add non-empty values
                          if (inputDetailValue && (!Array.isArray(inputDetailValue) || inputDetailValue.length > 0)) {
@@ -330,7 +330,7 @@ export function validateMetadata(metadata: MetadataContractData): void {
       for (const platformKey in metadata.platforms) {
           // Use type assertion for safety when accessing details
           const details = metadata.platforms[platformKey as keyof Platforms];
-          if (details && (details.url_download || details.url_launch)) {
+          if (details && (details.downloadUrl || details.launchUrl)) {
               hasPlatformUrl = true;
               break; // Found at least one, no need to check further
           }
@@ -352,8 +352,8 @@ export function validateMetadata(metadata: MetadataContractData): void {
           // Use type assertion for safety when accessing details
           const details = metadata.platforms[platformKey as keyof Platforms];
           if (details) {
-              validateHttpUrl(details.url_download, `${platformKey} download URL`);
-              validateHttpUrl(details.url_launch, `${platformKey} launch URL`);
+              validateHttpUrl(details.downloadUrl, `${platformKey} download URL`);
+              validateHttpUrl(details.launchUrl, `${platformKey} launch URL`);
               // Note: 'supported' is an array of strings, not a URL, so no validation needed here.
           }
       }

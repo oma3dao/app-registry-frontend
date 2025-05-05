@@ -182,6 +182,7 @@ export default function Dashboard() {
         log("Metadata set result:", result);
         if (result) {
           toast.success("Metadata set successfully!");
+          handleCloseMintModal(); // Close modal immediately
         } else {
           toast.error("Failed to set metadata");
         }

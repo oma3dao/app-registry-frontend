@@ -32,7 +32,7 @@ export const OMA3_WEBSITE_URL = "https://oma3.org";
 /**
  * Base URL for IWPS Portal
  */
-export const IWPS_PORTAL_BASE_URL = "https://appregistry.oma3.org/api/portal-uri";
+export const IWPS_PORTAL_BASE_URL = "https://appregistry.oma3.org/api/portal-url";
 
 /**
  * Validation message constants
@@ -77,13 +77,13 @@ export const METADATA_JSON_ANDROID_KEY = "android";
 export const METADATA_JSON_WINDOWS_KEY = "windows";
 export const METADATA_JSON_MACOS_KEY = "macos";
 export const METADATA_JSON_META_KEY = "meta";
-export const METADATA_JSON_PS5_KEY = "ps5";
+export const METADATA_JSON_PLAYSTATION_KEY = "playstation";
 export const METADATA_JSON_XBOX_KEY = "xbox";
 export const METADATA_JSON_NINTENDO_KEY = "nintendo";
 
 // URL and supported keys
-export const METADATA_JSON_URL_LAUNCH_KEY = "url_launch";
-export const METADATA_JSON_URL_DOWNLOAD_KEY = "url_download";
+export const METADATA_JSON_URL_LAUNCH_KEY = "launchUrl";
+export const METADATA_JSON_URL_DOWNLOAD_KEY = "downloadUrl";
 export const METADATA_JSON_SUPPORTED_KEY = "supported";
 
 /**

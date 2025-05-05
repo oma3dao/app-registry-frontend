@@ -1,5 +1,6 @@
 "use client"
 
+import React, { useEffect, useState } from 'react';
 import {
   Card, 
   CardContent, 
@@ -38,7 +39,7 @@ const platformIcons: Record<string, React.ReactNode> = {
   windows: <Laptop size={16} aria-label="Windows" />,
   macos: <Monitor size={16} aria-label="macOS" />,
   meta: <Gamepad2 size={16} aria-label="Meta Quest" />, // Using gamepad as generic VR
-  ps5: <Gamepad2 size={16} aria-label="PlayStation" />, // Using generic gamepad
+  playstation: <Gamepad2 size={16} aria-label="PlayStation" />, // Using generic gamepad
   xbox: <Gamepad2 size={16} aria-label="Xbox" />, // Using generic gamepad
   nintendo: <Gamepad2 size={16} aria-label="Nintendo Switch" />, // Using generic gamepad
 };
@@ -46,8 +47,17 @@ const platformIcons: Record<string, React.ReactNode> = {
 export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTCardProps) {
   // Use the metadata context to get complete metadata
   const { getNFTMetadata } = useNFTMetadata();
-  const nftMetadata = getNFTMetadata(nft);
   
+  // Local state to store the metadata for this card
+  const [nftMetadata, setNftMetadata] = useState<ReturnType<typeof getNFTMetadata> | null>(null);
+
+  // Effect to fetch/update metadata when NFT changes
+  useEffect(() => {
+    const metadata = getNFTMetadata(nft); // Call inside useEffect
+    setNftMetadata(metadata); // Update local state
+    // Note: getNFTMetadata handles the actual fetching and caching logic internally
+  }, [nft, getNFTMetadata]); // Rerun effect if nft prop or context function changes
+
   // Debug log key generation
   const key = `${nft.did || 'unknown'}-${nft.version || 'unknown'}`;
   log(`NFTCard rendering with key: ${key}`, nft);

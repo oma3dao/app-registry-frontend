@@ -5,11 +5,11 @@ export interface PlatformDetails {
   /**
    * URL for downloading the application (e.g., App Store, Google Play, website).
    */
-  url_download?: string;
+  downloadUrl?: string;
   /**
    * URL or scheme for launching the application directly (e.g., deep link).
    */
-  url_launch?: string;
+  launchUrl?: string;
   /**
    * Optional list of supported devices or architectures (e.g., ["iPhone", "iPad"], ["x64", "arm64"]).
    */
@@ -27,7 +27,7 @@ export interface Platforms {
   windows?: PlatformDetails;
   macos?: PlatformDetails;
   meta?: PlatformDetails; // For Meta Quest
-  ps5?: PlatformDetails; // For PlayStation 5
+  playstation?: PlatformDetails; // For PlayStation 5
   xbox?: PlatformDetails; // For Xbox
   nintendo?: PlatformDetails; // For Nintendo Switch
   // Add other platforms as needed

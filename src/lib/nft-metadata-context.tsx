@@ -115,8 +115,8 @@ const mapPlatforms = (platformData: any): UIMetadata['platforms'] => {
       if (platformData[platform]) {
         const details = platformData[platform];
         result[platform] = {
-          downloadUrl: details[METADATA_JSON_URL_DOWNLOAD_KEY] || details.url_download || undefined,
-          launchUrl: details[METADATA_JSON_URL_LAUNCH_KEY] || details.url_launch || undefined,
+          downloadUrl: details[METADATA_JSON_URL_DOWNLOAD_KEY] || details.downloadUrl || undefined,
+          launchUrl: details[METADATA_JSON_URL_LAUNCH_KEY] || details.launchUrl || undefined,
           supported: details[METADATA_JSON_SUPPORTED_KEY] || details.supported || undefined
         };
       }

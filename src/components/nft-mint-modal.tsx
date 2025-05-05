@@ -112,7 +112,7 @@ const nftToWizardForm = (nft: NFT): WizardFormData => {
     windows: sourcePlatforms.windows,
     macos: sourcePlatforms.macos,
     meta: sourcePlatforms.meta,
-    ps5: sourcePlatforms.ps5,
+    playstation: sourcePlatforms.playstation,
     xbox: sourcePlatforms.xbox,
     nintendo: sourcePlatforms.nintendo,
   };
@@ -181,8 +181,8 @@ const validateFields = (fields: FieldDescriptor[], formData: WizardFormData) => 
 
       const hasAtLeastOnePlatform = platforms && Object.keys(platforms).length > 0 && 
         Object.values(platforms).some(details => 
-          (details?.url_download && details.url_download.trim() !== '') || 
-          (details?.url_launch && details.url_launch.trim() !== '')
+          (details?.downloadUrl && details.downloadUrl.trim() !== '') || 
+          (details?.launchUrl && details.launchUrl.trim() !== '')
         );
 
       if (!hasAtLeastOnePlatform) {
@@ -193,11 +193,11 @@ const validateFields = (fields: FieldDescriptor[], formData: WizardFormData) => 
       else if (platforms) {
         Object.entries(platforms).forEach(([platformKey, details]) => {
           const pKey = platformKey as keyof Platforms; // Type assertion
-          if (details?.url_download && details.url_download.startsWith('http') && !validateUrl(details.url_download)) {
-            errors[`metadata.platforms.${pKey}.url_download`] = URL_ERROR_MESSAGE;
+          if (details?.downloadUrl && details.downloadUrl.startsWith('http') && !validateUrl(details.downloadUrl)) {
+            errors[`metadata.platforms.${pKey}.downloadUrl`] = URL_ERROR_MESSAGE;
           }
-          if (details?.url_launch && details.url_launch.startsWith('http') && !validateUrl(details.url_launch)) {
-            errors[`metadata.platforms.${pKey}.url_launch`] = URL_ERROR_MESSAGE;
+          if (details?.launchUrl && details.launchUrl.startsWith('http') && !validateUrl(details.launchUrl)) {
+            errors[`metadata.platforms.${pKey}.launchUrl`] = URL_ERROR_MESSAGE;
           }
         });
       }
@@ -327,18 +327,30 @@ export default function NFTMintModal({
       // Existing NFT - use its values
       const baseFormData = nftToWizardForm(nft);
       
-      // If initialMetadata is provided, merge it with the existing metadata
+      // If initialMetadata is provided, merge it carefully
       if (initialMetadata) {
         log("Setting form data with initialMetadata:", initialMetadata);
-        // Normalize the metadata to ensure it has all required fields
-        const normalizedMetadata = normalizeMetadata(initialMetadata);
+        const normalizedInitialMetadata = normalizeMetadata(initialMetadata);
+
+        // Merge metadata, prioritizing initialMetadata only if its screenshotUrls are valid and non-empty
+        // Also ensure all required string fields have default values
+        const mergedMetadata: MetadataContractData = {
+          descriptionUrl: normalizedInitialMetadata.descriptionUrl || baseFormData.metadata?.descriptionUrl || "",
+          external_url: normalizedInitialMetadata.external_url || baseFormData.metadata?.external_url || "",
+          token: normalizedInitialMetadata.token || baseFormData.metadata?.token || "",
+          image: normalizedInitialMetadata.image || baseFormData.metadata?.image || "",
+          description: normalizedInitialMetadata.description || baseFormData.metadata?.description || undefined, // Description can be optional (string | undefined)
+          platforms: { ...baseFormData.metadata?.platforms, ...normalizedInitialMetadata.platforms }, // Merge platforms, initialMetadata takes priority
+          // Explicitly handle screenshotUrls: prioritize valid initialMetadata, then baseFormData, then default
+          screenshotUrls: 
+            Array.isArray(normalizedInitialMetadata.screenshotUrls) && normalizedInitialMetadata.screenshotUrls.some(url => url && url.trim() !== '')
+            ? normalizedInitialMetadata.screenshotUrls 
+            : baseFormData.metadata?.screenshotUrls || ["", "", "", "", ""] // Fallback to base or default
+        };
         
         setFormData({
           ...baseFormData,
-          metadata: {
-            ...baseFormData.metadata,
-            ...normalizedMetadata
-          } as MetadataContractData
+          metadata: mergedMetadata
         });
       } else {
         setFormData(baseFormData);
@@ -387,7 +399,7 @@ export default function NFTMintModal({
     const { name, value } = e.target;
     
     // Check if the field belongs to platform availability
-    const platformMatch = name.match(/^(web|ios|android|windows|macos|meta|ps5|xbox|nintendo)_(url_download|url_launch|supported)$/);
+    const platformMatch = name.match(/^(web|ios|android|windows|macos|meta|playstation|xbox|nintendo)_(downloadUrl|launchUrl|supported)$/);
 
     if (platformMatch) {
       // Ensure platformKey is one of the known keys for type safety
@@ -430,7 +442,7 @@ export default function NFTMintModal({
       });
 
       // Validation for platform URLs (only if http/https)
-      if ((fieldKey === 'url_download' || fieldKey === 'url_launch') && value && value.startsWith('http') && !validateUrl(value)) {
+      if ((fieldKey === 'downloadUrl' || fieldKey === 'launchUrl') && value && value.startsWith('http') && !validateUrl(value)) {
          setErrors(prev => ({ 
            ...prev, 
            [`metadata.platforms.${String(platformKey)}.${String(fieldKey)}`]: URL_ERROR_MESSAGE 
@@ -1075,7 +1087,7 @@ export default function NFTMintModal({
                 First screenshot is required; others are optional. Maximum resolution is 2048 x 2048.
               </p>
 
-              {formData.metadata?.screenshotUrls.map((url, index) => (
+              {(formData.metadata?.screenshotUrls || []).map((url, index) => (
                 <div key={index} className="grid gap-2">
                   <Label htmlFor={`screenshot${index}`}>
                     Screenshot {index + 1} {index === 0 ? "(Required)" : "(Optional)"}
@@ -1169,20 +1181,20 @@ export default function NFTMintModal({
             <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
               <h3 className="text-sm font-semibold mb-3">Web Platform</h3>
               <div className="grid gap-2">
-                <Label htmlFor="web_url_launch">Launch URL</Label>
+                <Label htmlFor="web_launchUrl">Launch URL</Label>
                 <Textarea
-                  id="web_url_launch" // Name matches the flat field for handleChange
-                  name="web_url_launch"
-                  value={formData.metadata?.platforms?.web?.url_launch || ''}
+                  id="web_launchUrl" // Name matches the flat field for handleChange
+                  name="web_launchUrl"
+                  value={formData.metadata?.platforms?.web?.launchUrl || ''}
                   onChange={handleChange}
                   placeholder="https://example.com/app"
-                  className={`min-h-[70px] ${errors['metadata.platforms.web.url_launch'] ? "border-red-500" : ""}`}
-                  aria-describedby={`web_url_launch-help ${errors['metadata.platforms.web.url_launch'] ? 'web_url_launch-error' : ''} ${errors['metadata.platforms'] ? 'platforms-error' : ''}`}
+                  className={`min-h-[70px] ${errors['metadata.platforms.web.launchUrl'] ? "border-red-500" : ""}`}
+                  aria-describedby={`web_launchUrl-help ${errors['metadata.platforms.web.launchUrl'] ? 'web_launchUrl-error' : ''} ${errors['metadata.platforms'] ? 'platforms-error' : ''}`}
                 />
-                {errors['metadata.platforms.web.url_launch'] && (
-                  <p id="web_url_launch-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.web.url_launch']}</p>
+                {errors['metadata.platforms.web.launchUrl'] && (
+                  <p id="web_launchUrl-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.web.launchUrl']}</p>
                 )}
-                <p id="web_url_launch-help" className="text-xs text-slate-500">
+                <p id="web_launchUrl-help" className="text-xs text-slate-500">
                   URL to launch your web application
                 </p>
               </div>
@@ -1193,39 +1205,39 @@ export default function NFTMintModal({
               <h3 className="text-sm font-semibold mb-3">iOS Platform</h3>
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="ios_url_download">Download URL</Label>
+                  <Label htmlFor="ios_downloadUrl">Download URL</Label>
                   <Textarea
-                    id="ios_url_download"
-                    name="ios_url_download"
-                    value={formData.metadata?.platforms?.ios?.url_download || ''}
+                    id="ios_downloadUrl"
+                    name="ios_downloadUrl"
+                    value={formData.metadata?.platforms?.ios?.downloadUrl || ''}
                     onChange={handleChange}
                     placeholder="https://apps.apple.com/app/id123456789"
-                    className={`min-h-[70px] ${errors['metadata.platforms.ios.url_download'] ? "border-red-500" : ""}`}
-                    aria-describedby={`ios_url_download-help ${errors['metadata.platforms.ios.url_download'] ? 'ios_url_download-error' : ''}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.ios.downloadUrl'] ? "border-red-500" : ""}`}
+                    aria-describedby={`ios_downloadUrl-help ${errors['metadata.platforms.ios.downloadUrl'] ? 'ios_downloadUrl-error' : ''}`}
                   />
-                   {errors['metadata.platforms.ios.url_download'] && (
-                    <p id="ios_url_download-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ios.url_download']}</p>
+                   {errors['metadata.platforms.ios.downloadUrl'] && (
+                    <p id="ios_downloadUrl-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ios.downloadUrl']}</p>
                   )}
-                  <p id="ios_url_download-help" className="text-xs text-slate-500">
+                  <p id="ios_downloadUrl-help" className="text-xs text-slate-500">
                     App Store URL to download your iOS app
                   </p>
                 </div>
                 
                 <div className="grid gap-2">
-                  <Label htmlFor="ios_url_launch">Launch URL (Optional)</Label>
+                  <Label htmlFor="ios_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
-                    id="ios_url_launch"
-                    name="ios_url_launch"
-                    value={formData.metadata?.platforms?.ios?.url_launch || ''}
+                    id="ios_launchUrl"
+                    name="ios_launchUrl"
+                    value={formData.metadata?.platforms?.ios?.launchUrl || ''}
                     onChange={handleChange}
                     placeholder="https://example.com/app or custom-scheme://"
-                    className={`min-h-[70px] ${errors['metadata.platforms.ios.url_launch'] ? "border-red-500" : ""}`}
-                    aria-describedby={`ios_url_launch-help ${errors['metadata.platforms.ios.url_launch'] ? 'ios_url_launch-error' : ''}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.ios.launchUrl'] ? "border-red-500" : ""}`}
+                    aria-describedby={`ios_launchUrl-help ${errors['metadata.platforms.ios.launchUrl'] ? 'ios_launchUrl-error' : ''}`}
                   />
-                  {errors['metadata.platforms.ios.url_launch'] && (
-                    <p id="ios_url_launch-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ios.url_launch']}</p>
+                  {errors['metadata.platforms.ios.launchUrl'] && (
+                    <p id="ios_launchUrl-error" className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ios.launchUrl']}</p>
                   )}
-                  <p id="ios_url_launch-help" className="text-xs text-slate-500">
+                  <p id="ios_launchUrl-help" className="text-xs text-slate-500">
                     Deep link or URL to launch your iOS app
                   </p>
                 </div>
@@ -1253,34 +1265,34 @@ export default function NFTMintModal({
               <h3 className="text-sm font-semibold mb-3">Android Platform</h3>
               <div className="grid gap-4">
                  <div className="grid gap-2">
-                  <Label htmlFor="android_url_download">Download URL</Label>
+                  <Label htmlFor="android_downloadUrl">Download URL</Label>
                   <Textarea
-                    id="android_url_download"
-                    name="android_url_download"
-                    value={formData.metadata?.platforms?.android?.url_download || ''}
+                    id="android_downloadUrl"
+                    name="android_downloadUrl"
+                    value={formData.metadata?.platforms?.android?.downloadUrl || ''}
                     onChange={handleChange}
                     placeholder="https://play.google.com/store/apps/details?id=com.example.app"
-                    className={`min-h-[70px] ${errors['metadata.platforms.android.url_download'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.android.downloadUrl'] ? "border-red-500" : ""}`}
                   />
-                   {errors['metadata.platforms.android.url_download'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.android.url_download']}</p>
+                   {errors['metadata.platforms.android.downloadUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.android.downloadUrl']}</p>
                   )}
                   <p className="text-xs text-slate-500">
                     Google Play Store URL to download your Android app
                   </p>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="android_url_launch">Launch URL (Optional)</Label>
+                  <Label htmlFor="android_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
-                    id="android_url_launch"
-                    name="android_url_launch"
-                    value={formData.metadata?.platforms?.android?.url_launch || ''}
+                    id="android_launchUrl"
+                    name="android_launchUrl"
+                    value={formData.metadata?.platforms?.android?.launchUrl || ''}
                     onChange={handleChange}
                     placeholder="https://example.com/app or app://launch"
-                    className={`min-h-[70px] ${errors['metadata.platforms.android.url_launch'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.android.launchUrl'] ? "border-red-500" : ""}`}
                   />
-                  {errors['metadata.platforms.android.url_launch'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.android.url_launch']}</p>
+                  {errors['metadata.platforms.android.launchUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.android.launchUrl']}</p>
                   )}
                   <p className="text-xs text-slate-500">
                     Deep link or URL to launch your Android app
@@ -1294,34 +1306,34 @@ export default function NFTMintModal({
               <h3 className="text-sm font-semibold mb-3">Windows Platform</h3>
               <div className="grid gap-4">
                  <div className="grid gap-2">
-                  <Label htmlFor="windows_url_download">Download URL</Label>
+                  <Label htmlFor="windows_downloadUrl">Download URL</Label>
                   <Textarea
-                    id="windows_url_download"
-                    name="windows_url_download"
-                    value={formData.metadata?.platforms?.windows?.url_download || ''}
+                    id="windows_downloadUrl"
+                    name="windows_downloadUrl"
+                    value={formData.metadata?.platforms?.windows?.downloadUrl || ''}
                     onChange={handleChange}
                     placeholder="https://apps.microsoft.com/store/detail/yourapp/XXXXXXXX"
-                    className={`min-h-[70px] ${errors['metadata.platforms.windows.url_download'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.windows.downloadUrl'] ? "border-red-500" : ""}`}
                   />
-                   {errors['metadata.platforms.windows.url_download'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.windows.url_download']}</p>
+                   {errors['metadata.platforms.windows.downloadUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.windows.downloadUrl']}</p>
                   )}
                   <p className="text-xs text-slate-500">
                     Microsoft Store or website URL to download your Windows app
                   </p>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="windows_url_launch">Launch URL (Optional)</Label>
+                  <Label htmlFor="windows_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
-                    id="windows_url_launch"
-                    name="windows_url_launch"
-                    value={formData.metadata?.platforms?.windows?.url_launch || ''}
+                    id="windows_launchUrl"
+                    name="windows_launchUrl"
+                    value={formData.metadata?.platforms?.windows?.launchUrl || ''}
                     onChange={handleChange}
                     placeholder="oma3://launch"
-                    className={`min-h-[70px] ${errors['metadata.platforms.windows.url_launch'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.windows.launchUrl'] ? "border-red-500" : ""}`}
                   />
-                  {errors['metadata.platforms.windows.url_launch'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.windows.url_launch']}</p>
+                  {errors['metadata.platforms.windows.launchUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.windows.launchUrl']}</p>
                   )}
                   <p className="text-xs text-slate-500">
                     Protocol handler or URL to launch your Windows app
@@ -1347,32 +1359,32 @@ export default function NFTMintModal({
               <h3 className="text-sm font-semibold mb-3">macOS Platform</h3>
               <div className="grid gap-4">
                  <div className="grid gap-2">
-                  <Label htmlFor="macos_url_download">Download URL</Label>
+                  <Label htmlFor="macos_downloadUrl">Download URL</Label>
                   <Textarea
-                    id="macos_url_download"
-                    name="macos_url_download"
-                    value={formData.metadata?.platforms?.macos?.url_download || ''}
+                    id="macos_downloadUrl"
+                    name="macos_downloadUrl"
+                    value={formData.metadata?.platforms?.macos?.downloadUrl || ''}
                     onChange={handleChange}
                     placeholder="https://apps.apple.com/app/id123456789?mt=12"
-                    className={`min-h-[70px] ${errors['metadata.platforms.macos.url_download'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.macos.downloadUrl'] ? "border-red-500" : ""}`}
                   />
-                   {errors['metadata.platforms.macos.url_download'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.macos.url_download']}</p>
+                   {errors['metadata.platforms.macos.downloadUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.macos.downloadUrl']}</p>
                   )}
                   {/* ... help text ... */}
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="macos_url_launch">Launch URL (Optional)</Label>
+                  <Label htmlFor="macos_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
-                    id="macos_url_launch"
-                    name="macos_url_launch"
-                    value={formData.metadata?.platforms?.macos?.url_launch || ''}
+                    id="macos_launchUrl"
+                    name="macos_launchUrl"
+                    value={formData.metadata?.platforms?.macos?.launchUrl || ''}
                     onChange={handleChange}
                     placeholder="oma3://launch"
-                    className={`min-h-[70px] ${errors['metadata.platforms.macos.url_launch'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.macos.launchUrl'] ? "border-red-500" : ""}`}
                   />
-                   {errors['metadata.platforms.macos.url_launch'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.macos.url_launch']}</p>
+                   {errors['metadata.platforms.macos.launchUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.macos.launchUrl']}</p>
                   )}
                   {/* ... help text ... */}
                 </div>
@@ -1384,32 +1396,32 @@ export default function NFTMintModal({
               <h3 className="text-sm font-semibold mb-3">Meta Quest Platform</h3>
               <div className="grid gap-4">
                  <div className="grid gap-2">
-                  <Label htmlFor="meta_url_download">Download URL</Label>
+                  <Label htmlFor="meta_downloadUrl">Download URL</Label>
                   <Textarea
-                    id="meta_url_download"
-                    name="meta_url_download"
-                    value={formData.metadata?.platforms?.meta?.url_download || ''}
+                    id="meta_downloadUrl"
+                    name="meta_downloadUrl"
+                    value={formData.metadata?.platforms?.meta?.downloadUrl || ''}
                     onChange={handleChange}
                     placeholder="https://www.meta.com/experiences/1234567890"
-                    className={`min-h-[70px] ${errors['metadata.platforms.meta.url_download'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.meta.downloadUrl'] ? "border-red-500" : ""}`}
                   />
-                   {errors['metadata.platforms.meta.url_download'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.meta.url_download']}</p>
+                   {errors['metadata.platforms.meta.downloadUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.meta.downloadUrl']}</p>
                   )}
                   {/* ... help text ... */}
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="meta_url_launch">Launch URL (Optional)</Label>
+                  <Label htmlFor="meta_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
-                    id="meta_url_launch"
-                    name="meta_url_launch"
-                    value={formData.metadata?.platforms?.meta?.url_launch || ''}
+                    id="meta_launchUrl"
+                    name="meta_launchUrl"
+                    value={formData.metadata?.platforms?.meta?.launchUrl || ''}
                     onChange={handleChange}
                     placeholder="oculus://store/1234567890"
-                    className={`min-h-[70px] ${errors['metadata.platforms.meta.url_launch'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.meta.launchUrl'] ? "border-red-500" : ""}`}
                   />
-                  {errors['metadata.platforms.meta.url_launch'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.meta.url_launch']}</p>
+                  {errors['metadata.platforms.meta.launchUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.meta.launchUrl']}</p>
                   )}
                   {/* ... help text ... */}
                 </div>
@@ -1422,17 +1434,17 @@ export default function NFTMintModal({
               <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                  <h4 className="text-sm font-medium mb-2">PlayStation</h4>
                 <div className="grid gap-2">
-                  <Label htmlFor="ps5_url_download">Download URL</Label>
+                  <Label htmlFor="playstation_downloadUrl">Download URL</Label>
                   <Textarea
-                    id="ps5_url_download"
-                    name="ps5_url_download"
-                    value={formData.metadata?.platforms?.ps5?.url_download || ''}
+                    id="playstation_downloadUrl"
+                    name="playstation_downloadUrl"
+                    value={formData.metadata?.platforms?.playstation?.downloadUrl || ''}
                     onChange={handleChange}
                     placeholder="https://store.playstation.com/en-us/product/UP9000-CUSA12345_00-YOURGAME0000000"
-                    className={`min-h-[70px] ${errors['metadata.platforms.ps5.url_download'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.playstation.downloadUrl'] ? "border-red-500" : ""}`}
                   />
-                  {errors['metadata.platforms.ps5.url_download'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.ps5.url_download']}</p>
+                  {errors['metadata.platforms.playstation.downloadUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.playstation.downloadUrl']}</p>
                   )}
                 </div>
               </div>
@@ -1440,17 +1452,17 @@ export default function NFTMintModal({
               <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                  <h4 className="text-sm font-medium mb-2">Xbox</h4>
                 <div className="grid gap-2">
-                  <Label htmlFor="xbox_url_download">Download URL</Label>
+                  <Label htmlFor="xbox_downloadUrl">Download URL</Label>
                   <Textarea
-                    id="xbox_url_download"
-                    name="xbox_url_download"
-                    value={formData.metadata?.platforms?.xbox?.url_download || ''}
+                    id="xbox_downloadUrl"
+                    name="xbox_downloadUrl"
+                    value={formData.metadata?.platforms?.xbox?.downloadUrl || ''}
                     onChange={handleChange}
                     placeholder="https://www.microsoft.com/store/apps/9NBLGGH4R315"
-                    className={`min-h-[70px] ${errors['metadata.platforms.xbox.url_download'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.xbox.downloadUrl'] ? "border-red-500" : ""}`}
                   />
-                   {errors['metadata.platforms.xbox.url_download'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.xbox.url_download']}</p>
+                   {errors['metadata.platforms.xbox.downloadUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.xbox.downloadUrl']}</p>
                   )}
                 </div>
               </div>
@@ -1458,17 +1470,17 @@ export default function NFTMintModal({
               <div>
                  <h4 className="text-sm font-medium mb-2">Nintendo Switch</h4>
                 <div className="grid gap-2">
-                  <Label htmlFor="nintendo_url_download">Download URL</Label>
+                  <Label htmlFor="nintendo_downloadUrl">Download URL</Label>
                   <Textarea
-                    id="nintendo_url_download"
-                    name="nintendo_url_download"
-                    value={formData.metadata?.platforms?.nintendo?.url_download || ''}
+                    id="nintendo_downloadUrl"
+                    name="nintendo_downloadUrl"
+                    value={formData.metadata?.platforms?.nintendo?.downloadUrl || ''}
                     onChange={handleChange}
                     placeholder="https://www.nintendo.com/store/products/your-game-name-switch/"
-                    className={`min-h-[70px] ${errors['metadata.platforms.nintendo.url_download'] ? "border-red-500" : ""}`}
+                    className={`min-h-[70px] ${errors['metadata.platforms.nintendo.downloadUrl'] ? "border-red-500" : ""}`}
                   />
-                   {errors['metadata.platforms.nintendo.url_download'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.nintendo.url_download']}</p>
+                   {errors['metadata.platforms.nintendo.downloadUrl'] && (
+                    <p className="text-red-500 text-sm mt-1">{errors['metadata.platforms.nintendo.downloadUrl']}</p>
                   )}
                 </div>
               </div>
@@ -1527,15 +1539,15 @@ export default function NFTMintModal({
               {hasAnyPlatformData ? (
                 <div className="space-y-3">
                   {Object.entries(platforms).map(([key, details]) => (
-                    details && (details.url_download || details.url_launch) ? (
+                    details && (details.downloadUrl || details.launchUrl) ? (
                       <div key={key}>
                         <span className="font-medium capitalize">{key}:</span>
                         <div className="mt-1 space-y-1">
-                          {details.url_download && (
-                            <div className="break-all text-xs">Download URL: {details.url_download}</div>
+                          {details.downloadUrl && (
+                            <div className="break-all text-xs">Download URL: {details.downloadUrl}</div>
                           )}
-                          {details.url_launch && (
-                            <div className="break-all text-xs">Launch URL: {details.url_launch}</div>
+                          {details.launchUrl && (
+                            <div className="break-all text-xs">Launch URL: {details.launchUrl}</div>
                           )}
                           {details.supported && details.supported.length > 0 && (
                             <div className="break-all text-xs">Supported: {details.supported.join(", ")}</div>
