@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Define an interface for the context object to make the signature cleaner
+interface RouteContext {
+  params: {
+    did: string;
+    version: string;
+  };
+}
+
 // Handler now accepts params for dynamic route segments
 export async function POST(
   request: NextRequest,
-  { params }: { params: { did: string; version: string } } // Added params
+  context: RouteContext // Use the defined interface for the second argument
 ) {
   try {
-    // Extract did and version from params
-    const { did, version } = params; 
+    // Extract did and version from context.params
+    const { did, version } = context.params; 
 
     const body = await request.json();
 
