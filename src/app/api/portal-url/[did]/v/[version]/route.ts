@@ -65,24 +65,19 @@ export async function POST(
 
     // --- Validation Logic --- 
 
-    // 2. Group 1 Dependency Check (use underscored variables for keys and values)
-    const group1Params = { 
+    // Group 1 parameters (for reference, no longer a strict check here)
+    const _group1Params = { 
       _sourceIsa, 
       _sourceBits, 
       _sourceOs, 
       _sourceOsVersion, 
       _sourceClientType 
     };
-    const group1Keys = [AppConfig.IWPS_SOURCE_ISA_KEY, AppConfig.IWPS_SOURCE_BITS_KEY, AppConfig.IWPS_SOURCE_OS_KEY, AppConfig.IWPS_SOURCE_OS_VERSION_KEY, AppConfig.IWPS_SOURCE_CLIENT_TYPE_KEY]; 
-    const group1PresentCount = Object.values(group1Params).filter(isDefined).length;
+    // const group1PresentCount = Object.values(group1Params).filter(isDefined).length;
+    // The strict check for Group 1 completeness is removed.
+    // Platform matching logic will handle missing _sourceOs gracefully.
 
-    if (group1PresentCount > 0 && group1PresentCount < group1Keys.length) {
-      const missingKeys = group1Keys.filter(key => !isDefined(body[key]));
-      return NextResponse.json({ approval: false, error: `Incomplete Group 1 parameters. Missing: ${missingKeys.join(', ')}` }, { status: 400 });
-    }
-    // TODO: Add type/enum validation for Group 1 parameters if needed
-
-    // 3. Group 2 Dependency Check (use underscored variables for keys and values)
+    // 3. Group 2 Dependency Check (remains the same)
     const group2Params = { 
       _teleportId, 
       _userId, 
@@ -97,11 +92,22 @@ export async function POST(
       const missingKeys = group2Keys.filter(key => !isDefined(body[key]));
       return NextResponse.json({ approval: false, error: `Incomplete Group 2 parameters. Missing: ${missingKeys.join(', ')}` }, { status: 400 });
     }
-    // TODO: Add type/enum validation for Group 2 parameters if needed
 
-    // 4. Check if at least one group is present
-    if (group1PresentCount === 0 && group2PresentCount === 0) {
-      return NextResponse.json({ approval: false, error: 'Request must include either all Group 1 parameters or all Group 2 parameters.' }, { status: 400 });
+    // 4. Check if at least some meaningful parameters are present
+    // We need at least sourceOs for platform matching (if not web) OR Group 2 for teleport features.
+    // Location is always present in the request from proxy, but can be empty.
+    if (!isDefined(_sourceOs) && group2PresentCount === 0) {
+      // If no sourceOs AND no Group 2 params, the request is too vague.
+      // Note: platform matching will still try to match 'web' first even if _sourceOs is not defined.
+      // This check ensures that if it's not a 'web' platform and no _sourceOs, and no Group 2, it's an error.
+      // However, the platform matching itself will correctly say "Platform compatibility check requires Group 1 parameters" if _sourceOs is needed but missing.
+      // A more precise check: if no group 2, and sourceOs is needed for platform matching but is missing. 
+      // Let's refine this: the platform matching handles the _sourceOs requirement. We just need to ensure the request isn't completely empty of IWPS params.
+      const allIwpsParams = { ..._group1Params, ...group2Params, _location };
+      const anyIwpsParamPresent = Object.values(allIwpsParams).some(isDefined);
+      if (!anyIwpsParamPresent) {
+         return NextResponse.json({ approval: false, error: 'Request must include some IWPS parameters (either Group 1 or Group 2 related).' }, { status: 400 });
+      }
     }
 
     // --- End Validation --- 
@@ -133,8 +139,9 @@ export async function POST(
     // Keep underscore for spec response value
     let _downloadUrl: string | undefined = undefined; 
 
-    if (group1PresentCount > 0) {
-        // Rename variable to supportedPlatforms for better accuracy
+    const isGroup1Present = isDefined(_sourceOs) || isDefined(_sourceClientType) || isDefined(_sourceIsa) || isDefined(_sourceBits) || isDefined(_sourceOsVersion);
+
+    if (isGroup1Present) {
         const supportedPlatforms = appMetadata?.platforms; 
         if (!supportedPlatforms || Object.keys(supportedPlatforms).length === 0) {
             responseError = "No platform information found in application metadata.";
@@ -197,7 +204,7 @@ export async function POST(
         responseBody[AppConfig.IWPS_ERROR_KEY] = responseError;
     }
     // Keep prefix for value
-    if (group1PresentCount > 0 && _downloadUrl !== undefined) {
+    if (isGroup1Present && _downloadUrl !== undefined) { 
         responseBody[AppConfig.IWPS_DOWNLOAD_URL_KEY] = _downloadUrl;
     }
     if (group2PresentCount > 0) {
