@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/api/portal-uri/:did/v/:version",
+      "destination": "/api/portal-url/:did/v/:version",
+      "permanent": true
+    }
+  ]
+} 
