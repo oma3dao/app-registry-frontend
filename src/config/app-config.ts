@@ -202,6 +202,12 @@ export const IWPS_EXPIRATION_KEY = "expiration";
 export const IWPS_ERROR_KEY = "error";
 
 /**
+ * IWPS Default Values / Placeholders
+ */
+export const IWPS_DEFAULT_ACK_URL = "";
+export const IWPS_DEFAULT_NACK_URL = "";
+
+/**
  * Base URLs for metadata editing eligibility
  */
 export const METADATA_EDIT_ELIGIBLE_BASE_URLS = ["appregistry.oma3.org"];
