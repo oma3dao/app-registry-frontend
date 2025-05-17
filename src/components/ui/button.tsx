@@ -102,6 +102,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               name: "OMA3 App Registry",
               url: "https://oma3.org",
             }}
+            detailsModal={{
+              assetTabs: [], // Attempt to hide the asset display sections in the details modal
+            }}
             className={className}
             // Enable auto-connect for persistence between refreshes
             autoConnect={true}
