@@ -158,6 +158,12 @@ function processContractResponse(response: any): { apps: ContractApp[], nextInde
     log("Response is null or undefined");
     return { apps: [], nextIndex: 0 };
   }
+
+  // Handle empty array response
+  if (Array.isArray(response) && response.length === 0) {
+    log("Response is an empty array");
+    return { apps: [], nextIndex: 0 };
+  }
   
   log("Raw contract response:", response);
   let apps: ContractApp[] = [];
@@ -191,6 +197,14 @@ function processContractResponse(response: any): { apps: ContractApp[], nextInde
           apps = appData.map((innerAppData, index) => 
             parseRawAppData(innerAppData, index)
           ).filter(Boolean) as ContractApp[];
+        } else {
+          // This is the corrected path for a single app from getAppsByMinter.
+          // appData is [app1_field0, app1_field1, ..., app1_field9]
+          log("Interpreting appData as a single app's fields array (response[0] is the app fields)");
+          const singleApp = parseRawAppData(appData, 0);
+          if (singleApp) {
+            apps = [singleApp];
+          }
         }
       }
     }
