@@ -1,5 +1,5 @@
 import { defineChain } from "thirdweb/chains";
-import { celoAlfajores } from "./chains";
+import { celoAlfajores, customEvmChain } from "./chains";
 import appRegistryAbi from "../abi/appRegistry.json";
 import appMetadataAbi from "../abi/appMetadata.json";
 
@@ -24,27 +24,31 @@ import appMetadataAbi from "../abi/appMetadata.json";
  * ```
  */
 
-// Define the chain using Thirdweb's defineChain for proper typing
-const alfajoresChain = defineChain({
-  id: 44787,
-  rpc: celoAlfajores.rpc,
-  name: celoAlfajores.name,
-  nativeCurrency: celoAlfajores.nativeCurrency,
-  blockExplorers: celoAlfajores.blockExplorers
+// Configuration: Choose which chain to use
+// TODO: This could be moved to environment variables or app config
+const ACTIVE_CHAIN = celoAlfajores; // Change to customEvmChain when ready
+
+// Define the active chain using Thirdweb's defineChain for proper typing
+const activeChain = defineChain({
+  id: ACTIVE_CHAIN.id,
+  rpc: ACTIVE_CHAIN.rpc,
+  name: ACTIVE_CHAIN.name,
+  nativeCurrency: ACTIVE_CHAIN.nativeCurrency,
+  blockExplorers: ACTIVE_CHAIN.blockExplorers
 });
 
-// Alfajores testnet contract
+// App Registry contract (uses active chain configuration)
 export const OMA3_APP_REGISTRY = {
   name: "OMA3 App Registry",
-  chain: alfajoresChain,
-  address: celoAlfajores.contracts.OMA3AppRegistry,
+  chain: activeChain,
+  address: ACTIVE_CHAIN.contracts.OMA3AppRegistry,
   abi: appRegistryAbi as any
 }; 
 
-// Alfajores testnet metadata contract
+// App Metadata contract (uses active chain configuration)
 export const OMA3_APP_METADATA = {
   name: "OMA3 App Metadata",
-  chain: alfajoresChain,
-  address: celoAlfajores.contracts.OMA3AppMetadataV0,
+  chain: activeChain,
+  address: ACTIVE_CHAIN.contracts.OMA3AppMetadataV0,
   abi: appMetadataAbi as any
 }; 

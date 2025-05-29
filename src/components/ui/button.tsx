@@ -3,6 +3,11 @@ import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { useActiveAccount } from "thirdweb/react"
 import { client } from "@/app/client"
+import { 
+  createWallet,
+  inAppWallet,
+  walletConnect
+} from "thirdweb/wallets"
 
 import { cn } from "@/lib/utils"
 
@@ -89,6 +94,26 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     if (isConnectButton) {
       const { client: _, ...restProps } = props as ThirdwebConnectButtonProps
+      
+      // Configure wallets in priority order
+      const wallets = [
+        inAppWallet({
+          auth: {
+            options: [
+              "email",
+              "google", 
+              "apple",
+              "facebook",
+              "passkey"
+            ]
+          }
+        }),
+        createWallet("io.metamask"),
+        createWallet("com.coinbase.wallet"),
+        // Temporarily disabled due to session error after thirdweb upgrade
+        // walletConnect()
+      ];
+      
       // Use React.Suspense to handle the lazy loading
       return (
         <React.Suspense fallback={
@@ -102,12 +127,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               name: "OMA3 App Registry",
               url: "https://oma3.org",
             }}
-            detailsModal={{
-              assetTabs: [], // Attempt to hide the asset display sections in the details modal
-            }}
             className={className}
-            // Enable auto-connect for persistence between refreshes
-            autoConnect={true}
+            // Auto-connect to previously connected wallets but don't show modal
+            autoConnect={{
+              timeout: 15000,
+            }}
+            // Prioritize in-app wallets and social logins over external wallets
+            wallets={wallets}
+            connectModal={{
+              size: "wide",
+              showThirdwebBranding: false,
+            }}
             {...restProps}
           />
         </React.Suspense>

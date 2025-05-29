@@ -38,3 +38,34 @@ export const celoAlfajores = {
     OMA3AppMetadataV0: "0x9f1f5559b6D08eC855cafaCD76D9ae69c41169C9"
   }
 };
+
+/**
+ * Custom EVM Chain (Placeholder)
+ * Chain ID: 999999 (placeholder)
+ * RPC: https://placeholder-rpc-endpoint.com (to be updated)
+ * Explorer: https://placeholder-explorer.com (to be updated)
+ * Faucet: TBD
+ */
+export const customEvmChain = {
+  id: 999999,
+  chainId: 999999,
+  rpc: "https://placeholder-rpc-endpoint.com",
+  name: "Custom EVM Chain",
+  nativeCurrency: {
+    name: "Custom Token",
+    symbol: "CUSTOM",
+    decimals: 18,
+  },
+  blockExplorers: [
+    {
+      name: "Custom Explorer",
+      url: "https://placeholder-explorer.com",
+    },
+  ],
+  testnet: true, // Change to false for mainnet
+  contracts: {
+    // Placeholder addresses - to be updated when contracts are deployed
+    OMA3AppRegistry: "0x0000000000000000000000000000000000000000",
+    OMA3AppMetadataV0: "0x0000000000000000000000000000000000000000"
+  }
+};
