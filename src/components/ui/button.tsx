@@ -8,6 +8,8 @@ import {
   inAppWallet,
   walletConnect
 } from "thirdweb/wallets"
+import { defineChain } from "thirdweb/chains"
+import { supportedWalletChains } from "@/config/chains"
 
 import { cn } from "@/lib/utils"
 
@@ -15,6 +17,17 @@ import { cn } from "@/lib/utils"
 const ThirdwebConnectButton = React.lazy(() => 
   import("thirdweb/react").then(mod => ({ default: mod.ConnectButton }))
 )
+
+// Convert our chain configurations to thirdweb chain definitions
+const supportedChains = supportedWalletChains.map(chain => 
+  defineChain({
+    id: chain.id,
+    rpc: chain.rpc,
+    name: chain.name,
+    nativeCurrency: chain.nativeCurrency,
+    blockExplorers: chain.blockExplorers
+  })
+);
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
@@ -134,6 +147,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             }}
             // Prioritize in-app wallets and social logins over external wallets
             wallets={wallets}
+            // Configure supported chains for the connect modal
+            chains={supportedChains}
             connectModal={{
               size: "wide",
               showThirdwebBranding: false,

@@ -1,14 +1,3 @@
-export const thirdwebTestSubnet = {
-    id: 894538,
-    chainId: 894538,
-    rpc: "https://894538.rpc.thirdweb.com",
-    nativeCurrency: {
-      name: "Thirdweb Test Token",
-      symbol: "TWT",
-      decimals: 18,
-    },
-  };
-
 /**
  * Celo Alfajores Testnet
  * Chain ID: 44787
@@ -69,3 +58,34 @@ export const customEvmChain = {
     OMA3AppMetadataV0: "0x0000000000000000000000000000000000000000"
   }
 };
+
+/**
+ * Ethereum Mainnet configuration for wallet support
+ */
+export const ethereumMainnet = {
+  id: 1,
+  chainId: 1,
+  rpc: "https://1.rpc.thirdweb.com",
+  name: "Ethereum",
+  nativeCurrency: {
+    name: "Ether",
+    symbol: "ETH",
+    decimals: 18,
+  },
+  blockExplorers: [
+    {
+      name: "Etherscan",
+      url: "https://etherscan.io",
+    },
+  ],
+  testnet: false
+};
+
+/**
+ * Configuration for supported chains in the social wallet
+ * Order matters - first chain is the default
+ */
+export const supportedWalletChains = [
+  celoAlfajores,      // Primary chain - users start here
+  ethereumMainnet    // Ethereum mainnet for broader dApp compatibility
+];
