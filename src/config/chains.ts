@@ -23,8 +23,38 @@ export const celoAlfajores = {
   ],
   testnet: true,
   contracts: {
-    OMA3AppRegistry: "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83",
+    OMA3AppRegistry: "0xE2d601F18166F6632f80d2Fa0Ab474B6d251D400", //Legacy contract address "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83",
     OMA3AppMetadataV0: "0x9f1f5559b6D08eC855cafaCD76D9ae69c41169C9"
+  }
+};
+
+/**
+ * OMAchain Testnet
+ * Chain ID: 66238
+ * RPC: https://rpc.testnet.chain.oma3.org/
+ * Explorer: https://explorer.testnet.chain.oma3.org/
+ * Faucet: TBD
+ */
+export const omachainTestnet = {
+  id: 66238,
+  chainId: 66238,
+  rpc: "https://rpc.testnet.chain.oma3.org/",
+  name: "OMAchain Testnet",
+  nativeCurrency: {
+    name: "OMA",
+    symbol: "OMA",
+    decimals: 18,
+  },
+  blockExplorers: [
+    {
+      name: "OMAchain Explorer",
+      url: "https://explorer.testnet.chain.oma3.org/",
+    },
+  ],
+  testnet: true,
+  contracts: {
+    OMA3AppRegistry: "0x", // TODO: Set after deployment
+    OMA3AppMetadataV0: "0x" // TODO: Set after deployment
   }
 };
 
@@ -87,5 +117,6 @@ export const ethereumMainnet = {
  */
 export const supportedWalletChains = [
   celoAlfajores,      // Primary chain - users start here
+  omachainTestnet,    // OMAchain testnet for OMA3 ecosystem testing
   ethereumMainnet    // Ethereum mainnet for broader dApp compatibility
 ];

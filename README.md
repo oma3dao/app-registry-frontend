@@ -82,13 +82,18 @@ Install the template using [thirdweb create](https://portal.thirdweb.com/cli/cre
 
 To run this project, copy .env.example into your .env.local file.
 
-## Testing with Celo Alfajores Testnet
+## Testing with Supported Testnets
 
-This application currently uses the App Registry contract deployed to the Celo Alfajores testnet for development and testing. THIS DOES NOT MEAN THE PRODUCTION APP REGISTRY CONTRACT WILL BE DEPLOYED TO CELO.  To interact with this application, you'll need to:
+This application currently supports multiple testnets for development and testing:
+
+- **Celo Alfajores Testnet** - Primary testnet for development
+- **OMAchain Testnet** - OMA3 ecosystem testnet (Chain ID: 66238)
+
+The App Registry contracts are deployed to these testnets for development and testing. THIS DOES NOT MEAN THE PRODUCTION APP REGISTRY CONTRACT WILL BE DEPLOYED TO THESE NETWORKS.  To interact with this application, you'll need to:
 
 1. **Install MetaMask Mobile**
-2. **Add Alfajores Testnet to MetaMask**
-3. **Get test CELO tokens from the Alfajores faucet**
+2. **Add supported testnets to MetaMask** (see sections below)
+3. **Get test tokens from the respective faucets**
 
 ### Installing MetaMask
 
@@ -125,6 +130,34 @@ This application currently uses the App Registry contract deployed to the Celo A
 4. You can get additional tokens by signing in with GitHub (10x more tokens)
 5. Wait a few moments for the tokens to appear in your wallet
 
+### Adding OMAchain Testnet to MetaMask
+
+#### Desktop Browser Extension:
+
+1. Open MetaMask and click on the network dropdown (usually shows "Ethereum Mainnet")
+2. Click "Add Network"
+3. In newer versions, click "Add a network manually" at the bottom
+4. Enter the following details:
+   - **Network Name**: OMAchain Testnet
+   - **New RPC URL**: https://rpc.testnet.chain.oma3.org/
+   - **Chain ID**: 66238
+   - **Currency Symbol**: OMA
+   - **Block Explorer URL**: https://explorer.testnet.chain.oma3.org/
+
+#### Mobile App:
+
+1. Open the MetaMask app
+2. Tap on the hamburger menu or the settings icon
+3. Tap "Settings" → "Networks" → "Add Network"
+4. Tap "Add a network manually" and enter the same details as above
+
+### Getting Test OMA Tokens
+
+1. Visit the OMAchain testnet faucet (URL TBD)
+2. Connect your wallet or paste your wallet address
+3. Request the test OMA tokens
+4. Wait a few moments for the tokens to appear in your wallet
+
 ### Connecting to the app
 
 1. In Metamask, make sure you're using the Alfajores network (need to choose it in your Networks settings)
@@ -136,25 +169,25 @@ This application currently uses the App Registry contract deployed to the Celo A
 Install dependencies
 
 ```bash
-yarn
+npm install
 ```
 
 Start development server
 
 ```bash
-yarn dev
+npm run dev
 ```
 
 Create a production build
 
 ```bash
-yarn build
+npm run build
 ```
 
 Preview the production build
 
 ```bash
-yarn start
+npm run start
 ```
 
 ## Resources

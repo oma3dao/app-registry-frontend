@@ -18,15 +18,18 @@ This file contains chain configuration data for the blockchains the application 
 - Contract addresses deployed on each chain
 
 ```typescript
-// Example: accessing Celo Alfajores testnet configuration
-import { celoAlfajores } from "@/config/chains";
+// Example: accessing supported testnet configurations
+import { celoAlfajores, omachainTestnet } from "@/config/chains";
 
-// Access chain properties
-const chainId = celoAlfajores.chainId; // 44787
-const rpcUrl = celoAlfajores.rpc; // https://alfajores-forno.celo-testnet.org
+// Access Celo Alfajores chain properties
+const celoChainId = celoAlfajores.chainId; // 44787
+const celoRpcUrl = celoAlfajores.rpc; // https://alfajores-forno.celo-testnet.org
+const celoRegistryAddress = celoAlfajores.contracts.OMA3AppRegistry;
 
-// Access contract addresses deployed on this chain
-const registryAddress = celoAlfajores.contracts.OMA3AppRegistry;
+// Access OMAchain testnet chain properties
+const omachainId = omachainTestnet.chainId; // 66238
+const omachainRpcUrl = omachainTestnet.rpc; // https://rpc.testnet.chain.oma3.org/
+const omachainRegistryAddress = omachainTestnet.contracts.OMA3AppRegistry;
 ```
 
 #### `src/config/contracts.ts`
@@ -43,6 +46,13 @@ The contract configurations import their addresses from `chains.ts` to maintain 
 1. First, add your contract address to the appropriate chain in `src/config/chains.ts`:
    ```ts
    export const celoAlfajores = {
+     // ...chain configuration
+     contracts: {
+       OMA3AppRegistry: "0xYourContractAddressHere"
+     }
+   };
+   
+   export const omachainTestnet = {
      // ...chain configuration
      contracts: {
        OMA3AppRegistry: "0xYourContractAddressHere"
