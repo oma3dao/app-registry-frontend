@@ -7,9 +7,9 @@ import NFTGrid from "@/components/nft-grid"
 import NFTMintModal, { WizardStep } from "@/components/nft-mint-modal"
 import NFTViewModal from "@/components/nft-view-modal"
 import type { NFT } from "@/types/nft"
-import { getAppsByMinter, registerApp, updateStatus } from "@/contracts/appRegistry"
+import { useAppsByOwner, useMintApp, useUpdateStatus, type Status } from "@/lib/contracts"
 import { useActiveAccount } from "thirdweb/react"
-import { setMetadata } from "@/contracts/appMetadata"
+import { useSetMetadata } from "@/lib/contracts"
 import { log } from "@/lib/log"
 import { fetchMetadataImage } from "@/lib/utils"
 import { toast } from "sonner"
@@ -17,91 +17,76 @@ import { toast } from "sonner"
 export default function Dashboard() {
   log("Component rendering");
   const account = useActiveAccount();
-  const connectedAddress = account?.address;
+  const connectedAddress = account?.address as `0x${string}` | undefined;
+  
+  
   const [nfts, setNfts] = useState<NFT[]>([])
   const [isMintModalOpen, setIsMintModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
-  const [isLoadingNFTs, setIsLoadingNFTs] = useState(true)
   const [currentStep, setCurrentStep] = useState(1);
   const [editMetadata, setEditMetadata] = useState<Record<string, any> | null>(null);
+  
+  // Use new hooks
+  const { data: appsData, isLoading: isLoadingApps, error: appsError } = useAppsByOwner(connectedAddress);
+  const { mint, isPending: isMinting } = useMintApp();
+  const { updateStatus: updateStatusFn, isPending: isUpdatingStatus } = useUpdateStatus();
+  const { setMetadata, isPending: isSettingMetadata } = useSetMetadata();
+  
+  
+  const isLoadingNFTs = isLoadingApps;
 
-  // Fetch registered apps by the connected wallet
+  // Convert AppSummary to NFT and augment with metadata when apps data changes
   useEffect(() => {
-    const fetchApps = async () => {
-      try {
-        setIsLoadingNFTs(true);
-        log("Fetching apps from contract...")
-        
-        if (connectedAddress) {
-          log("Fetching apps created by:", connectedAddress);
-          const apps = await getAppsByMinter(connectedAddress);
-          
-          if (!apps || !Array.isArray(apps)) {
-            console.error("Invalid apps data received:", apps);
-            setNfts([]);
-            setIsLoadingNFTs(false);
-            return;
-          }
-          log(`Apps fetched: ${apps.length}`);
-
-          // Augment apps with fetched metadata images
-          const augmentedAppsPromises = apps.map(async (app) => {
-            if (app && app.dataUrl) {
-              const image = await fetchMetadataImage(app.dataUrl);
-              if (image) {
-                 const metadata = app.metadata || {}; 
-                 return { 
-                   ...app, 
-                   metadata: { ...metadata, image } 
-                 };
-              }
-            }
-            return app; // Return original app if no dataUrl or fetch fails
-          });
-
-          // Wait for all metadata fetches to settle
-          const augmentedAppsResults = await Promise.allSettled(augmentedAppsPromises);
-          
-          const finalApps = augmentedAppsResults
-             .filter(result => result.status === 'fulfilled') // Keep successfully processed apps
-             .map(result => (result as PromiseFulfilledResult<NFT>).value);
-
-          // Instead of filtering, flag apps with missing DID or Version
-          const appsWithFlags = finalApps.map(app => {
-             let hasError = false;
-             let errorMessage = "";
-             if (!app) { // Handle potential null/undefined apps from augmentation results
-                console.warn("Null/undefined app encountered after augmentation");
-                // Depending on requirements, either skip or flag
-                // Skipping for now, as we can't display anything useful
-                return null; 
-             } 
-             if (!app.did || !app.version) {
-               console.warn("App missing DID or Version after augmentation:", app);
-               hasError = true;
-               errorMessage = "Missing essential DID or Version information.";
-             }
-             // Return the app object, potentially adding error flags
-             return { ...app, hasError, errorMessage }; 
-          }).filter(app => app !== null) as (NFT & { hasError: boolean, errorMessage: string })[]; // Filter out nulls and assert type
-          
-          log(`Setting ${appsWithFlags.length} apps (including potentially invalid) in state`);
-          setNfts(appsWithFlags);
-        } else {
-          log("No wallet connected, showing empty list");
-          setNfts([]);
-        }
-      } catch (error) {
-        console.error("Error fetching apps:", error)
-        setNfts([])
-      } finally {
-        setIsLoadingNFTs(false);
+    const augmentApps = async () => {
+      if (!appsData || appsData.length === 0) {
+        log("No apps to augment");
+        setNfts([]);
+        return;
       }
+      
+      try {
+        log(`Augmenting ${appsData.length} apps`);
+        
+        // useAppsByOwner now returns AppSummary[] with all fields
+        const nftApps: NFT[] = appsData.map(app => {
+          log(`[dashboard] App from contract: ${app.did}`, {
+            name: app.name,
+            version: app.version,
+            dataUrl: app.dataUrl,
+            minter: app.minter,
+          });
+          
+          return {
+            did: app.did,
+            name: app.name || '',
+            version: app.version || '1.0.0',
+            dataUrl: app.dataUrl || '',
+            status: app.status === 'Active' ? 0 : app.status === 'Inactive' ? 1 : 2,
+            minter: app.minter || connectedAddress || '',
+            iwpsPortalUri: app.iwpsPortalUri || '',
+            agentApiUri: app.agentApiUri || '',
+            contractAddress: app.contractAddress || '',
+          };
+        });
+        
+        setNfts(nftApps);
+        log(`Set ${nftApps.length} apps in state`);
+      } catch (error) {
+        console.error("Error augmenting apps:", error);
+        setNfts([]);
+      }
+    };
+    
+    augmentApps();
+  }, [appsData, connectedAddress]);
+  
+  // Show error toast if apps failed to load
+  useEffect(() => {
+    if (appsError) {
+      toast.error(`Failed to load apps: ${appsError.message}`);
     }
-
-    fetchApps()
-  }, [connectedAddress])
+  }, [appsError]);
 
   // Opens the mint modal - only for creating new apps
   const handleOpenMintModal = (nft?: NFT) => {
@@ -166,19 +151,27 @@ export default function Dashboard() {
       // Only register app if in step 1
       if (currentStep === 1) {
         log("Registering new app:", nft);
-        const registeredNft = await registerApp(nft, account);
+        
+        // Use the new mint hook
+        await mint({
+          did: nft.did,
+          name: nft.name,
+          version: nft.version,
+          dataUrl: nft.dataUrl,
+          iwpsPortalUri: nft.iwpsPortalUri,
+          agentApiUri: nft.agentApiUri,
+          contractAddress: nft.contractAddress,
+        });
 
-        // Update NFTs list if registration is successful
-        if (registeredNft) {
-          setNfts([...nfts, registeredNft]);
-          toast.success("App registered successfully!");
-        }
+        // Add to local state (it will be refetched automatically but this provides immediate feedback)
+        setNfts([...nfts, nft]);
+        toast.success("App registered successfully!");
       }
 
       // Handle metadata setting if in step 5
       if (currentStep === 5 && nft.metadata) {
         log("Submitting metadata for app:", nft);
-        const result = await setMetadata(nft, account);
+        const result = await setMetadata(nft);
         log("Metadata set result:", result);
         if (result) {
           toast.success("Metadata set successfully!");
@@ -211,19 +204,27 @@ export default function Dashboard() {
       }
 
       log(`Updating status for ${nft.did} from ${nft.status} to ${newStatus}`);
-      log(`Calling updateStatus function in appRegistry.ts`);
       
-      // Update the NFT with the new status - this should trigger wallet transaction
-      const updatedNft = await updateStatus({...nft, status: newStatus}, account);
+      // Map number status to Status type
+      const statusMap: Record<number, Status> = { 0: 'Active', 1: 'Inactive', 2: 'Deprecated' };
+      const statusType = statusMap[newStatus] || 'Active';
+      
+      // Use the new updateStatus hook
+      await updateStatusFn(nft.did, statusType);
       
       log(`Status update successful, updating UI`);
       
-      // Update the local state with the updated NFT
-      setNfts(prev => prev.map(item => (item.did === updatedNft.did ? updatedNft : item)));
+      // Update the local state with the updated status
+      setNfts(prev => prev.map(item => 
+        item.did === nft.did ? { ...item, status: newStatus } : item
+      ));
+      
+      toast.success("Status updated successfully!");
       
       return Promise.resolve();
     } catch (error) {
       console.error("Error updating status:", error);
+      toast.error("Failed to update status");
       return Promise.reject(error);
     }
   }

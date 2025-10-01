@@ -26,7 +26,7 @@ import { useActiveAccount } from "thirdweb/react"
 import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile, buildVersionedDID } from "@/lib/utils"
 import { log } from "@/lib/log"
-import { getMetadata } from "@/contracts/appMetadata"
+import { useMetadata } from "@/lib/contracts"
 import { AlertCircleIcon, Image as ImageIcon, ExternalLinkIcon, RocketIcon } from 'lucide-react';
 import { toast } from "sonner"
 import * as AppConfig from "@/config/app-config";
@@ -51,6 +51,10 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   const [metadataExists, setMetadataExists] = useState(false)
   const [isLoadingDescription, setIsLoadingDescription] = useState(false)
   const [showLaunchConfirmation, setShowLaunchConfirmation] = useState(false);
+  
+  // Use metadata hook
+  const versionedDid = nft ? buildVersionedDID(nft.did, nft.version) : undefined;
+  const { data: contractMetadata, isLoading: isLoadingContractMetadata } = useMetadata(versionedDid);
   const [launchData, setLaunchData] = useState<{
     appName: string;
     destinationUrl?: string | null;
@@ -106,35 +110,20 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     }
   }
   
-  const checkMetadata = async () => {
-    log('checkMetadata called');
-    if (!nft) return null;
-    try {
-      const versionedDid = buildVersionedDID(nft.did, nft.version);
-      log(`[NFTViewModal] Checking metadata for versioned DID: ${versionedDid}`);
-      const metadataJson = await getMetadata(versionedDid);
-      if (metadataJson !== null) {
-        log("[NFTViewModal] Metadata found.");
-        setMetadataExists(true);
-        return metadataJson;
-      } else {
-        log("[NFTViewModal] Metadata not found.");
-        setMetadataExists(false);
-        return null;
-      }
-    } catch (error) {
-      console.error("[NFTViewModal] Error checking metadata:", error);
+  // Update metadata exists when contract metadata changes
+  useEffect(() => {
+    if (contractMetadata !== null) {
+      log("[NFTViewModal] Metadata found.");
+      setMetadataExists(true);
+    } else if (contractMetadata === null && !isLoadingContractMetadata) {
+      log("[NFTViewModal] Metadata not found.");
       setMetadataExists(false);
-      return null;
     }
-  };
+  }, [contractMetadata, isLoadingContractMetadata]);
 
   useEffect(() => {
     if (isOpen && nft) {
       setSelectedStatus(nft.status); // Update status selector
-      
-      // Check metadata with backend 
-      checkMetadata();
     }
   }, [nft, isOpen]); // Rerun when modal opens or NFT changes
 
@@ -212,11 +201,10 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
 
   const buttonStyle = "bg-black text-white hover:bg-black/90";
 
-  const handleEditMetadata = async () => {
+  const handleEditMetadata = () => {
     log('handleEditMetadata called');
-    const metadata = await checkMetadata();
-    // Convert metadata to an object if it's not already one
-    const metadataObject = (typeof metadata === 'object' && metadata !== null) ? metadata : {};
+    // Use the metadata from the hook
+    const metadataObject = (typeof contractMetadata === 'object' && contractMetadata !== null) ? contractMetadata : {};
 
     // Call the parent component's onEditMetadata function if provided
     if (onEditMetadata && nft) {

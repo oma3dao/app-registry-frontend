@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getMetadata, buildMetadataJSON, validateMetadataJSON } from '@/contracts/appMetadata';
+import { getMetadata } from '@/lib/contracts/metadata.read';
+import { buildMetadataJSON, validateMetadataJSON } from '@/lib/contracts/metadata.utils';
 import { log } from '@/lib/log';
 import type { NFT } from '@/types/nft';
 import type { MetadataContractData } from '@/types/metadata-contract';

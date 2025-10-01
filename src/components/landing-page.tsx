@@ -3,104 +3,101 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import NFTGrid from "@/components/nft-grid"
-import { getTotalApps, getAppsWithPagination } from "@/contracts/appRegistry"
+import { useTotalApps, useAppsList } from "@/lib/contracts"
 import type { NFT } from "@/types/nft"
 import { LANDING_PAGE_NUM_APPS } from "@/config/app-config"
 import NFTViewModal from "@/components/nft-view-modal"
 import { log } from "@/lib/log"
-import { fetchMetadataImage } from "@/lib/utils"
 import { useActiveAccount } from "thirdweb/react"
 
 export default function LandingPage() {
   const [latestApps, setLatestApps] = useState<NFT[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingImages, setIsLoadingImages] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
   const account = useActiveAccount()
   const [shouldLoadNFTs, setShouldLoadNFTs] = useState(false)
+  const [startIndex, setStartIndex] = useState(1)
   
+  // Use the new hooks
+  const { data: totalAppsCount } = useTotalApps()
+  const { data: appsData, isLoading: isLoadingApps } = useAppsList(startIndex, LANDING_PAGE_NUM_APPS)
+  
+  
+  // Redirect to dashboard if wallet is connected
   useEffect(() => {
     if (account) {
-      // Redirect to dashboard if wallet is connected
       window.location.href = "/dashboard";
-      return;
     }
-
-    const fetchLatestApps = async () => {
+  }, [account])
+  
+  // Calculate start index when total apps changes
+  useEffect(() => {
+    if (totalAppsCount > 0) {
+      const calculatedStartIndex = Math.max(1, totalAppsCount - LANDING_PAGE_NUM_APPS + 1)
+      log(`Total apps: ${totalAppsCount}, calculated start index: ${calculatedStartIndex}`)
+      setStartIndex(calculatedStartIndex)
+    }
+  }, [totalAppsCount])
+  
+  // Process and augment apps when data changes
+  useEffect(() => {
+    if (!shouldLoadNFTs || !appsData?.items || appsData.items.length === 0) {
+      return
+    }
+    
+    const augmentApps = async () => {
       try {
-        setIsLoading(true)
+        setIsLoadingImages(true)
+        log(`Processing ${appsData.items.length} apps`)
         
-        // Get total number of apps first to know how many there are
-        const totalApps = await getTotalApps()
-        log(`Total registered apps: ${totalApps}`)
-        
-        // If there are apps, fetch the latest ones
-        if (totalApps > 0) {
-          try {
-            // Calculate the starting index based on total apps
-            // If totalApps <= LANDING_PAGE_NUM_APPS, start from beginning (index 1)
-            // Otherwise, start from (totalApps - LANDING_PAGE_NUM_APPS + 1)
-            const startIndex = Math.max(1, totalApps - LANDING_PAGE_NUM_APPS + 1)
-            log(`Fetching the latest apps starting from index ${startIndex}`)
-            
-            // Always use pagination to fetch the exact apps we need
-            const apps = await getAppsWithPagination(startIndex, LANDING_PAGE_NUM_APPS)
-            
-            // Augment apps with fetched metadata images
-            const augmentedAppsPromises = apps.map(async (app) => {
-              if (app && app.dataUrl) {
-                const image = await fetchMetadataImage(app.dataUrl);
-                if (image) {
-                   // Create a new object to avoid direct state mutation worries
-                   // Ensure metadata object exists
-                   const metadata = app.metadata || {}; 
-                   return { 
-                     ...app, 
-                     metadata: { ...metadata, image } 
-                   };
-                }
-              }
-              return app; // Return original app if no dataUrl or fetch fails
-            });
-
-            // Wait for all metadata fetches to settle
-            const augmentedAppsResults = await Promise.allSettled(augmentedAppsPromises);
-            
-            const finalApps = augmentedAppsResults
-               .filter(result => result.status === 'fulfilled') // Keep only successfully processed apps
-               .map(result => (result as PromiseFulfilledResult<NFT>).value);
-
-            const reversedApps = finalApps.reverse(); // Reverse after augmentation
-            log(`Showing the latest ${reversedApps.length} augmented apps`);
-            setLatestApps(reversedApps)
-          } catch (getAppsError) {
-            log("Error fetching apps:", getAppsError)
-            // Continue showing loading state as false, but with no apps
+        // Convert AppSummary to NFT type
+        const nftApps = appsData.items.map((app) => {
+          const nft: NFT = {
+            did: app.did,
+            name: app.name || '',
+            version: app.version || '1.0.0',
+            dataUrl: app.dataUrl || '',
+            status: app.status === 'Active' ? 0 : app.status === 'Inactive' ? 1 : 2,
+            minter: app.minter || '',
+            iwpsPortalUri: app.iwpsPortalUri || '',
+            agentApiUri: app.agentApiUri || '',
+            contractAddress: app.contractAddress || '',
           }
-        } else {
-          log("No apps registered yet or couldn't get total count")
-          setLatestApps([]) // Ensure empty array if no apps
-        }
+          
+          return nft
+        })
+
+        const augmentedAppsResults = nftApps.map(app => ({ status: 'fulfilled' as const, value: app }))
+        
+        const finalApps = augmentedAppsResults
+          .filter(result => result.status === 'fulfilled')
+          .map(result => (result as PromiseFulfilledResult<NFT>).value)
+
+        const reversedApps = finalApps.reverse()
+        log(`Showing the latest ${reversedApps.length} apps`)
+        setLatestApps(reversedApps)
       } catch (error) {
-        log("Error fetching latest apps:", error)
-        setLatestApps([]) // Ensure empty array on error
+        log("Error augmenting apps:", error)
+        setLatestApps([])
       } finally {
-        setIsLoading(false)
+        setIsLoadingImages(false)
       }
     }
     
-    // Add 1-second delay before loading NFTs to allow connect button to load first
+    augmentApps()
+  }, [appsData, shouldLoadNFTs])
+  
+  // Add 1-second delay before loading NFTs to allow connect button to load first
+  useEffect(() => {
     const timer = setTimeout(() => {
-      setShouldLoadNFTs(true);
-    }, 1000);
+      setShouldLoadNFTs(true)
+    }, 1000)
     
-    if (shouldLoadNFTs) {
-      fetchLatestApps()
-    }
-
-    // Clean up the timer if component unmounts
-    return () => clearTimeout(timer);
-  }, [account, shouldLoadNFTs])
+    return () => clearTimeout(timer)
+  }, [])
+  
+  const isLoading = isLoadingApps || isLoadingImages
 
   // Opens the view modal for an NFT
   const handleOpenViewModal = (nft: NFT) => {

@@ -8,30 +8,46 @@
 export type Status = 'Active' | 'Inactive' | 'Deprecated';
 
 /**
- * Summary representation of an app (for lists/grids)
+ * App representation containing all on-chain data from the contract
+ * 
+ * PHASE 0 (Current):
+ * This contains all 10 fields from the contract tuple plus derived fields.
+ * Used for all read operations (lists, grids, individual views).
+ * 
+ * PHASE 1 (Future):
+ * When we parse the dataUrl off-chain metadata, we'll introduce interface-specific
+ * types that extend this base type:
+ * 
+ * type AppDetail = HumanAppDetail | ApiAppDetail | ContractAppDetail
+ * 
+ * where each type includes parsed metadata based on the interfaces field:
+ * - HumanAppDetail (interfaces=0): platforms, screenshots, mcp, artifacts, etc.
+ * - ApiAppDetail (interfaces=2): endpoint, payments, mcp, a2a, etc.
+ * - ContractAppDetail (interfaces=4): minimal metadata
  */
 export interface AppSummary {
+  // NFT token ID
   id: bigint;
+  
+  // On-chain fields (immutable or controlled by versioning policy)
   did: string;
   name?: string;
-  status: Status;
-}
-
-/**
- * Detailed representation of an app (for individual views)
- */
-export interface AppDetail extends AppSummary {
-  owner?: `0x${string}`;
+  version?: string;
   dataUrl?: string;
   iwpsPortalUri?: string;
   agentApiUri?: string;
   contractAddress?: string;
-  version?: string;
+  
+  // Ownership & status
   minter?: `0x${string}`;
-  // Phase 1 additions (placeholders for now)
-  traits?: string[];
-  interfaces?: number;
-  versions?: Array<{ version: string; timestamp: number }>;
+  owner?: `0x${string}`;
+  status: Status;
+  
+  // Phase 1 fields (coming soon)
+  interfaces?: number;  // Bitfield: 0=human, 2=api, 4=contract
+  traitHashes?: string[];
+  dataHash?: string;
+  dataHashAlgorithm?: string;
 }
 
 /**

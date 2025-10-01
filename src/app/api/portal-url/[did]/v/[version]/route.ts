@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as AppConfig from '@/config/app-config'; // Import constants
 // Import validation functions
 import { validateDid, validateVersion, validateUrl } from '@/lib/validation';
-import { getMetadata } from '@/contracts/appMetadata'; // Import getMetadata
+import { getMetadata } from '@/lib/contracts/metadata.read';
 import type { MetadataContractData } from "@/types/metadata-contract"; // Import type for metadata
 import { buildVersionedDID } from "@/lib/utils"; // Import buildVersionedDID
 

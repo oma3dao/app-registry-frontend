@@ -3,6 +3,13 @@
  */
 
 import { MAX_URL_LENGTH, MAX_DID_LENGTH, MAX_NAME_LENGTH } from '@/lib/validation';
+import { celoAlfajores } from './chains';
+
+/**
+ * Active blockchain network configuration
+ * Change this to switch networks (e.g., celoAlfajores, omachainTestnet, etc.)
+ */
+export const ACTIVE_CHAIN = celoAlfajores;
 
 /**
  * Number of latest apps to show on the landing page

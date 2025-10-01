@@ -23,7 +23,8 @@ export const celoAlfajores = {
   ],
   testnet: true,
   contracts: {
-    OMA3AppRegistry: "0xE2d601F18166F6632f80d2Fa0Ab474B6d251D400", //Legacy contract address "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83",
+    OMA3AppRegistryLegacy: "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83", // Phase 0 contract (deployed, 29 apps)
+    OMA3AppRegistry: "0x", // Phase 1 contract (not yet deployed)
     OMA3AppMetadataV0: "0x9f1f5559b6D08eC855cafaCD76D9ae69c41169C9"
   }
 };
@@ -53,8 +54,8 @@ export const omachainTestnet = {
   ],
   testnet: true,
   contracts: {
-    OMA3AppRegistry: "0x", // TODO: Set after deployment
-    OMA3AppMetadataV0: "0x" // TODO: Set after deployment
+    OMA3AppRegistry: "0x", // Phase 1 contract (not yet deployed)
+    OMA3AppMetadata: "0x" // Metadata contract (not yet deployed)
   }
 };
 
@@ -84,8 +85,8 @@ export const customEvmChain = {
   testnet: true, // Change to false for mainnet
   contracts: {
     // Placeholder addresses - to be updated when contracts are deployed
-    OMA3AppRegistry: "0x0000000000000000000000000000000000000000",
-    OMA3AppMetadataV0: "0x0000000000000000000000000000000000000000"
+    OMA3AppRegistry: "0x0000000000000000000000000000000000000000", // Phase 1
+    OMA3AppMetadata: "0x0000000000000000000000000000000000000000"
   }
 };
 

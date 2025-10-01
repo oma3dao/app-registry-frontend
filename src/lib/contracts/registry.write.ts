@@ -4,14 +4,11 @@
  */
 
 import { prepareContractCall } from 'thirdweb';
-import { getRegistryContract } from './client';
-import { appRegistryLegacyAbi } from './abi/appRegistry.legacy.abi';
-import { celoAlfajores } from '@/config/chains';
+import { getAppRegistryContract } from './client';
 import { normalizeEvmError } from './errors';
 import type { Status, MintAppInput } from './types';
-
-// Use the existing contract address from config
-const REGISTRY_ADDRESS = celoAlfajores.contracts.OMA3AppRegistry;
+import { stringToBytes32 } from '../utils/bytes32';
+import { statusToNumber } from '../utils/status';
 
 /**
  * Prepare a transaction to mint/register a new app
@@ -20,11 +17,11 @@ const REGISTRY_ADDRESS = celoAlfajores.contracts.OMA3AppRegistry;
  */
 export function prepareMintApp(input: MintAppInput) {
   try {
-    const contract = getRegistryContract(appRegistryLegacyAbi, REGISTRY_ADDRESS);
+    const contract = getAppRegistryContract();
     
-    // Convert name and version to bytes32 for legacy contract
-    const nameBytes32 = ('0x' + Buffer.from(input.name.padEnd(32, '\0')).toString('hex')) as `0x${string}`;
-    const versionBytes32 = ('0x' + Buffer.from(input.version.padEnd(32, '\0')).toString('hex')) as `0x${string}`;
+    // Convert name and version to bytes32 using utility
+    const nameBytes32 = stringToBytes32(input.name);
+    const versionBytes32 = stringToBytes32(input.version);
     
     return prepareContractCall({
       contract,
@@ -52,10 +49,10 @@ export function prepareMintApp(input: MintAppInput) {
  */
 export function prepareUpdateStatus(did: string, status: Status) {
   try {
-    const contract = getRegistryContract(appRegistryLegacyAbi, REGISTRY_ADDRESS);
+    const contract = getAppRegistryContract();
     
-    // Map Status to number for legacy contract
-    const statusNum = status === 'Active' ? 0 : status === 'Inactive' ? 1 : 2;
+    // Convert Status to number using utility
+    const statusNum = statusToNumber(status);
     
     return prepareContractCall({
       contract,

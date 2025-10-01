@@ -17,7 +17,7 @@ import {
 } from './registry.read';
 import { prepareMintApp, prepareUpdateStatus } from './registry.write';
 import { normalizeEvmError, formatErrorMessage } from './errors';
-import type { AppDetail, AppSummary, Status, MintAppInput, Paginated } from './types';
+import type { AppSummary, Status, MintAppInput, Paginated } from './types';
 
 /**
  * Hook to fetch a single app by DID
@@ -25,7 +25,7 @@ import type { AppDetail, AppSummary, Status, MintAppInput, Paginated } from './t
  * @returns App data, loading state, and error
  */
 export function useApp(did?: string) {
-  const [data, setData] = useState<AppDetail | null>(null);
+  const [data, setData] = useState<AppSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -95,7 +95,9 @@ export function useAppsList(startIndex: number = 1, pageSize: number = 20) {
     setError(null);
 
     listApps(startIndex, pageSize)
-      .then(setData)
+      .then((result) => {
+        setData(result);
+      })
       .catch((e) => {
         setError(new Error(formatErrorMessage(e)));
       })
@@ -123,7 +125,9 @@ export function useTotalApps() {
     setError(null);
 
     getTotalApps()
-      .then(setData)
+      .then((result) => {
+        setData(result);
+      })
       .catch((e) => {
         setError(new Error(formatErrorMessage(e)));
       })

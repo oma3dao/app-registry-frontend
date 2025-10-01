@@ -1,8 +1,9 @@
 /**
- * Legacy OMA3 App Registry ABI
- * This is the ABI for the current deployed contract (Phase 0)
+ * OMA3AppRegistryLegacy ABI
+ * This is the ABI for the current deployed Phase 0 contract
+ * Matches contract name: OMA3AppRegistryLegacy.sol
  */
 
-import legacyAbi from './appRegistry.legacy.abi.json';
+import appRegistryLegacyAbiJson from '../../../abi/appRegistryLegacy.json';
 
-export const appRegistryLegacyAbi = legacyAbi as const;
+export const appRegistryLegacyAbi = appRegistryLegacyAbiJson as any;
