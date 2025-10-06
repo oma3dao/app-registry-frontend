@@ -89,12 +89,11 @@ export async function GET(request: Request) {
       did: baseDid,
       name: 'Unknown', // Use a simple default name
       version: fullVersion, // Use the original version from the parameters
+      interfaces: 1, // Default to human interface
       dataUrl: '',
-      iwpsPortalUri: '',
-      agentApiUri: '',
       status: 0, // Default to active
       minter: '',
-      metadata: metadataContractData
+      metadata: metadataContractData,
     };
     
     // Convert the metadata to a JSON string using the existing function

@@ -1,31 +1,26 @@
 /**
- * Celo Alfajores Testnet
- * Chain ID: 44787
- * RPC: https://alfajores-forno.celo-testnet.org
- * Explorer: https://alfajores.celoscan.io
- * Faucet: https://faucet.celo.org/alfajores
+ * Localhost (Hardhat)
+ * Chain ID: 31337
+ * RPC: http://127.0.0.1:8545
+ * For local development and testing
  */
-export const celoAlfajores = {
-  id: 44787,
-  chainId: 44787,
-  rpc: "https://alfajores-forno.celo-testnet.org",
-  name: "Celo Alfajores",
+export const localhost = {
+  id: 31337,
+  chainId: 31337,
+  rpc: "http://127.0.0.1:8545",
+  name: "Localhost (Hardhat)",
   nativeCurrency: {
-    name: "CELO",
-    symbol: "CELO",
+    name: "OMA",
+    symbol: "OMA",
     decimals: 18,
   },
-  blockExplorers: [
-    {
-      name: "Celoscan",
-      url: "https://alfajores.celoscan.io",
-    },
-  ],
+  blockExplorers: [],
   testnet: true,
   contracts: {
-    OMA3AppRegistryLegacy: "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83", // Phase 0 contract (deployed, 29 apps)
-    OMA3AppRegistry: "0x", // Phase 1 contract (not yet deployed)
-    OMA3AppMetadataV0: "0x9f1f5559b6D08eC855cafaCD76D9ae69c41169C9"
+    // Update these addresses after running: npx hardhat deploy-system --network localhost
+    registry: "0x5FbDB2315678afecb367f032d93F642f64180aa3",  // From your deployment
+    metadata: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", // TODO: Update from deployment output
+    resolver: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"  // TODO: Update from deployment output
   }
 };
 
@@ -48,68 +43,46 @@ export const omachainTestnet = {
   },
   blockExplorers: [
     {
-      name: "OMAchain Explorer",
+      name: "OMAchain Testnet Explorer",
       url: "https://explorer.testnet.chain.oma3.org/",
     },
   ],
   testnet: true,
   contracts: {
-    OMA3AppRegistry: "0x", // Phase 1 contract (not yet deployed)
-    OMA3AppMetadata: "0x" // Metadata contract (not yet deployed)
+    registry: "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83",
+    metadata: "0x13aD113D0DE923Ac117c82401e9E1208F09D7F19",
+    resolver: "0xe4E8FBf35b6f4D975B4334ffAfaEfd0713217cAb"
   }
 };
 
 /**
- * Custom EVM Chain (Placeholder)
- * Chain ID: 999999 (placeholder)
- * RPC: https://placeholder-rpc-endpoint.com (to be updated)
- * Explorer: https://placeholder-explorer.com (to be updated)
- * Faucet: TBD
+ * OMAchain Mainnet (Placeholder)
+ * Chain ID: TBD
+ * RPC: TBD
+ * Explorer: TBD
  */
-export const customEvmChain = {
-  id: 999999,
+export const omachainMainnet = {
+  id: 999999, // Placeholder - update when mainnet launches
   chainId: 999999,
-  rpc: "https://placeholder-rpc-endpoint.com",
-  name: "Custom EVM Chain",
+  rpc: "https://rpc.mainnet.chain.oma3.org/", // Placeholder
+  name: "OMAchain Mainnet",
   nativeCurrency: {
-    name: "Custom Token",
-    symbol: "CUSTOM",
+    name: "OMA",
+    symbol: "OMA",
     decimals: 18,
   },
   blockExplorers: [
     {
-      name: "Custom Explorer",
-      url: "https://placeholder-explorer.com",
+      name: "OMAchain Explorer",
+      url: "https://explorer.mainnet.chain.oma3.org/",
     },
   ],
-  testnet: true, // Change to false for mainnet
+  testnet: false,
   contracts: {
-    // Placeholder addresses - to be updated when contracts are deployed
-    OMA3AppRegistry: "0x0000000000000000000000000000000000000000", // Phase 1
-    OMA3AppMetadata: "0x0000000000000000000000000000000000000000"
+    registry: "0x", // Not yet deployed
+    metadata: "0x",  // Not yet deployed
+    resolver: "0x"  // Not yet deployed
   }
-};
-
-/**
- * Ethereum Mainnet configuration for wallet support
- */
-export const ethereumMainnet = {
-  id: 1,
-  chainId: 1,
-  rpc: "https://1.rpc.thirdweb.com",
-  name: "Ethereum",
-  nativeCurrency: {
-    name: "Ether",
-    symbol: "ETH",
-    decimals: 18,
-  },
-  blockExplorers: [
-    {
-      name: "Etherscan",
-      url: "https://etherscan.io",
-    },
-  ],
-  testnet: false
 };
 
 /**
@@ -117,7 +90,19 @@ export const ethereumMainnet = {
  * Order matters - first chain is the default
  */
 export const supportedWalletChains = [
-  celoAlfajores,      // Primary chain - users start here
+  localhost,          // Development - local Hardhat node
   omachainTestnet,    // OMAchain testnet for OMA3 ecosystem testing
-  ethereumMainnet    // Ethereum mainnet for broader dApp compatibility
+  omachainMainnet     // OMAChain mainnet for OMA3 ecosystem
 ];
+
+/**
+ * Chain presets for environment-based selection
+ * Maps NEXT_PUBLIC_ACTIVE_CHAIN env var to chain configurations
+ */
+export const CHAIN_PRESETS = {
+  'localhost': localhost,
+  'omachain-testnet': omachainTestnet,
+  'omachain-mainnet': omachainMainnet,
+} as const;
+
+export type ChainPreset = keyof typeof CHAIN_PRESETS;

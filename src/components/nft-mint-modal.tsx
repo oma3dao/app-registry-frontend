@@ -29,6 +29,16 @@ import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { ExternalLinkIcon, EditIcon, AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, InfoIcon } from "lucide-react"
 import { ImagePreview } from "@/components/image-preview"
 import { UrlValidator } from "@/components/url-validator"
+import { DidVerification } from "@/components/did-verification"
+import { DidWebInput } from "@/components/did-web-input"
+import { Caip10Input } from "@/components/caip10-input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { Platforms, PlatformDetails } from "@/types/metadata-contract"
 import { log } from "@/lib/log"
 import { 
@@ -55,34 +65,35 @@ const STEP_FIELDS: Record<WizardStep, FieldDescriptor[]> = {
   1: [
     { name: 'name', isRequired: true },
     { name: 'version', isRequired: true },
-    { name: 'did', isRequired: true },
-    { name: 'dataUrl', isRequired: true },
-    { name: 'iwpsPortalUri', isRequired: true },
-    { name: 'agentApiUri', isRequired: false },
-    { name: 'contractAddress', isRequired: false }
+    { name: 'did', isRequired: true }
+    // DID verification handled separately
   ],
   2: [
+    { name: 'dataUrl', isRequired: true },
+    { name: 'iwpsPortalUrl', isRequired: true },
+    { name: 'contractId', isRequired: false }
+  ],
+  3: [
     { name: 'metadata.descriptionUrl', isRequired: true },
     { name: 'metadata.external_url', isRequired: true },
     { name: 'metadata.token', isRequired: false }
   ],
-  3: [
+  4: [
     { name: 'metadata.image', isRequired: true },
     { name: 'metadata.screenshotUrls', isRequired: true }
   ],
-  4: [
+  5: [
     { name: 'metadata.platforms', isRequired: true }
   ],
-  5: [] // No specific fields required for step 5
 };
 
 // Step titles for the wizard
 const stepTitles = {
-  1: "App Identity & URLs",
-  2: "App Description",
-  3: "App Images",
-  4: "Platform Availability",
-  5: "Review & Submit"
+  1: "App Identity & DID Verification",
+  2: "App URLs",
+  3: "App Description",
+  4: "App Images",
+  5: "Platform Availability"
 };
 
 interface NFTMintModalProps {
@@ -133,10 +144,11 @@ const nftToWizardForm = (nft: NFT): WizardFormData => {
     did: nft.did,
     name: nft.name,
     version: nft.version,
+    interfaces: nft.interfaces || 1, // Default to human interface
     dataUrl: nft.dataUrl,
-    iwpsPortalUri: nft.iwpsPortalUri,
-    agentApiUri: nft.agentApiUri,
-    contractAddress: nft.contractAddress || "",
+    iwpsPortalUrl: nft.iwpsPortalUrl || "",
+    contractId: nft.contractId || "",
+    fungibleTokenId: nft.fungibleTokenId || "",
     status: nft.status || 0,
     minter: nft.minter || "",
     
@@ -214,12 +226,14 @@ const validateFields = (fields: FieldDescriptor[], formData: WizardFormData) => 
           if (!validateVersion(value as string)) error = VERSION_ERROR_MESSAGE;
           break;
         case 'dataUrl':
-        case 'iwpsPortalUri':
-        case 'agentApiUri':
+        case 'iwpsPortalUrl':
         case 'metadata.descriptionUrl':
         case 'metadata.external_url':
         case 'metadata.image':
           if (!validateUrl(value as string)) error = URL_ERROR_MESSAGE;
+          break;
+        case 'contractId':
+          if (!validateCaipAddress(value as string)) error = CONTRACT_ERROR_MESSAGE;
           break;
         case 'did':
           if (!validateDid(value as string)) error = DID_ERROR_MESSAGE;
@@ -271,10 +285,11 @@ export default function NFTMintModal({
     did: "",
     name: "",
     version: "",
+    interfaces: 1, // Default to human interface
     dataUrl: "",
-    iwpsPortalUri: "",
-    agentApiUri: "",
-    contractAddress: "",
+    iwpsPortalUrl: "",
+    contractId: "",
+    fungibleTokenId: "",
     status: 0, // Default to Active
     minter: "", // Initial placeholder
     
@@ -294,6 +309,8 @@ export default function NFTMintModal({
   const [showTxAlert, setShowTxAlert] = useState(false)
   const [txError, setTxError] = useState<string | null>(null)
   const [isCustomizingUrls, setIsCustomizingUrls] = useState(false)
+  const [isDidVerified, setIsDidVerified] = useState(false)
+  const [didType, setDidType] = useState<"did:web" | "did:pkh" | "">("")
   
   // Function to generate default URLs based on DID and version
   const generateDefaultUrls = (did: string, version: string) => {
@@ -306,18 +323,17 @@ export default function NFTMintModal({
       ? `${APP_REGISTRY_METADATA_BASE_URL}/${did}/v/${version}` 
       : "";
     
-    // Generate IWPS Portal URI with the same pattern
-    const iwpsPortalUri = hasBothValues
+    // Generate IWPS Portal URL with the same pattern
+    const iwpsPortalUrl = hasBothValues
       ? `${IWPS_PORTAL_BASE_URL}/${did}/v/${version}`
       : "";
     
     console.log(`Generated dataUrl: '${dataUrl}'`);
-    console.log(`Generated iwpsPortalUri: '${iwpsPortalUri}'`);
+    console.log(`Generated iwpsPortalUrl: '${iwpsPortalUrl}'`);
     
     return {
       dataUrl,
-      iwpsPortalUri,
-      agentApiUri: ""
+      iwpsPortalUrl
     };
   }
 
@@ -367,10 +383,11 @@ export default function NFTMintModal({
         did: "",
         name: "",
         version: "",
+        interfaces: 1, // Default to human interface
         dataUrl: "",
-        iwpsPortalUri: "",
-        agentApiUri: "",
-        contractAddress: "",
+        iwpsPortalUrl: "",
+        contractId: "",
+        fungibleTokenId: "",
         status: 0, // Default to Active
         minter: "",
         metadata: {
@@ -394,6 +411,19 @@ export default function NFTMintModal({
     setTxError(null);
     setIsCustomizingUrls(false);
   }, [nft, isOpen, initialMetadata]);
+
+  // Auto-generate URLs when entering Step 2 (always, unless customizing)
+  useEffect(() => {
+    if (currentStep === 2 && formData.did && formData.version && !isCustomizingUrls) {
+      const defaults = generateDefaultUrls(formData.did, formData.version);
+      console.log('[useEffect] Auto-generating URLs on entering Step 2:', defaults);
+      setFormData(prev => ({
+        ...prev,
+        dataUrl: defaults.dataUrl,
+        iwpsPortalUrl: defaults.iwpsPortalUrl
+      }));
+    }
+  }, [currentStep, formData.did, formData.version, isCustomizingUrls]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -480,42 +510,6 @@ export default function NFTMintModal({
        } else {
           setErrors(prev => { const newErrors = { ...prev }; delete newErrors[name]; return newErrors; });
        }
-    } else if ((name === 'did' || name === 'version') && !isCustomizingUrls) {
-       // Handle DID/Version change affecting default URLs
-      const updatedFormData = { ...formData, [name]: value };
-      const hasBothValues = 
-        (name === 'did' ? value : formData.did) && 
-        (name === 'version' ? value : formData.version);
-      
-      console.log('handleChange - checking for URL update:', {
-        field: name,
-        value,
-        hasBothValues,
-        did: name === 'did' ? value : formData.did,
-        version: name === 'version' ? value : formData.version
-      });
-      
-      // Generate default URLs based on the updated values
-      const defaults = generateDefaultUrls(
-        name === 'did' ? value : formData.did,
-        name === 'version' ? value : formData.version
-      );
-      
-      // Update form data with field value and auto-generated URLs
-      setFormData(prev => {
-        const updated = { ...prev, [name]: value }; // Ensure changed field value is preserved
-        
-        // Only set the dataUrl if both DID and version are available
-        if (hasBothValues) {
-          updated.dataUrl = defaults.dataUrl;
-        }
-        
-        // Always update the other URLs
-        updated.iwpsPortalUri = defaults.iwpsPortalUri;
-        updated.agentApiUri = defaults.agentApiUri;
-        
-        return updated;
-      });
     } else {
       // For non-URL related fields, simply update the form data
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -539,8 +533,7 @@ export default function NFTMintModal({
         break
         
       case "dataUrl":
-      case "iwpsPortalUri":
-      case "agentApiUri":
+      case "iwpsPortalUrl":
         if (value && !validateUrl(value)) {
           setErrors(prev => ({ 
             ...prev, 
@@ -608,7 +601,7 @@ export default function NFTMintModal({
       setFormData(prev => ({
         ...prev,
         dataUrl: "",
-        iwpsPortalUri: "",
+        iwpsPortalUrl: "",
       }));
       setIsCustomizingUrls(true);
     } else {
@@ -617,8 +610,7 @@ export default function NFTMintModal({
       setFormData(prev => ({
         ...prev,
         dataUrl: defaults.dataUrl,
-        iwpsPortalUri: defaults.iwpsPortalUri,
-        agentApiUri: defaults.agentApiUri
+        iwpsPortalUrl: defaults.iwpsPortalUrl
       }));
       setIsCustomizingUrls(false);
     }
@@ -627,6 +619,19 @@ export default function NFTMintModal({
   // Handle next button click - validate current step before proceeding
   const handleNextStep = async () => {
     log(`[handleNextStep] Called for step ${currentStep}`);
+
+    // Special check for Step 1: DID type must be selected
+    if (currentStep === 1) {
+      if (!didType) {
+        setErrors({ did: "Please select a DID type first" });
+        return;
+      }
+      if (didType === "did:web" && !isDidVerified) {
+        setErrors({ did: "You must verify DID ownership before proceeding" });
+        return;
+      }
+      // did:pkh doesn't require verification, it's self-verifying
+    }
 
     // Validate fields for the current step
     const stepErrors = validateFields(STEP_FIELDS[currentStep], formData);
@@ -658,6 +663,7 @@ export default function NFTMintModal({
         setErrors(registrationErrors);
         return;
       }
+      
     } else if (currentStep === 5) {
       // Validate steps 2, 3, and 4 fields using validateMetadata
       const metadataErrors = validateMetadata(formData);
@@ -725,8 +731,8 @@ export default function NFTMintModal({
     switch (currentStep) {
       case 1:
         return (
-          <>
-            <div className="grid gap-2">
+          <div className="space-y-6">
+            <div className="space-y-2">
               <Label htmlFor="name">App Name</Label>
               <Input
                 id="name"
@@ -742,7 +748,7 @@ export default function NFTMintModal({
               )}
             </div>
 
-            <div className="grid gap-2">
+            <div className="space-y-2">
               <Label htmlFor="version">Version</Label>
               <Input
                 id="version"
@@ -756,32 +762,116 @@ export default function NFTMintModal({
               {errors.version && (
                 <p className="text-red-500 text-sm mt-1">{errors.version}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Semantic version (e.g., 1.0.0)
+              </p>
             </div>
 
-            <div className="grid gap-2">
-              <Label 
-                htmlFor="did" 
-                title="To use a web address as a DID, use the format did:web:appname.mydomain.tld"
-                className="cursor-help"
-              >
-                DID
-              </Label>
-              <Input
-                id="did"
-                name="did"
+            {/* DID Explanation */}
+            <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+              <div className="flex gap-2 items-start">
+                <InfoIcon size={18} className="mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                <div className="text-sm text-blue-900 dark:text-blue-100">
+                  <p className="font-medium mb-2">What is a DID?</p>
+                  <p className="mb-2">
+                    A <strong>DID (Decentralized Identifier)</strong> is the main identitier for your app in the registry.
+                    Along with the major version, it uniquely identifies your tokenized app on-chain.
+                  </p>
+                  <p>
+                    Choose between a <strong>website-based DID</strong> (did:web) or a <strong>smart contract DID</strong> (did:pkh).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* DID Type Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="did-type">DID Type</Label>
+              <Select value={didType} onValueChange={(v) => {
+                setDidType(v as "did:web" | "did:pkh" | "");
+                // Clear DID when switching types
+                setFormData(prev => ({ ...prev, did: "" }));
+                setIsDidVerified(false);
+              }}>
+                <SelectTrigger id="did-type">
+                  <SelectValue placeholder="Select DID type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="did:web">Website URL (did:web)</SelectItem>
+                  <SelectItem value="did:pkh">Smart Contract (did:pkh)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Conditional DID Input based on type */}
+            {didType === "did:web" && (
+              <DidWebInput
                 value={formData.did}
-                onChange={handleChange}
-                placeholder={DID_PLACEHOLDER}
-                required
-                className={errors.did ? "border-red-500" : ""}
-                title="To use a web address as a DID, use the format did:web:subdomain.example.com"
+                onChange={(newDid) => {
+                  setFormData(prev => ({ ...prev, did: newDid || "" }));
+                  if (errors.did) {
+                    setErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.did;
+                      return newErrors;
+                    });
+                  }
+                }}
+                error={errors.did}
               />
-              {errors.did && (
-                <p className="text-red-500 text-sm mt-1">{errors.did}</p>
-              )}
-            </div>
+            )}
 
-            <div className="border p-4 rounded-md mt-2 mb-2 bg-slate-50 dark:bg-slate-900">
+            {didType === "did:pkh" && (
+              <Caip10Input
+                value={formData.did.startsWith("did:pkh:") ? formData.did.replace("did:pkh:", "") : ""}
+                onChange={(caip10) => {
+                  const newDid = caip10 ? `did:pkh:${caip10}` : "";
+                  setFormData(prev => ({ ...prev, did: newDid }));
+                  if (errors.did) {
+                    setErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.did;
+                      return newErrors;
+                    });
+                  }
+                }}
+                error={errors.did}
+              />
+            )}
+
+            {/* DID Verification - only for did:web */}
+            {didType === "did:web" && (
+              <div className="border-t pt-4 mt-2">
+                <DidVerification
+                  did={formData.did}
+                  onVerificationComplete={setIsDidVerified}
+                  isVerified={isDidVerified}
+                />
+              </div>
+            )}
+
+            {/* did:pkh doesn't require DNS verification */}
+            {didType === "did:pkh" && formData.did && (
+              <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md mt-4">
+                <div className="flex gap-2 items-start text-green-700 dark:text-green-400">
+                  <InfoIcon size={18} className="mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium">Smart Contract DIDs</p>
+                    <p className="mt-1">
+                      Smart contract DIDs (did:pkh) are self-verifying through the blockchain.
+                      No additional domain verification is required.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+        
+      case 2:
+        return (
+          <div className="space-y-6">
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900 space-y-4">
               {isCustomizingUrls && (
                 <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
                   <div className="flex gap-2 items-start text-amber-700 dark:text-amber-400">
@@ -805,8 +895,8 @@ export default function NFTMintModal({
                 </div>
               )}
 
-              <div className="grid gap-3">
-                <div className="grid gap-2">
+              <div className="space-y-4">
+                <div className="space-y-2">
                   <Label htmlFor="dataUrl">Data URL</Label>
                   <Textarea
                     id="dataUrl"
@@ -823,20 +913,20 @@ export default function NFTMintModal({
                   )}
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="iwpsPortalUri">IWPS Portal URL</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="iwpsPortalUrl">IWPS Portal URL</Label>
                   <Textarea
-                    id="iwpsPortalUri"
-                    name="iwpsPortalUri"
-                    value={formData.iwpsPortalUri}
+                    id="iwpsPortalUrl"
+                    name="iwpsPortalUrl"
+                    value={formData.iwpsPortalUrl}
                     onChange={handleChange}
                     placeholder={URL_PLACEHOLDER}
                     required
-                    className={`min-h-[80px] ${errors.iwpsPortalUri ? "border-red-500" : ""}`}
+                    className={`min-h-[80px] ${errors.iwpsPortalUrl ? "border-red-500" : ""}`}
                     disabled={!isCustomizingUrls}
                   />
-                  {errors.iwpsPortalUri && (
-                    <p className="text-red-500 text-sm mt-1">{errors.iwpsPortalUri}</p>
+                  {errors.iwpsPortalUrl && (
+                    <p className="text-red-500 text-sm mt-1">{errors.iwpsPortalUrl}</p>
                   )}
                 </div>
               </div>
@@ -855,45 +945,28 @@ export default function NFTMintModal({
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="agentApiUri">Agent API URL (Optional)</Label>
-              </div>
-              <Textarea
-                id="agentApiUri"
-                name="agentApiUri"
-                value={formData.agentApiUri}
-                onChange={handleChange}
-                placeholder={URL_PLACEHOLDER}
-                className={`min-h-[80px] ${errors.agentApiUri ? "border-red-500" : ""}`}
-              />
-              {errors.agentApiUri && (
-                <p className="text-red-500 text-sm mt-1">{errors.agentApiUri}</p>
-              )}
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="contractAddress">Contract Address (Optional)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="contractId">Contract ID - CAIP-10 Format (Optional)</Label>
               <Input
-                id="contractAddress"
-                name="contractAddress"
-                value={formData.contractAddress}
+                id="contractId"
+                name="contractId"
+                value={formData.contractId}
                 onChange={handleChange}
                 placeholder={CONTRACT_PLACEHOLDER}
-                className={errors.contractAddress ? "border-red-500" : ""}
+                className={errors.contractId ? "border-red-500" : ""}
               />
-              {errors.contractAddress && (
-                <p className="text-red-500 text-sm mt-1">{errors.contractAddress}</p>
+              {errors.contractId && (
+                <p className="text-red-500 text-sm mt-1">{errors.contractId}</p>
               )}
             </div>
-          </>
+          </div>
         );
         
-      case 2:
+      case 3:
         return (
-          <div className="grid gap-4">
+          <div className="space-y-6">
             {/* Description URL */}
-            <div className="grid gap-2">
+            <div className="space-y-2">
               <Label htmlFor="descriptionUrl">Description URL</Label>
               <Textarea
                 id="descriptionUrl"
@@ -909,7 +982,6 @@ export default function NFTMintModal({
                   }));
                 }}
                 onBlur={() => {
-                  // Validation happens on blur
                   if (formData.metadata?.descriptionUrl && !validateUrl(formData.metadata.descriptionUrl)) {
                     setErrors(prev => ({ 
                       ...prev, 
@@ -933,8 +1005,6 @@ export default function NFTMintModal({
               <p className="text-xs text-slate-500">
                 Link to a document describing your app, including its purpose and features.
               </p>
-              
-              {/* URL Validator for Description */}
               {validateUrl(formData.metadata?.descriptionUrl || '') && (
                 <UrlValidator 
                   url={formData.metadata?.descriptionUrl || ''} 
@@ -943,7 +1013,7 @@ export default function NFTMintModal({
             </div>
 
             {/* Marketing URL */}
-            <div className="grid gap-2">
+            <div className="space-y-2">
               <Label htmlFor="external_url">Marketing URL</Label>
               <Textarea
                 id="external_url"
@@ -959,7 +1029,6 @@ export default function NFTMintModal({
                   }));
                 }}
                 onBlur={() => {
-                  // Validation happens on blur
                   if (formData.metadata?.external_url && !validateUrl(formData.metadata.external_url)) {
                     setErrors(prev => ({ 
                       ...prev, 
@@ -983,8 +1052,6 @@ export default function NFTMintModal({
               <p className="text-xs text-slate-500">
                 Link to your app website, landing page, or marketing materials.
               </p>
-              
-              {/* URL Validator for Marketing */}
               {validateUrl(formData.metadata?.external_url || '') && (
                 <UrlValidator 
                   url={formData.metadata?.external_url || ''} 
@@ -993,7 +1060,7 @@ export default function NFTMintModal({
             </div>
 
             {/* Token Contract Address */}
-            <div className="grid gap-2">
+            <div className="space-y-2">
               <Label htmlFor="token">Token Contract Address (Optional)</Label>
               <Input
                 id="token"
@@ -1021,11 +1088,11 @@ export default function NFTMintModal({
           </div>
         );
         
-      case 3:
+      case 4:
         return (
-          <div className="grid gap-4 py-4">
+          <div className="space-y-6">
             {/* Icon URL */}
-            <div className="grid gap-2 mb-4">
+            <div className="space-y-2">
               <Label htmlFor="image">Icon URL</Label>
               <Textarea
                 id="image"
@@ -1088,7 +1155,7 @@ export default function NFTMintModal({
               </p>
 
               {(formData.metadata?.screenshotUrls || []).map((url, index) => (
-                <div key={index} className="grid gap-2">
+                <div key={index} className="space-y-2">
                   <Label htmlFor={`screenshot${index}`}>
                     Screenshot {index + 1} {index === 0 ? "(Required)" : "(Optional)"}
                   </Label>
@@ -1154,10 +1221,10 @@ export default function NFTMintModal({
           </div>
         );
 
-      case 4:
+      case 5:
         return (
-          <div className="space-y-4">
-            <p className="font-medium mb-2">Platform Availability</p>
+          <div className="space-y-6">
+            <p className="font-medium">Platform Availability</p>
             <div className="p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md mb-4">
               <div className="flex gap-2 items-start text-amber-700 dark:text-amber-400">
                 <InfoIcon size={18} className="mt-0.5 flex-shrink-0" />
@@ -1178,9 +1245,9 @@ export default function NFTMintModal({
             )}
             
             {/* Web Platform */}
-            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
-              <h3 className="text-sm font-semibold mb-3">Web Platform</h3>
-              <div className="grid gap-2">
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900 space-y-4">
+              <h3 className="text-sm font-semibold">Web Platform</h3>
+              <div className="space-y-2">
                 <Label htmlFor="web_launchUrl">Launch URL</Label>
                 <Textarea
                   id="web_launchUrl" // Name matches the flat field for handleChange
@@ -1201,10 +1268,10 @@ export default function NFTMintModal({
             </div>
             
             {/* iOS Platform */}
-            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
-              <h3 className="text-sm font-semibold mb-3">iOS Platform</h3>
-              <div className="grid gap-4">
-                <div className="grid gap-2">
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900 space-y-4">
+              <h3 className="text-sm font-semibold">iOS Platform</h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
                   <Label htmlFor="ios_downloadUrl">Download URL</Label>
                   <Textarea
                     id="ios_downloadUrl"
@@ -1223,7 +1290,7 @@ export default function NFTMintModal({
                   </p>
                 </div>
                 
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="ios_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
                     id="ios_launchUrl"
@@ -1242,7 +1309,7 @@ export default function NFTMintModal({
                   </p>
                 </div>
                 
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="ios_supported">Supported Devices (Optional)</Label>
                   <Input
                     id="ios_supported"
@@ -1261,10 +1328,10 @@ export default function NFTMintModal({
             </div>
             
             {/* Android Platform - Similar updates needed... */}
-            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
-              <h3 className="text-sm font-semibold mb-3">Android Platform</h3>
-              <div className="grid gap-4">
-                 <div className="grid gap-2">
+            <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900 space-y-4">
+              <h3 className="text-sm font-semibold">Android Platform</h3>
+              <div className="space-y-4">
+                 <div className="space-y-2">
                   <Label htmlFor="android_downloadUrl">Download URL</Label>
                   <Textarea
                     id="android_downloadUrl"
@@ -1281,7 +1348,7 @@ export default function NFTMintModal({
                     Google Play Store URL to download your Android app
                   </p>
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="android_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
                     id="android_launchUrl"
@@ -1302,10 +1369,10 @@ export default function NFTMintModal({
             </div>
             
             {/* Windows Platform - Similar updates needed... */}
-             <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
-              <h3 className="text-sm font-semibold mb-3">Windows Platform</h3>
-              <div className="grid gap-4">
-                 <div className="grid gap-2">
+             <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900 space-y-4">
+              <h3 className="text-sm font-semibold">Windows Platform</h3>
+              <div className="space-y-4">
+                 <div className="space-y-2">
                   <Label htmlFor="windows_downloadUrl">Download URL</Label>
                   <Textarea
                     id="windows_downloadUrl"
@@ -1322,7 +1389,7 @@ export default function NFTMintModal({
                     Microsoft Store or website URL to download your Windows app
                   </p>
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="windows_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
                     id="windows_launchUrl"
@@ -1339,7 +1406,7 @@ export default function NFTMintModal({
                     Protocol handler or URL to launch your Windows app
                   </p>
                 </div>
-                 <div className="grid gap-2">
+                 <div className="space-y-2">
                   <Label htmlFor="windows_supported">Supported Architectures (Optional)</Label>
                   <Input
                     id="windows_supported"
@@ -1357,8 +1424,8 @@ export default function NFTMintModal({
             {/* macOS Platform - Similar updates needed... */}
             <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
               <h3 className="text-sm font-semibold mb-3">macOS Platform</h3>
-              <div className="grid gap-4">
-                 <div className="grid gap-2">
+              <div className="space-y-4">
+                 <div className="space-y-2">
                   <Label htmlFor="macos_downloadUrl">Download URL</Label>
                   <Textarea
                     id="macos_downloadUrl"
@@ -1373,7 +1440,7 @@ export default function NFTMintModal({
                   )}
                   {/* ... help text ... */}
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="macos_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
                     id="macos_launchUrl"
@@ -1394,8 +1461,8 @@ export default function NFTMintModal({
             {/* Meta Quest Platform - Similar updates needed... */}
              <div className="border p-4 rounded-md bg-slate-50 dark:bg-slate-900">
               <h3 className="text-sm font-semibold mb-3">Meta Quest Platform</h3>
-              <div className="grid gap-4">
-                 <div className="grid gap-2">
+              <div className="space-y-4">
+                 <div className="space-y-2">
                   <Label htmlFor="meta_downloadUrl">Download URL</Label>
                   <Textarea
                     id="meta_downloadUrl"
@@ -1410,7 +1477,7 @@ export default function NFTMintModal({
                   )}
                   {/* ... help text ... */}
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="meta_launchUrl">Launch URL (Optional)</Label>
                   <Textarea
                     id="meta_launchUrl"
@@ -1433,7 +1500,7 @@ export default function NFTMintModal({
               {/* ... PlayStation ... */}
               <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                  <h4 className="text-sm font-medium mb-2">PlayStation</h4>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="playstation_downloadUrl">Download URL</Label>
                   <Textarea
                     id="playstation_downloadUrl"
@@ -1451,7 +1518,7 @@ export default function NFTMintModal({
               {/* ... Xbox ... */}
               <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                  <h4 className="text-sm font-medium mb-2">Xbox</h4>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="xbox_downloadUrl">Download URL</Label>
                   <Textarea
                     id="xbox_downloadUrl"
@@ -1469,7 +1536,7 @@ export default function NFTMintModal({
               {/* ... Nintendo Switch ... */}
               <div>
                  <h4 className="text-sm font-medium mb-2">Nintendo Switch</h4>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="nintendo_downloadUrl">Download URL</Label>
                   <Textarea
                     id="nintendo_downloadUrl"

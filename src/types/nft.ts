@@ -4,10 +4,18 @@ export interface NFT {
     did: string   // Primary identifier
     name: string
     version: string
-    dataUrl: string
-    iwpsPortalUri: string
-    agentApiUri: string
-    contractAddress?: string
+    
+    // Interface support bitmap
+    interfaces: number  // Bitmap: 1=human, 2=api, 4=contract
+    dataUrl: string     // URL to metadata JSON
+    
+    // Fields extracted from metadata JSON (not stored on-chain separately)
+    iwpsPortalUrl?: string // Extracted from dataUrl metadata
+    
+    // On-chain optional identifiers
+    contractId?: string // CAIP-10 format (e.g., "eip155:1:0x...")
+    fungibleTokenId?: string // CAIP-19 format (e.g., "eip155:1/erc20:0x...")
+    
     status: number // 0: Active, 1: Deprecated, 2: Replaced
     minter: string // Ethereum address of the app creator
     

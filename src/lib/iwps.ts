@@ -78,7 +78,7 @@ export function generateTeleportId(): string {
  * Builds the complete request body to be sent to the IWPS Query Proxy.
  * Internally calls functions to detect device parameters and generate IWPS Group 2 params.
  * 
- * @param nft The NFT object containing iwpsPortalUri.
+ * @param nft The NFT object containing iwpsPortalUrl.
  * @returns An object containing the `requestBody` for the proxy and the `generatedPin`.
  */
 export function buildIwpsProxyRequest(nft: NFT): { requestBody: any; generatedPin: string } {
@@ -125,7 +125,7 @@ export function buildIwpsProxyRequest(nft: NFT): { requestBody: any; generatedPi
 
   // Construct the body to send TO THE PROXY
   const requestBody: any = {
-    targetIwpsPortalUrl: nft.iwpsPortalUri, // Pass the target URL to the proxy
+    targetIwpsPortalUrl: nft.iwpsPortalUrl, // Pass the target URL to the proxy
     iwpsParams: buildIwpsParams(),
   };
 

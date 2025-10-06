@@ -34,10 +34,18 @@ export type {
 export {
   getAppByDid,
   getAppsByOwner,
-  listApps,
-  getTotalApps,
+  getAppsByMinter, // Deprecated alias for getAppsByOwner
+  listActiveApps,
+  getTotalActiveApps,
   searchByDid,
+  isDidRegistered,
+  getLatestMajor,
+  hasAnyTraits,
+  hasAllTraits,
 } from './registry.read';
+
+// Convenience aliases
+export { listActiveApps as listApps, getTotalActiveApps as getTotalApps } from './registry.read';
 
 export {
   prepareMintApp,

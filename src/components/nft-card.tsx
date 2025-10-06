@@ -223,10 +223,10 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
                   <span className="font-medium text-slate-700 dark:text-slate-300">DID: </span>
                   <span className="text-slate-600 dark:text-slate-400 break-all" title={did}>{did}</span>
                 </div>
-                {nft.contractAddress && (
+                {nft.contractId && (
                   <div className="text-sm">
                     <span className="font-medium text-slate-700 dark:text-slate-300">Contract: </span>
-                    <span className="text-slate-600 dark:text-slate-400 break-all" title={nft.contractAddress}>{nft.contractAddress}</span>
+                    <span className="text-slate-600 dark:text-slate-400 break-all" title={nft.contractId}>{nft.contractId}</span>
                   </div>
                 )}
             </>

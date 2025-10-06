@@ -3,13 +3,7 @@
  */
 
 import { MAX_URL_LENGTH, MAX_DID_LENGTH, MAX_NAME_LENGTH } from '@/lib/validation';
-import { celoAlfajores } from './chains';
-
-/**
- * Active blockchain network configuration
- * Change this to switch networks (e.g., celoAlfajores, omachainTestnet, etc.)
- */
-export const ACTIVE_CHAIN = celoAlfajores;
+import { env } from './env';
 
 /**
  * Number of latest apps to show on the landing page
@@ -23,8 +17,9 @@ export const SELF_HOSTING_DOCS_URL = "https://docs.oma3.org/app-registry/self-ho
 
 /**
  * Base URL for app registry metadata
+ * Dynamically set based on deployment environment
  */
-export const APP_REGISTRY_METADATA_BASE_URL = "https://appregistry.oma3.org/api/data-url";
+export const APP_REGISTRY_METADATA_BASE_URL = `${env.appBaseUrl}/api/data-url`;
 
 /**
  * OMA3 main documentation URL
@@ -38,8 +33,9 @@ export const OMA3_WEBSITE_URL = "https://oma3.org";
 
 /**
  * Base URL for IWPS Portal
+ * Dynamically set based on deployment environment
  */
-export const IWPS_PORTAL_BASE_URL = "https://appregistry.oma3.org/api/portal-url";
+export const IWPS_PORTAL_BASE_URL = `${env.appBaseUrl}/api/portal-url`;
 
 /**
  * Validation message constants
@@ -216,5 +212,9 @@ export const IWPS_DEFAULT_NACK_URL = "";
 
 /**
  * Base URLs for metadata editing eligibility
+ * Dynamically includes the current deployment URL
  */
-export const METADATA_EDIT_ELIGIBLE_BASE_URLS = ["appregistry.oma3.org"];
+export const METADATA_EDIT_ELIGIBLE_BASE_URLS = [
+  new URL(env.appBaseUrl).hostname, // Current deployment (localhost, preregistry.oma3.org, appregistry.oma3.org)
+  "appregistry.oma3.org",           // Production (always allowed)
+];

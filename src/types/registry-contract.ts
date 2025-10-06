@@ -10,7 +10,7 @@ export interface RegistryContractData {
   did: string;
   
   /**
-   * App name
+   * App name (stored in metadata at dataUrl, not on-chain)
    */
   name: string;
   
@@ -20,24 +20,34 @@ export interface RegistryContractData {
   version: string;
   
   /**
-   * URL to app metadata
+   * Interface support bitmap (1=human, 2=api, 4=contract)
+   * For Phase 1: Always 1 (human apps only)
+   */
+  interfaces: number;
+  
+  /**
+   * URL to app metadata JSON
+   * The JSON at this URL contains: name, description, images, iwpsPortalUrl, etc.
    */
   dataUrl: string;
   
   /**
-   * IWPS Portal URL
+   * IWPS Portal URL (stored in metadata JSON at dataUrl, not on-chain, optional)
+   * Extracted from dataUrl metadata for display/launch purposes
    */
-  iwpsPortalUri: string;
+  iwpsPortalUrl?: string;
   
   /**
-   * Agent API UR (optional)
+   * Contract address in CAIP-10 format (on-chain, optional)
+   * Format: "eip155:1:0x..."
    */
-  agentApiUri: string;
+  contractId?: string;
   
   /**
-   * Contract address (optional)
+   * Fungible token ID in CAIP-19 format (on-chain, optional)
+   * Format: "eip155:1/erc20:0x..."
    */
-  contractAddress?: string;
+  fungibleTokenId?: string;
   
   /**
    * App status: 0=Active, 1=Deprecated, 2=Replaced
@@ -48,4 +58,4 @@ export interface RegistryContractData {
    * Ethereum address of the app creator
    */
   minter: string;
-} 
+}

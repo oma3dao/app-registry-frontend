@@ -1,38 +1,31 @@
 /**
  * Thirdweb client and contract utilities
  * 
- * PHASE 0 CONFIGURATION (Current)
- * - Using OMA3AppRegistryLegacy contract
- * - Using OMA3AppMetadataV0 contract
- * 
- * FOR PHASE 1 MIGRATION:
- * Just change the import lines below to:
- *   import { appRegistryAbi } from './abi/appRegistry.abi';
- *   import { appMetadataAbi } from './abi/appMetadata.abi';
- * That's it! No other changes needed.
+ * Contract versions are managed via Git branches:
+ * - main branch: production contracts
+ * - preview branch: next-gen contracts (when available)
  */
 
 import { getContract } from 'thirdweb';
 import { defineChain } from 'thirdweb/chains';
 import { client } from '@/app/client';
-import { ACTIVE_CHAIN } from '@/config/app-config';
 import { env } from '@/config/env';
-
-// Phase 0 ABIs (current) - aliased to generic names
-import { appRegistryLegacyAbi as appRegistryAbi } from './abi/appRegistry.legacy.abi';
-import { appMetadataV0Abi as appMetadataAbi } from './abi/appMetadata.v0.abi';
+import { appRegistryAbi } from './abi/appRegistry.abi';
+import { appMetadataAbi } from './abi/appMetadata.abi';
+import { resolverAbi } from './abi/resolver.abi';
 
 /**
  * Get the active chain configuration
- * Uses the chain defined in app-config.ts (ACTIVE_CHAIN)
+ * Uses the chain selected via NEXT_PUBLIC_ACTIVE_CHAIN env var
  */
 export function getActiveChain() {
+  const activeChain = env.activeChain;
   return defineChain({
-    id: ACTIVE_CHAIN.id,
-    rpc: ACTIVE_CHAIN.rpc,
-    name: ACTIVE_CHAIN.name,
-    nativeCurrency: ACTIVE_CHAIN.nativeCurrency,
-    blockExplorers: ACTIVE_CHAIN.blockExplorers,
+    id: activeChain.id,
+    rpc: activeChain.rpc,
+    name: activeChain.name,
+    nativeCurrency: activeChain.nativeCurrency,
+    blockExplorers: activeChain.blockExplorers,
   });
 }
 
@@ -61,6 +54,21 @@ export function getAppMetadataContract() {
     chain: getActiveChain(),
     address: env.metadataAddress,
     abi: appMetadataAbi,
+  });
+}
+
+/**
+ * Helper to get a Resolver contract instance with proper chain and client setup
+ * Uses the address from env config
+ * Used for DID ownership validation
+ * @returns Contract instance ready for Thirdweb operations
+ */
+export function getResolverContract() {
+  return getContract({
+    client,
+    chain: getActiveChain(),
+    address: env.resolverAddress,
+    abi: resolverAbi,
   });
 }
 

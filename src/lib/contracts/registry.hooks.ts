@@ -194,7 +194,17 @@ export function useUpdateStatus() {
     setTxHash(null);
 
     try {
-      const transaction = prepareUpdateStatus(did, status);
+      // Get the app to determine the major version
+      const app = await getAppByDid(did);
+      if (!app) {
+        throw new Error(`App not found: ${did}`);
+      }
+      
+      const transaction = prepareUpdateStatus({
+        did,
+        major: app.versionMajor,
+        status,
+      });
       const result = await sendTransaction({ account, transaction });
       setTxHash(result.transactionHash);
       return result.transactionHash;
@@ -203,7 +213,7 @@ export function useUpdateStatus() {
       const errorObj = new Error(normalized.message);
       setError(errorObj);
       throw errorObj;
-    } finally {
+    } finally{
       setIsPending(false);
     }
   };

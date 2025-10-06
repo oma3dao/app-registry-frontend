@@ -12,6 +12,7 @@ import { useActiveAccount } from "thirdweb/react"
 import { useSetMetadata } from "@/lib/contracts"
 import { log } from "@/lib/log"
 import { fetchMetadataImage } from "@/lib/utils"
+import { appSummariesToNFTs } from "@/lib/utils/app-converter"
 import { toast } from "sonner"
 
 export default function Dashboard() {
@@ -48,27 +49,10 @@ export default function Dashboard() {
       try {
         log(`Augmenting ${appsData.length} apps`);
         
-        // useAppsByOwner now returns AppSummary[] with all fields
-        const nftApps: NFT[] = appsData.map(app => {
-          log(`[dashboard] App from contract: ${app.did}`, {
-            name: app.name,
-            version: app.version,
-            dataUrl: app.dataUrl,
-            minter: app.minter,
-          });
-          
-          return {
-            did: app.did,
-            name: app.name || '',
-            version: app.version || '1.0.0',
-            dataUrl: app.dataUrl || '',
-            status: app.status === 'Active' ? 0 : app.status === 'Inactive' ? 1 : 2,
-            minter: app.minter || connectedAddress || '',
-            iwpsPortalUri: app.iwpsPortalUri || '',
-            agentApiUri: app.agentApiUri || '',
-            contractAddress: app.contractAddress || '',
-          };
-        });
+        // Convert AppSummary[] to NFT[] using utility function
+        const nftApps = appSummariesToNFTs(appsData, connectedAddress);
+        
+        log(`[dashboard] Converted ${nftApps.length} apps from contract`);
         
         setNfts(nftApps);
         log(`Set ${nftApps.length} apps in state`);
@@ -152,15 +136,30 @@ export default function Dashboard() {
       if (currentStep === 1) {
         log("Registering new app:", nft);
         
-        // Use the new mint hook
+        // Parse version string (e.g., "1.0.0" -> {major: 1, minor: 0, patch: 0})
+        const versionParts = nft.version.split('.').map(Number);
+        const [major = 1, minor = 0, patch = 0] = versionParts;
+        
+        // Compute data hash from metadata if available
+        const metadataStr = nft.metadata ? JSON.stringify(nft.metadata) : '';
+        const dataHash = metadataStr ? '0x' + Array.from(
+          new TextEncoder().encode(metadataStr)
+        ).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 64).padEnd(64, '0') : '0x0000000000000000000000000000000000000000000000000000000000000000';
+        
+        // Use the new mint hook with proper structure
         await mint({
           did: nft.did,
-          name: nft.name,
-          version: nft.version,
-          dataUrl: nft.dataUrl,
-          iwpsPortalUri: nft.iwpsPortalUri,
-          agentApiUri: nft.agentApiUri,
-          contractAddress: nft.contractAddress,
+          interfaces: 1, // Default to human interface (bitmap: 1=human)
+          dataUrl: nft.dataUrl || '',
+          dataHash,
+          dataHashAlgorithm: 0, // keccak256
+          fungibleTokenId: nft.fungibleTokenId || '',
+          contractId: nft.contractId || '',
+          initialVersionMajor: major,
+          initialVersionMinor: minor,
+          initialVersionPatch: patch,
+          traitHashes: [],
+          metadataJson: metadataStr,
         });
 
         // Add to local state (it will be refetched automatically but this provides immediate feedback)
@@ -205,8 +204,8 @@ export default function Dashboard() {
 
       log(`Updating status for ${nft.did} from ${nft.status} to ${newStatus}`);
       
-      // Map number status to Status type
-      const statusMap: Record<number, Status> = { 0: 'Active', 1: 'Inactive', 2: 'Deprecated' };
+      // Map number status to Status type (Contract: 0=Active, 1=Deprecated, 2=Replaced)
+      const statusMap: Record<number, Status> = { 0: 'Active', 1: 'Deprecated', 2: 'Replaced' };
       const statusType = statusMap[newStatus] || 'Active';
       
       // Use the new updateStatus hook

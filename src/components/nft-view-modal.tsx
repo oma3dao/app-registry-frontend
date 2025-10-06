@@ -221,11 +221,11 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     log("Launch clicked for:", nft.did, nft.version);
     toast.info("Initiating launch sequence..."); 
 
-    // Get target URL from NFT data - this check remains here
-    const targetIwpsPortalUrl = nft.iwpsPortalUri;
-    if (!targetIwpsPortalUrl) {
-      console.error("Cannot launch: Missing IWPS Portal URL (iwpsPortalUri) on NFT data.");
-      toast.error("Cannot launch: Application is missing required portal configuration.");
+    // Get target URL from NFT data
+    const targetUrl = nft.dataUrl;
+    if (!targetUrl) {
+      console.error("Cannot launch: Missing data URL on NFT data.");
+      toast.error("Cannot launch: Application is missing required configuration.");
       return;
     }
 
@@ -485,32 +485,18 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               )}
               
-              <div className="grid gap-2">
-                <Label htmlFor="iwps-portal-display" className="text-base font-medium">IWPS Portal URL</Label>
-                <div id="iwps-portal-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
-                  <a href={nft.iwpsPortalUri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    {nft.iwpsPortalUri}
-                  </a>
-                </div>
-              </div>
-              
-              <div className="grid gap-2">
-                <Label htmlFor="agent-api-display" className="text-base font-medium">Agent API URL</Label>
-                <div id="agent-api-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
-                  <a href={nft.agentApiUri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    {nft.agentApiUri}
-                  </a>
-                </div>
-              </div>
-              
-              {nft.contractAddress && (
+              {nft.iwpsPortalUrl && (
                 <div className="grid gap-2">
-                  <Label htmlFor="contract-address-display" className="text-base font-medium">Contract Address</Label>
-                  <div id="contract-address-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
-                    {nft.contractAddress}
+                  <Label htmlFor="iwps-portal-display" className="text-base font-medium">IWPS Portal URL</Label>
+                  <div id="iwps-portal-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
+                    <a href={nft.iwpsPortalUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {nft.iwpsPortalUrl}
+                    </a>
                   </div>
                 </div>
               )}
+              
+              {/* Already showing contractId above */}
               
               <div className="grid gap-2">
                 <Label htmlFor="minter-display" className="text-base font-medium">Minter</Label>
