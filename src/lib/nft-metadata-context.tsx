@@ -15,6 +15,7 @@ import {
   METADATA_JSON_URL_LAUNCH_KEY,
   METADATA_JSON_SUPPORTED_KEY
 } from "@/config/app-config";
+import { ethers } from "ethers";
 
 /**
  * UI-friendly version of the metadata with normalized field names
@@ -50,6 +51,13 @@ interface ExtendedMetadata {
   isLoading: boolean;
   error: string | null;
   lastFetched: number; // Timestamp
+  
+  // Data integrity verification (computed when fetching)
+  dataHashVerification?: {
+    computedHash: string;
+    storedHash: string;
+    isValid: boolean;
+  };
 }
 
 // Define the cache structure
@@ -156,20 +164,48 @@ export function NFTMetadataProvider({ children }: { children: ReactNode }) {
         throw new Error(errorData.error || `Failed to fetch metadata: ${response.status}`);
       }
       
-      const rawData = await response.json();
+      // Get raw text for hash computation
+      const jsonText = await response.text();
+      const rawData = JSON.parse(jsonText);
       log(`[NFTMetadataContext] Successfully received metadata for: ${versionedDID}`);
       
       // Map the raw data to UI-friendly format
       const displayData = mapToUIMetadata(rawData);
       
-      // Remove description fetching from here - we'll only fetch when explicitly requested
+      // Verify dataHash integrity (compute hash from fetched data)
+      let dataHashVerification = undefined;
+      try {
+        const computedHash = ethers.id(jsonText);
+        
+        // Fetch app data from registry to get stored hash
+        const { getAppByDid } = await import('@/lib/contracts/registry.read');
+        const appData = await getAppByDid(nft.did);
+        
+        if (appData) {
+          const isValid = computedHash.toLowerCase() === appData.dataHash.toLowerCase();
+          dataHashVerification = {
+            computedHash,
+            storedHash: appData.dataHash,
+            isValid
+          };
+          
+          if (!isValid) {
+            log(`[NFTMetadataContext] ⚠️ Hash mismatch for ${versionedDID}!`);
+          } else {
+            log(`[NFTMetadataContext] ✅ Hash verified for ${versionedDID}`);
+          }
+        }
+      } catch (error) {
+        log(`[NFTMetadataContext] Hash verification failed:`, error);
+      }
       
       return {
         rawData,
         displayData,
         isLoading: false,
         error: null,
-        lastFetched: Date.now()
+        lastFetched: Date.now(),
+        dataHashVerification
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -278,7 +278,7 @@ export default function NFTMintModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} key={`wizard-${currentStepIndex}`}>
-      <DialogContent className="w-[95vw] sm:w-auto sm:max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-[80rem] max-h-[90vh] overflow-hidden p-4 sm:p-6 flex flex-col">
+      <DialogContent className="w-[95vw] sm:w-auto sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-hidden p-4 sm:p-6 flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {initialData ? "Edit App Registration" : "Register New App"}

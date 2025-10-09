@@ -27,12 +27,14 @@ import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile, buildVersionedDID } from "@/lib/utils"
 import { log } from "@/lib/log"
 import { useMetadata } from "@/lib/contracts"
-import { AlertCircleIcon, Image as ImageIcon, ExternalLinkIcon, RocketIcon } from 'lucide-react';
+import { AlertCircleIcon, Image as ImageIcon, ExternalLinkIcon, RocketIcon, CheckCircle2, XCircle, Loader2, Shield } from 'lucide-react';
 import { toast } from "sonner"
 import * as AppConfig from "@/config/app-config";
 import { useNFTMetadata } from "@/lib/nft-metadata-context";
 import { buildIwpsProxyRequest } from "@/lib/iwps";
 import LaunchConfirmationDialog from '@/components/launch-confirmation-dialog';
+import { ethers } from "ethers";
+import { env } from "@/config/env";
 
 interface NFTViewModalProps {
   isOpen: boolean
@@ -51,6 +53,11 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   const [metadataExists, setMetadataExists] = useState(false)
   const [isLoadingDescription, setIsLoadingDescription] = useState(false)
   const [showLaunchConfirmation, setShowLaunchConfirmation] = useState(false);
+  const [attestationStatus, setAttestationStatus] = useState<{
+    checking: boolean;
+    hasAttestation: boolean;
+    message?: string;
+  }>({ checking: false, hasAttestation: false });
   
   // Use metadata hook
   const versionedDid = nft ? buildVersionedDID(nft.did, nft.version) : undefined;
@@ -66,6 +73,63 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   // Use the metadata context to get complete metadata
   const { getNFTMetadata, fetchNFTDescription } = useNFTMetadata();
   const nftMetadata = nft ? getNFTMetadata(nft) : null;
+  
+  // Check for attestation when modal opens (separate from hash verification)
+  useEffect(() => {
+    if (!isOpen || !nft?.did) {
+      setAttestationStatus({ checking: false, hasAttestation: false });
+      return;
+    }
+    
+    const checkAttestation = async () => {
+      try {
+        setAttestationStatus({ checking: true, hasAttestation: false, message: 'Checking attestation...' });
+        
+        // Check if resolver is configured
+        if (env.resolverAddress === ethers.ZeroAddress) {
+          setAttestationStatus({ checking: false, hasAttestation: false, message: 'Resolver not configured' });
+          return;
+        }
+        
+        // Get app data from registry to get dataHash
+        const { getAppByDid } = await import('@/lib/contracts/registry.read');
+        const appData = await getAppByDid(nft.did);
+        
+        if (!appData) {
+          setAttestationStatus({ checking: false, hasAttestation: false });
+          return;
+        }
+        
+        // Query resolver contract for attestation
+        const { getResolverContract } = await import('@/lib/contracts/client');
+        const { readContract } = await import('thirdweb');
+        
+        const resolver = getResolverContract();
+        const didHash = ethers.id(nft.did) as `0x${string}`;
+        
+        const hasAttestation = await readContract({
+          contract: resolver,
+          method: 'function checkDataHashAttestation(bytes32 didHash, bytes32 dataHash) view returns (bool)',
+          params: [didHash, appData.dataHash as `0x${string}`]
+        }) as boolean;
+        
+        setAttestationStatus({ 
+          checking: false, 
+          hasAttestation,
+          message: hasAttestation ? 'Data hash attested by trusted oracle' : 'No attestation found'
+        });
+      } catch (error) {
+        console.error('[NFTViewModal] Attestation check error:', error);
+        setAttestationStatus({ 
+          checking: false, 
+          hasAttestation: false,
+          message: 'Attestation check failed'
+        });
+      }
+    };
+    
+    checkAttestation();
+  }, [isOpen, nft?.did]);
   
   // Extract metadata values with fallbacks
   const image = nftMetadata?.displayData.image || nft?.metadata?.image || "";
@@ -298,7 +362,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-[800px] flex flex-col max-h-[90vh]">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader className="flex-shrink-0 border-b pb-4">
             <div className="flex justify-between items-end gap-4">
               <div className="flex items-start gap-4">
@@ -359,7 +423,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           
           {/* Scrollable content area */}
           <div className="flex-grow overflow-y-auto pr-2 -mr-2">
-            <div className="grid gap-6 py-4">
+            <div className="grid gap-4 py-3">
               {/* Status section - only visible to the owner */}
               {isOwner && (
                 <div className="grid gap-2">
@@ -413,22 +477,22 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               )}
               
-              {/* Publisher */}
-              {!isLoading && nftMetadata?.displayData && (nftMetadata.rawData?.publisher || nftMetadata.rawData?.description) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {nftMetadata.rawData?.publisher && (
-                    <div className="grid gap-2">
-                      <Label className="text-base font-medium">Publisher</Label>
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md">
+              {/* Publisher and Website - Compact 2-column */}
+              {!isLoading && (nftMetadata?.rawData?.publisher || external_url) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {nftMetadata?.rawData?.publisher && (
+                    <div className="grid gap-1">
+                      <Label className="text-sm font-medium">Publisher</Label>
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
                         {nftMetadata.rawData.publisher}
                       </div>
                     </div>
                   )}
                   
                   {external_url && (
-                    <div className="grid gap-2">
-                      <Label className="text-base font-medium">Website</Label>
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md">
+                    <div className="grid gap-1">
+                      <Label className="text-sm font-medium">Website</Label>
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
                         <a href={external_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
                           {external_url}
                         </a>
@@ -438,63 +502,105 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               )}
               
-              {/* Description */}
+              {/* Description - More Compact */}
               {!isLoading && description && (
-                <div className="grid gap-2">
-                  <Label className="text-base font-medium">Description</Label>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-md text-sm">
+                <div className="grid gap-1">
+                  <Label className="text-sm font-medium">Description</Label>
+                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs leading-relaxed">
                     {description}
                   </div>
                 </div>
               )}
               
-              {/* Traits */}
-              {!isLoading && nft.traits && nft.traits.length > 0 && (
-                <div className="grid gap-2">
-                  <Label className="text-base font-medium">Traits</Label>
-                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded">
-                    {nft.traits.map((trait, index) => (
-                      <span 
-                        key={index} 
-                        className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded text-sm"
-                      >
-                        {trait}
-                      </span>
-                    ))}
-                  </div>
+              {/* Traits and Platforms - Compact side-by-side */}
+              {!isLoading && ((nft.traits && nft.traits.length > 0) || Object.keys(platforms).length > 0) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Traits */}
+                  {nft.traits && nft.traits.length > 0 && (
+                    <div className="grid gap-1">
+                      <Label className="text-sm font-medium">Traits</Label>
+                      <div className="flex flex-wrap gap-1 p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                        {nft.traits.map((trait, index) => (
+                          <span 
+                            key={index} 
+                            className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded text-xs"
+                          >
+                            {trait}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Platforms */}
+                  {Object.keys(platforms).length > 0 && (
+                    <div className="grid gap-1">
+                      <Label className="text-sm font-medium">Platforms</Label>
+                      <div className="flex flex-wrap gap-1 p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                        {Object.keys(platforms).map((platform) => (
+                          <span 
+                            key={platform} 
+                            className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs capitalize"
+                          >
+                            {platform}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               
-              {/* Platform Information - Simplified Display */}
-              {!isLoading && Object.keys(platforms).length > 0 && (
-                <div className="grid gap-2">
-                  <Label className="text-base font-medium">Platforms</Label>
-                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded">
-                    {Object.keys(platforms).map((platform) => (
-                      <span 
-                        key={platform} 
-                        className="px-2 py-1 bg-slate-200 dark:bg-slate-700 rounded text-sm capitalize"
-                      >
-                        {platform}
-                      </span>
-                    ))}
+              {/* DID and Data URL - Compact */}
+              <div className="grid gap-3">
+                <div className="grid gap-1">
+                  <Label htmlFor="did-display" className="text-sm font-medium">DID</Label>
+                  <div id="did-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs break-all">
+                    {nft.did}
                   </div>
                 </div>
-              )}
-              
-              <div className="grid gap-2">
-                <Label htmlFor="did-display" className="text-base font-medium">DID</Label>
-                <div id="did-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
-                  {nft.did}
-                </div>
-              </div>
-              
-              <div className="grid gap-2">
-                <Label htmlFor="data-url-display" className="text-base font-medium">Data URL</Label>
-                <div id="data-url-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md break-all">
-                  <a href={nft.dataUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    {nft.dataUrl}
-                  </a>
+                
+                <div className="grid gap-1">
+                  <Label htmlFor="data-url-display" className="text-sm font-medium">Data URL</Label>
+                  <div id="data-url-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs break-all">
+                    <a href={nft.dataUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {nft.dataUrl}
+                    </a>
+                  </div>
+                
+                  {/* Data Hash Verification Status (from metadata context) */}
+                  {nftMetadata?.dataHashVerification && (
+                    <div className={`flex items-center gap-2 p-1.5 rounded text-xs ${
+                      nftMetadata.dataHashVerification.isValid 
+                        ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' 
+                        : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300'
+                    }`}>
+                      {nftMetadata.dataHashVerification.isValid ? (
+                        <>
+                          <CheckCircle2 size={14} />
+                          <span>Data verified</span>
+                          {attestationStatus.hasAttestation && (
+                            <span title={attestationStatus.message}>
+                              <Shield size={12} className="ml-1" />
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={14} />
+                          <span>Hash mismatch</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Attestation checking indicator */}
+                  {attestationStatus.checking && (
+                    <div className="flex items-center gap-2 p-1.5 rounded text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Checking attestation...</span>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -533,16 +639,16 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               </div>
               
-              {/* Screenshots Section - Moved to bottom */}
+              {/* Screenshots Section - Compact grid at bottom */}
               {!isLoading && screenshotUrls.length > 0 && (
-                <div className="grid gap-2">
-                  <Label className="text-base font-medium">Screenshots</Label>
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-1">
+                  <Label className="text-sm font-medium">Screenshots</Label>
+                  <div className="grid grid-cols-3 gap-1.5">
                     {screenshotUrls.map((url, index) => (
                       <div key={index} className="aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden">
                         <img 
                           src={url} 
-                          alt={`${nft.name || 'App'} screenshot ${index + 1}`} 
+                          alt={`Screenshot ${index + 1}`} 
                           className="w-full h-full object-cover" 
                           loading="lazy"
                         />
