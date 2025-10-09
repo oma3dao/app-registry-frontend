@@ -298,7 +298,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-[600px] flex flex-col max-h-[90vh]">
+        <DialogContent className="sm:max-w-[800px] flex flex-col max-h-[90vh]">
           <DialogHeader className="flex-shrink-0 border-b pb-4">
             <div className="flex justify-between items-end gap-4">
               <div className="flex items-start gap-4">
@@ -307,12 +307,19 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                     <img src={image} alt={`${nft.name || 'App'} icon`} className="w-full h-full object-contain" />
                   ) : <ImageIcon className="w-10 h-10 text-muted-foreground" />}
                 </div>
-                <div>
-                  <DialogTitle className="text-2xl mb-1">{nft.name}</DialogTitle>
-                  <DialogDescription className="text-md flex items-center gap-2">
+                <div className="flex-grow">
+                  <DialogTitle className="text-2xl mb-1">{nftMetadata?.displayData.name || nft.name || 'Unnamed App'}</DialogTitle>
+                  <DialogDescription className="text-md flex flex-col gap-2">
                     <span>Version: {nft.version}</span>
+                    {/* Interfaces */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium text-foreground">Interfaces:</span>
+                      {nft.interfaces & 1 && <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 text-xs">Human</span>}
+                      {nft.interfaces & 2 && <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs">API</span>}
+                      {nft.interfaces & 4 && <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 text-xs">Contract</span>}
+                    </div>
                     {isOwner && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${getStatusClasses(nft.status)}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs w-fit ${getStatusClasses(nft.status)}`}>
                         {getStatusLabel(nft.status)}
                       </span>
                     )}
@@ -352,26 +359,6 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           
           {/* Scrollable content area */}
           <div className="flex-grow overflow-y-auto pr-2 -mr-2">
-
-            {/* Screenshots Section - Only show when loaded */}
-            {!isLoading && screenshotUrls.length > 0 && (
-              <div className="mb-4 border-t pt-4">
-                <h3 className="text-lg font-medium mb-3">Screenshots</h3>
-                <div className="grid grid-cols-2 gap-2 overflow-x-auto">
-                  {screenshotUrls.map((url, index) => (
-                    <div key={index} className="aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden">
-                      <img 
-                        src={url} 
-                        alt={`${nft.name || 'App'} screenshot ${index + 1}`} 
-                        className="w-full h-full object-cover" 
-                        loading="lazy"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
             <div className="grid gap-6 py-4">
               {/* Status section - only visible to the owner */}
               {isOwner && (
@@ -426,13 +413,54 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               )}
               
-              {isOwner && (
+              {/* Publisher */}
+              {!isLoading && nftMetadata?.displayData && (nftMetadata.rawData?.publisher || nftMetadata.rawData?.description) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {nftMetadata.rawData?.publisher && (
+                    <div className="grid gap-2">
+                      <Label className="text-base font-medium">Publisher</Label>
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md">
+                        {nftMetadata.rawData.publisher}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {external_url && (
+                    <div className="grid gap-2">
+                      <Label className="text-base font-medium">Website</Label>
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md">
+                        <a href={external_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
+                          {external_url}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Description */}
+              {!isLoading && description && (
                 <div className="grid gap-2">
-                  <Label className="text-base font-medium">Status</Label>
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-md">
-                    <span className={`px-2 py-1 rounded-full text-sm ${getStatusClasses(nft.status)}`}>
-                      {getStatusLabel(nft.status)}
-                    </span>
+                  <Label className="text-base font-medium">Description</Label>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-md text-sm">
+                    {description}
+                  </div>
+                </div>
+              )}
+              
+              {/* Traits */}
+              {!isLoading && nft.traits && nft.traits.length > 0 && (
+                <div className="grid gap-2">
+                  <Label className="text-base font-medium">Traits</Label>
+                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded">
+                    {nft.traits.map((trait, index) => (
+                      <span 
+                        key={index} 
+                        className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded text-sm"
+                      >
+                        {trait}
+                      </span>
+                    ))}
                   </div>
                 </div>
               )}
@@ -504,6 +532,25 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                   {nft.minter}
                 </div>
               </div>
+              
+              {/* Screenshots Section - Moved to bottom */}
+              {!isLoading && screenshotUrls.length > 0 && (
+                <div className="grid gap-2">
+                  <Label className="text-base font-medium">Screenshots</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {screenshotUrls.map((url, index) => (
+                      <div key={index} className="aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden">
+                        <img 
+                          src={url} 
+                          alt={`${nft.name || 'App'} screenshot ${index + 1}`} 
+                          className="w-full h-full object-cover" 
+                          loading="lazy"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           

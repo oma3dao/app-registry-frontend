@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getMetadata } from '@/lib/contracts/metadata.read';
-import { buildMetadataJSON, validateMetadataJSON } from '@/lib/contracts/metadata.utils';
+import { readContract } from 'thirdweb';
+import { getAppMetadataContract } from '@/lib/contracts/client';
 import { log } from '@/lib/log';
-import type { NFT } from '@/types/nft';
-import type { MetadataContractData } from '@/types/metadata-contract';
 
 /**
  * Dynamic route handler for /api/data-url/[...versionedDid]
@@ -56,26 +54,23 @@ export async function GET(
     }
     
     // Metadata contract stores by DID only (not versioned DID)
-    // Try to fetch metadata using just the base DID
-    let metadataContractData: MetadataContractData | null = null;
+    // Fetch raw JSON string directly from contract (bypass parsing/transformation)
+    log(`[API data-url] Fetching raw metadata JSON for base DID: ${baseDid}`);
     
-    log(`[API data-url] Fetching metadata for base DID: ${baseDid}`);
-    metadataContractData = await getMetadata(baseDid);
+    const contract = getAppMetadataContract();
+    const metadataJSON = await readContract({
+      contract,
+      method: "function getMetadataJson(string) view returns (string)",
+      params: [baseDid]
+    }) as string;
     
-    // If we still don't have metadata, return a 404
-    if (!metadataContractData) {
+    // If no metadata found, return 404
+    if (!metadataJSON || metadataJSON.trim() === "") {
       log(`[API data-url] Metadata not found for DID: ${baseDid}`);
       return NextResponse.json({ error: 'Metadata not found for this app' }, { status: 404 });
     }
     
-    log(`[API data-url] Found metadata for DID: ${baseDid}`);
-    
-    // The metadata contract returns raw JSON string - just validate and return it
-    const metadataJSON = typeof metadataContractData === 'string' 
-      ? metadataContractData 
-      : JSON.stringify(metadataContractData);
-    
-    log(`[API data-url] Returning metadata JSON (${metadataJSON.length} bytes)`);
+    log(`[API data-url] Returning raw metadata JSON (${metadataJSON.length} bytes)`);
     
     // Return the metadata JSON string with appropriate content type
     return new NextResponse(metadataJSON, {

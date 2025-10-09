@@ -22,7 +22,10 @@ import {
   Gamepad2,
   ExternalLinkIcon,
   Image as ImageIcon, // Placeholder icon
-  AlertTriangleIcon // Icon for error state
+  AlertTriangleIcon, // Icon for error state
+  User, // Human interface
+  Code, // API interface
+  FileCode // Contract interface
 } from "lucide-react"
 
 interface NFTCardProps {
@@ -44,6 +47,15 @@ const platformIcons: Record<string, React.ReactNode> = {
   nintendo: <Gamepad2 size={16} aria-label="Nintendo Switch" />, // Using generic gamepad
 };
 
+// Helper to get interface badges from bitmap
+function getInterfaceBadges(interfaces: number) {
+  const badges = [];
+  if (interfaces & 1) badges.push({ icon: <User size={12} />, label: 'Human', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' });
+  if (interfaces & 2) badges.push({ icon: <Code size={12} />, label: 'API', color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' });
+  if (interfaces & 4) badges.push({ icon: <FileCode size={12} />, label: 'Contract', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' });
+  return badges;
+}
+
 export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTCardProps) {
   // Use the metadata context to get complete metadata
   const { getNFTMetadata } = useNFTMetadata();
@@ -62,10 +74,11 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
   const key = `${nft.did || 'unknown'}-${nft.version || 'unknown'}`;
   log(`NFTCard rendering with key: ${key}`, nft);
   
-  // Ensure we have valid data
-  const name = nft.name || "Unnamed App";
+  // Get data from metadata context (fetched from dataUrl), with fallbacks
+  const name = nftMetadata?.displayData.name || nft.name || "Unnamed App";
   const version = nft.version || "Unknown Version";
   const did = nft.did || "Unknown DID";
+  const interfaces = nft.interfaces || 0;
   
   // Get image/icon from metadata context first, then fall back to NFT metadata
   const image = nftMetadata?.displayData.image || nft.metadata?.image || "";
@@ -159,6 +172,18 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
                 </a>
               )}
             </div>
+            {/* Interface types */}
+            <div className="flex items-center gap-2 mt-2 text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-medium">Interfaces:</span>
+              <div className="flex gap-1 flex-wrap">
+                {getInterfaceBadges(interfaces).map((badge, i) => (
+                  <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${badge.color}`}>
+                    {badge.icon}
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </CardHeader>
       ) : (
@@ -186,6 +211,18 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
                 <ExternalLinkIcon size={16} />
               </a>
             )}
+          </div>
+          {/* Interface types */}
+          <div className="flex items-center gap-2 mt-2 text-xs text-slate-600 dark:text-slate-400">
+            <span className="font-medium">Interfaces:</span>
+            <div className="flex gap-1 flex-wrap">
+              {getInterfaceBadges(interfaces).map((badge, i) => (
+                <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${badge.color}`}>
+                  {badge.icon}
+                  {badge.label}
+                </span>
+              ))}
+            </div>
           </div>
         </CardHeader>
       )}
