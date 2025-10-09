@@ -18,6 +18,7 @@ import { ethers } from 'ethers';
 import { localhost, omachainTestnet, omachainMainnet } from '@/config/chains';
 import { getRpcUrl, withRetry } from '@/lib/rpc';
 import { normalizeDomain } from '@/lib/utils/did';
+import { loadIssuerPrivateKey, getThirdwebManagedWallet } from '@/lib/server/issuer-key';
 import resolverAbi from '@/abi/resolver.json';
 import dns from 'dns';
 import { promisify } from 'util';
@@ -37,39 +38,6 @@ export const runtime = 'nodejs';
 // Debug logger
 function debug(section: string, message: string, data?: any) {
   console.log(`[verify-and-attest:${section}] ${message}`, data || '');
-}
-
-/**
- * Load private key for signing transactions
- * Production: Use Thirdweb Transactions API with THIRDWEB_SECRET_KEY
- * Local: Use SSH private key (~/.ssh/local-attestation-key)
- */
-function loadPrivateKeyFromSshFile(): `0x${string}` {
-  const fs = require('fs');
-  const os = require('os');
-  const path = require('path');
-  
-  const sshKeyPath = path.join(os.homedir(), '.ssh', 'local-attestation-key');
-  
-  if (!fs.existsSync(sshKeyPath)) {
-    throw new Error(`SSH private key not found at ${sshKeyPath}. Run: node -e "console.log('0x' + require('crypto').randomBytes(32).toString('hex'))" > ~/.ssh/local-attestation-key && chmod 600 ~/.ssh/local-attestation-key`);
-  }
-  
-  const keyContent = fs.readFileSync(sshKeyPath, 'utf8')
-    .trim()
-    .replace(/\s+/g, '') // Remove all whitespace
-    .toLowerCase(); // Normalize to lowercase
-  
-  // Ensure 0x prefix
-  const privateKey = keyContent.startsWith('0x') ? keyContent : `0x${keyContent}`;
-  
-  // Validate: should be 0x + 64 hex chars = 66 chars total
-  if (privateKey.length !== 66 || !/^0x[0-9a-f]{64}$/.test(privateKey)) {
-    throw new Error(`Invalid private key format. Expected 0x followed by 64 hex characters, got length ${privateKey.length}`);
-  }
-  
-  debug('load-key', `Loaded private key from ${sshKeyPath}`);
-  return privateKey as `0x${string}`;
 }
 
 /**
@@ -395,14 +363,13 @@ async function writeAttestation(
   const chain = defineChain(chainId);
   const resolver = getContract({ client, chain, address: resolverAddress });
   
-  // Check environment for signing
-  const thirdwebSecretKey = process.env.THIRDWEB_SECRET_KEY;
-  const thirdwebServerWallet = process.env.THIRDWEB_SERVER_WALLET_ADDRESS;
+  // Check for Thirdweb Managed Vault (highest priority - production ready)
+  const managedWallet = getThirdwebManagedWallet();
   
   let txHash: string;
   
-  if (thirdwebSecretKey && thirdwebServerWallet) {
-    // Production: Use Thirdweb Transactions API
+  if (managedWallet) {
+    // Production: Use Thirdweb Managed Vault (HSM-secured)
     debug('write-attestation', 'Using Thirdweb Transactions API');
     
     // Prepare the transaction
@@ -417,12 +384,12 @@ async function writeAttestation(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-secret-key': thirdwebSecretKey,
+        'x-secret-key': managedWallet.secretKey,
       },
       body: JSON.stringify({
         chainId: chainId.toString(),
         transaction: tx,
-        from: thirdwebServerWallet,
+        from: managedWallet.walletAddress,
       }),
     });
     
@@ -437,10 +404,10 @@ async function writeAttestation(
     debug('write-attestation', `Transaction sent via Thirdweb: ${txHash}`);
     
   } else {
-    // Local development: Use SSH private key
-    debug('write-attestation', 'Using SSH private key for local development');
+    // Testnet/Development: Use direct private key signing
+    debug('write-attestation', 'Using direct private key signing (ISSUER_PRIVATE_KEY or SSH file)');
     
-    const privateKey = loadPrivateKeyFromSshFile();
+    const privateKey = loadIssuerPrivateKey();
     const account = privateKeyToAccount({ client, privateKey: privateKey as `0x${string}` });
     
     debug('write-attestation', `Signer address: ${account.address}`);

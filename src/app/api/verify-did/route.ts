@@ -48,48 +48,24 @@ import * as os from 'os';
 import { ethers, verifyMessage } from 'ethers';
 import { normalizeDomain } from '@/lib/utils/did';
 import { getRpcUrl, withRetry } from '@/lib/rpc';
+import { loadIssuerPrivateKeyOrNull, getThirdwebManagedWallet } from '@/lib/server/issuer-key';
 
-/**
- * Load private key from SSH file (same as deployment scripts)
- * Path: ~/.ssh/test-evm-deployment-key
- * Format: 64 hex characters (no 0x prefix)
- */
-async function loadPrivateKeyFromSshFile(): Promise<string | null> {
-  try {
-    const deploymentKeyPath = process.env.DEPLOYMENT_KEY_PATH || 
-      path.join(os.homedir(), '.ssh', 'test-evm-deployment-key');
-    
-    const content = await fs.readFile(deploymentKeyPath, 'utf-8');
-    const key = content.trim();
-    
-    // Must be 64 hex characters
-    if (!/^[0-9a-fA-F]{64}$/.test(key)) {
-      console.warn('[verify-did] Invalid key format in SSH file. Expected 64 hex chars.');
-      return null;
-    }
-    
-    return `0x${key}`;
-  } catch (error) {
-    console.log('[verify-did] Could not load SSH key:', (error as Error).message);
-    return null;
-  }
-}
 
 // Create Thirdweb client for server-side operations (lazy init to avoid build errors)
 let client: ReturnType<typeof createThirdwebClient> | null = null;
 function getClient() {
   if (!client) {
-    const secretKey = process.env.THIRDWEB_SECRET_KEY;
+    const managedWallet = getThirdwebManagedWallet();
     const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
     
-    if (secretKey) {
-      // Production: Use Thirdweb secret key
-      client = createThirdwebClient({ secretKey });
-      console.log('[verify-did] Using Thirdweb secret key (production mode)');
+    if (managedWallet) {
+      // Production: Use Thirdweb Managed Vault secret key
+      client = createThirdwebClient({ secretKey: managedWallet.secretKey });
+      console.log('[verify-did] Client using Thirdweb Managed Vault');
     } else if (clientId) {
-      // Local dev: Use client ID (won't support server wallet ops without TEST_PRIVATE_KEY)
+      // Testnet/Dev: Use client ID (server wallet ops use direct private key)
       client = createThirdwebClient({ clientId });
-      console.log('[verify-did] Using Thirdweb client ID (local dev mode - limited functionality)');
+      console.log('[verify-did] Client using Thirdweb client ID');
     } else {
       throw new Error('Neither THIRDWEB_SECRET_KEY nor NEXT_PUBLIC_THIRDWEB_CLIENT_ID is set');
     }
@@ -501,21 +477,22 @@ async function registerDidInResolver(did: string): Promise<{ success: boolean; t
       params: [did],
     });
     
-    // 1. Production: Use Thirdweb Managed Vault (HSM-secured)
-    if (process.env.THIRDWEB_SECRET_KEY && process.env.THIRDWEB_SERVER_WALLET_ADDRESS) {
-      console.log(`[verify-did] Using Thirdweb Managed Vault server wallet`);
-      console.log(`[verify-did] Wallet: ${process.env.THIRDWEB_SERVER_WALLET_ADDRESS}`);
+    // 1. Production: Use Thirdweb Managed Vault (HSM-secured, highest priority)
+    const managedWallet = getThirdwebManagedWallet();
+    if (managedWallet) {
+      console.log(`[verify-did] Using Thirdweb Managed Vault (HSM-secured)`);
+      console.log(`[verify-did] Wallet: ${managedWallet.walletAddress}`);
       
       // Send via Thirdweb Transactions API
       const response = await fetch('https://api.thirdweb.com/v1/transactions', {
         method: 'POST',
         headers: {
-          'x-secret-key': process.env.THIRDWEB_SECRET_KEY,
+          'x-secret-key': managedWallet.secretKey,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           chainId: env.chainId,
-          from: process.env.THIRDWEB_SERVER_WALLET_ADDRESS,
+          from: managedWallet.walletAddress,
           transactions: [transaction],
         }),
       });
@@ -536,17 +513,18 @@ async function registerDidInResolver(did: string): Promise<{ success: boolean; t
       };
     }
     
-    // 2. Local dev: Use SSH private key
+    // 2. Testnet/Development: Use direct private key signing
     else {
-      console.log(`[verify-did] Using SSH private key (local development)`);
+      console.log(`[verify-did] Using direct private key signing (ISSUER_PRIVATE_KEY or SSH file)`);
       
-      const privateKey = await loadPrivateKeyFromSshFile();
+      const privateKey = await loadIssuerPrivateKeyOrNull();
       
       if (!privateKey) {
         throw new Error(
           'No authentication method available.\n' +
-          'Production: Set THIRDWEB_SECRET_KEY and THIRDWEB_SERVER_WALLET_ADDRESS\n' +
-          'Local dev: Ensure ~/.ssh/test-evm-deployment-key exists'
+          'Production: Set THIRDWEB_SECRET_KEY + THIRDWEB_SERVER_WALLET_ADDRESS\n' +
+          'Testnet: Set ISSUER_PRIVATE_KEY\n' +
+          'Local dev: Create ~/.ssh/local-attestation-key'
         );
       }
       
