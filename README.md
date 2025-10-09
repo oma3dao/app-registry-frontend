@@ -1,6 +1,6 @@
 # app-registry-frontend
 
-Front end for the Application Registry
+Front end for the OMATrust App Registry
 
 ## License and Participation
 
@@ -17,32 +17,50 @@ OMA3 standards (such as specifications and schemas) will always remain open and 
 ## Purpose
 
 This repository serves multiple purposes:
-- **App Tokenization**: The repository implements a minting tool that allows developers to quickly tokenize their app onchain.
+- **App Registry**: The repository implements the front-end of the OMATrust registry on OMAChain.  It provides the easiest way for app developers to registry apps with OMATrust and allows clients to discover, trust, and utilize them.  For more details on OMATrust, see [the docs](https://github.com/oma3dao/omatrust-docs).
+- **Sample Code**: Developers can use the repository as sample code to implement their own clients such as discovery tools and app stores.
 - **IWPS Demo**: The repository also implements a basic implementation of the Inter World Portaling System (IWPS), an appliction launching standard that is now in [draft form](../iwps-specification/blob/main/IWPS%20Base%20Specification.md).
-- **Sample Code**: Developers can use the repository as sample code to implement their own:
-  - App store
-  - App tokenization tool
-  - IWPS implementation (source or destination)
 
 ## Repository Overview
 
-This repository is a Next.js application built with TypeScript, utilizing thirdweb for blockchain interactions. Below is a guide to key directories and files relevant to the purposes outlined above. For a more granular breakdown of the source code, including blockchain configuration (`chains.ts`, `contracts.ts`) and smart contract integration details, please also consult the [src/README.md](src/README.md) file.
+This repository is a Next.js application built with TypeScript, utilizing thirdweb for blockchain interactions. The wizard has been restructured (modal‑owned step state, single‑submit mint), and contract I/O has moved under `src/lib/contracts`. Below reflects the current layout.
 
-**1. App Tokenization (Minting Tool & NFT Management):**
+**1. App Tokenization (Wizard & NFT Management):**
 
 If you want to understand how applications are tokenized as NFTs or how to manage their metadata and status, refer to:
 
-*   **Smart Contract Interaction:**
-    *   `src/contracts/appRegistry.ts`: Contains functions for interacting with the main App Registry smart contract (fetching NFTs, updating status, etc.).
-    *   `src/contracts/appMetadata.ts`: Contains functions for interacting with the optional App Metadata smart contract (dataUrl, iwpsPortalUri, etc.).
-*   **Minting & Editing UI:**
-    *   `src/components/nft-mint-modal.tsx`: The core component for the multi-stage wizard used to mint new app NFTs and edit existing ones. This is where developers input application details, metadata URLs, and IWPS URIs.
-    *   `src/app/mint/page.tsx`: The page that hosts the minting functionality.
+*   **Contract Interaction (current):**
+    *   `src/lib/contracts/registry.write.ts` / `src/lib/contracts/registry.hooks.ts` — prepare and send Registry txs (mint, update status)
+    *   `src/lib/contracts/metadata.*.ts` — App Metadata contract helpers (optional on‑chain storage)
+*   **Wizard UI:**
+    *   `src/components/nft-mint-modal.tsx` — multi‑step wizard; modal owns step state; calls parent `onSubmit` only at Step 6 (Review & Mint)
+    *   `src/lib/wizard/registry.tsx` — step definitions, validation and visibility
+    *   `src/lib/wizard/field-requirements.ts` — dynamic required/optional flags per interface type
+*   **Deterministic hashing & JSON:**
+    *   `src/lib/utils/offchain-json.ts` — spec‑aligned builder for DataURL JSON (omits empty fields)
+    *   `src/lib/utils/dataurl.ts` — JCS canonicalization + keccak256 hashing and verification
 *   **NFT Data Types:**
-    *   `src/types/nft.ts`: Defines the structure for NFT objects used throughout the application.
-    *   `src/types/metadata-contract.ts`: Defines the structure for the metadata JSON expected by the `dataUrl`.
+    *   `src/types/nft.ts` — App NFT shape used by wizard and dashboard
 
-**2. IWPS Demo (Application Launching):**
+**2. Project Structure (Extending the App Registry):**
+
+For developers looking to use this repository as a base for their own client, here's the overall structure:
+
+*   **Core Application Logic:**
+    *   `src/app/`: Main pages and API routes (Next.js App Router)
+    *   `src/components/`: Reusable UI components (modals, cards, etc.)
+    *   `src/lib/`: Utilities and helpers (e.g., `utils.ts`, `validation.ts`, `log.ts`)
+    *   `src/config/`: Configuration (`chains.ts`, `env.ts`)
+    *   `src/types/`: TypeScript type definitions
+*   **Styling:**
+    *   `src/app/globals.css` & `tailwind.config.ts`: Global styles and Tailwind config
+    *   Shadcn/ui components are used and can be found in `src/components/ui/`
+*   **Blockchain Integration (thirdweb):**
+    *   `src/app/client.ts` — creates the thirdweb client from env
+    *   `src/lib/contracts/client.ts` — resolves active chain and returns typed contracts
+    *   `src/config/chains.ts` + `src/config/env.ts` — numeric chain IDs, RPC, and contract addresses
+
+**3. IWPS Demo (Application Launching):**
 
 To understand or extend the IWPS implementation for launching applications, these are the key areas:
 
@@ -58,89 +76,48 @@ To understand or extend the IWPS implementation for launching applications, thes
 *   **Redirect (Legacy/Alternative URI):**
     *   `vercel.json`: Contains redirect rules. Currently used to redirect legacy `/api/portal-uri/...` requests to the `/api/portal-url/...` endpoint, ensuring backward compatibility or cleaner URLs.
 
-**3. Sample Code & General Structure (Extending the App Registry):**
+## Setup local development environment
 
-For developers looking to use this repository as a base for their own app store, tokenization tool, or a more custom IWPS implementation, here's the overall structure:
-
-*   **Core Application Logic:**
-    *   `src/app/`: Contains the main pages and API routes, following Next.js App Router conventions.
-    *   `src/components/`: Reusable React components used throughout the application (modals, cards, UI elements).
-    *   `src/lib/`: Utility functions, helper scripts (e.g., `utils.ts`, `validation.ts`, `log.ts`).
-    *   `src/config/`: Application-wide configuration, such as `app-config.ts`.
-    *   `src/types/`: TypeScript type definitions.
-*   **Styling:**
-    *   `src/app/globals.css` & `tailwind.config.ts`: For global styles and Tailwind CSS configuration.
-    *   Shadcn/ui components are used and can be found in `src/components/ui/`.
-*   **Blockchain Integration (thirdweb):**
-    *   `src/lib/thirdweb.ts` (or similar, depending on your specific thirdweb setup file): Initializes and exports the thirdweb SDK client.
-    *   Functions in `src/contracts/` demonstrate how to use the SDK to interact with your contracts.
-
-## Setup
-
-### Installation
-
-Install the template using [thirdweb create](https://portal.thirdweb.com/cli/create)
+### Install dependencies
 
 ```bash
-  npx thirdweb create app --next
+npm install
 ```
 
 ### Environment Variables
 
 To run this project, copy .env.example into your .env.local file.
 
-## Testing with Supported Testnets
+### Start development server
 
-This application currently supports multiple testnets for development and testing:
+```bash
+npm run dev
+```
 
-- **Celo Alfajores Testnet** - Primary testnet for development
-- **OMAchain Testnet** - OMA3 ecosystem testnet (Chain ID: 66238)
+### Start a production build
 
-The App Registry contracts are deployed to these testnets for development and testing. THIS DOES NOT MEAN THE PRODUCTION APP REGISTRY CONTRACT WILL BE DEPLOYED TO THESE NETWORKS.  To interact with this application, you'll need to:
+```bash
+npm run build
+npm run start
+```
 
-1. **Install MetaMask Mobile**
-2. **Add supported testnets to MetaMask** (see sections below)
-3. **Get test tokens from the respective faucets**
+### Testnet
 
-### Installing MetaMask
+This application currently supports OMAChain testnet for development and testing.  See [src/config/chains.ts](src/config/chains.ts) for config details.
 
-1. Visit [MetaMask.io](https://metamask.io/download/) to download the extension for your browser or download the app to your mobile device
-2. Follow the setup instructions to create a new wallet or import an existing one
-3. Make sure to securely store your recovery phrase
+### Connecting a Wallet
 
-### Adding Celo Alfajores Testnet to MetaMask
+#### OMA3 Embedded Wallet
 
-#### Desktop Browser Extension:
+The front-end gives users the option to create an embedded wallet using social login (such as Google, Apple, or Facebook).  This is the easiest onboarding path for users and automatically supports OMAChain:
 
-1. Open MetaMask and click on the network dropdown (usually shows "Ethereum Mainnet")
-2. Click "Add Network"
-3. In newer versions, click "Add a network manually" at the bottom
-4. Enter the following details:
-   - **Network Name**: Celo Alfajores Testnet
-   - **New RPC URL**: https://alfajores-forno.celo-testnet.org
-   - **Chain ID**: 44787
-   - **Currency Symbol**: CELO
-   - **Block Explorer URL**: https://alfajores.celoscan.io
+1.  Click "Connect"
+2.  Choose your social login
+3.  Click on the wallet button at the top right of the screen
 
-#### Mobile App:
+#### Metamask Browser Extension
 
-1. Open the MetaMask app
-2. Tap on the hamburger menu or the settings icon
-3. Tap "Settings" → "Networks" → "Add Network"
-4. Tap "Add a network manually" and enter the same details as above
-
-### Getting Test CELO Tokens
-
-1. Visit the [Alfajores Faucet](https://faucet.celo.org/alfajores)
-2. Connect your wallet or paste your wallet address
-3. Request the test CELO tokens
-4. You can get additional tokens by signing in with GitHub (10x more tokens)
-5. Wait a few moments for the tokens to appear in your wallet
-
-### Adding OMAchain Testnet to MetaMask
-
-#### Desktop Browser Extension:
-
+1. Visit [MetaMask.io](https://metamask.io/download/) to download the extension and install it
 1. Open MetaMask and click on the network dropdown (usually shows "Ethereum Mainnet")
 2. Click "Add Network"
 3. In newer versions, click "Add a network manually" at the bottom
@@ -150,60 +127,59 @@ The App Registry contracts are deployed to these testnets for development and te
    - **Chain ID**: 66238
    - **Currency Symbol**: OMA
    - **Block Explorer URL**: https://explorer.testnet.chain.oma3.org/
+5.  Hit the "Connect" button on the website and confirm the login in the wallet
 
-#### Mobile App:
+#### Metamask Mobile App:
 
-1. Open the MetaMask app
+1. Download and open the MetaMask app
 2. Tap on the hamburger menu or the settings icon
 3. Tap "Settings" → "Networks" → "Add Network"
 4. Tap "Add a network manually" and enter the same details as above
+5. Hit the "Connect" button on the website and confirm the login in the wallet
 
-### Getting Test OMA Tokens
+### Getting Test OMA Tokens (required to register applications)
 
-1. Visit the OMAchain testnet faucet (URL TBD)
-2. Connect your wallet or paste your wallet address
+1. Visit the [OMAChain Testnet Faucet](https://faucet.testnet.chain.oma3.org)
+2. Paste in your wallet address
 3. Request the test OMA tokens
-4. Wait a few moments for the tokens to appear in your wallet
 
-### Connecting to the app
+## Frontend Architecture
 
-1. In Metamask, make sure you're using the Alfajores network (need to choose it in your Networks settings)
-2. Hit the app connect button
-3. Follow instructions
+For more information on the source code for this frontend, visit [src/README.md](src/README.md).
 
-## Run locally
+## Optional Onchain Metadata Architecture
 
-Install dependencies
+The OMA Trust Registry stores application metadata, both onchain and offchain. Certain types of metadata, such as the DID, must be stored on-chain. But for most of the metadata the developer has the option to store it either on-chain or off-chain. To store the metadata on-chain, OMA3 provides a metadata smart contract that essentially stores the whole metadata JSON object as a string onchain.
 
-```bash
-npm install
+### Storage Strategy: DID-Only Indexing
+
+The optional OMA3AppMetadata contract uses a **DID-only storage strategy** for gas efficiency:
+
+- **Storage:** Metadata is indexed by **base DID only** (not versioned DID)
+  - Example: `did:web:example.com` → metadata
+  - All versions (v1.0, v2.0, v3.0) share the same metadata
+  
+- **Onchain Metadata API Layer:** The `/api/data-url` endpoint accepts versioned URLs but strips the version before querying
+  - Request: `/api/data-url/did:web:example.com/v/2.0` (RESTful, includes version)
+  - Query: `getMetadataJson("did:web:example.com")` (base DID only)
+  - Result: Same metadata for all versions
+
+- **Version Tracking:** Events include full version context (major.minor.patch)
+  - `MetadataSet` events: `(did, major, minor, patch, metadataJson, hash, timestamp)`
+  - Shows which version triggered each metadata update
+  - Example: "v2.1.0 updated metadata at block 12345"
+  - Complete historical audit trail via blockchain events
+  - Much cheaper than storing duplicates on-chain
+
+**Contract Interface:**
+```solidity
+// Registry calls with version components (no string concatenation)
+setMetadataForRegistry(string did, uint8 major, uint8 minor, uint8 patch, string metadataJson)
 ```
 
-Start development server
-
-```bash
-npm run dev
-```
-
-Create a production build
-
-```bash
-npm run build
-```
-
-Preview the production build
-
-```bash
-npm run start
-```
-
-## Resources
-
-- [Documentation](https://portal.thirdweb.com/typescript/v5)
-- [Templates](https://thirdweb.com/templates)
-- [YouTube](https://www.youtube.com/c/thirdweb)
-- [Blog](https://blog.thirdweb.com)
-
-## Need help?
-
-For help or feedback, please [visit our support site](https://thirdweb.com/support)
+**Why This Design?**
+- Gas efficiency: No duplicate metadata storage across versions
+- Version tracking: Events show which version updated metadata
+- Most apps don't need version-specific metadata
+- Apps requiring version-specific metadata can use custom `dataUrl` (self-hosted)
+- Events provide immutable history when needed

@@ -13,8 +13,32 @@ export type NormalizedError = {
  * @param e The error to normalize
  * @returns Normalized error object with code, message, and optional cause
  */
+/**
+ * Type guard to check if error has a message property
+ */
+function hasMessage(e: unknown): e is { message: string } {
+  return (
+    typeof e === 'object' && 
+    e !== null && 
+    'message' in e && 
+    typeof (e as Record<string, unknown>).message === 'string'
+  );
+}
+
+/**
+ * Type guard to check if error has a shortMessage property
+ */
+function hasShortMessage(e: unknown): e is { shortMessage: string } {
+  return (
+    typeof e === 'object' && 
+    e !== null && 
+    'shortMessage' in e && 
+    typeof (e as Record<string, unknown>).shortMessage === 'string'
+  );
+}
+
 export function normalizeEvmError(e: unknown): NormalizedError {
-  const msg = (e as any)?.shortMessage || (e as any)?.message || 'Transaction failed';
+  const msg = hasShortMessage(e) ? e.shortMessage : hasMessage(e) ? e.message : 'Transaction failed';
   
   // User rejected transaction
   if (msg.match(/User rejected/i) || msg.match(/user denied/i) || msg.match(/rejected/i)) {

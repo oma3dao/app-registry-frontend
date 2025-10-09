@@ -4,13 +4,22 @@ import { buildMetadataJSON, validateMetadataJSON } from '@/lib/contracts/metadat
 import { log } from '@/lib/log';
 import type { NFT } from '@/types/nft';
 import type { MetadataContractData } from '@/types/metadata-contract';
-import { normalizeAndValidateVersion } from '@/lib/utils';
 
-export async function GET(request: Request) {
+/**
+ * Dynamic route handler for /api/data-url/[...versionedDid]
+ * Handles path-based URLs like: /api/data-url/did:web:lumian.org/v/1.0
+ * 
+ * This route is essential for external access to metadata stored on-chain.
+ * The dataUrl stored in the registry uses this path format, so external consumers
+ * (block explorers, NFT marketplaces, other dApps) need this route to work.
+ */
+export async function GET(
+  request: Request,
+  { params }: { params: { versionedDid: string[] } }
+) {
   try {
-    // Extract the versionedDID parameter from the URL
-    const { searchParams } = new URL(request.url);
-    const versionedDID = searchParams.get('versionedDID');
+    // Join the path segments to reconstruct the full versionedDID
+    const versionedDID = params.versionedDid.join('/');
     
     log('[API data-url] Received request for versionedDID:', versionedDID);
     
@@ -72,7 +81,11 @@ export async function GET(request: Request) {
     return new NextResponse(metadataJSON, {
       status: 200,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        // Allow CORS for external access
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
       }
     });
     
@@ -86,4 +99,17 @@ export async function GET(request: Request) {
     
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
-} 
+}
+
+// Handle CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+

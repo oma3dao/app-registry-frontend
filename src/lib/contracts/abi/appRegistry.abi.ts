@@ -6,4 +6,4 @@
 
 import appRegistryAbiJson from '../../../abi/appRegistry.json';
 
-export const appRegistryAbi = appRegistryAbiJson.abi as any;
+export const appRegistryAbi = appRegistryAbiJson.abi;

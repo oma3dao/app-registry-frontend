@@ -42,7 +42,7 @@ export interface MetadataContractData {
   /**
    * URL to app description
    */
-  descriptionUrl: string;
+  descriptionUrl?: string;
   
   /**
    * Full text description content (cached from descriptionUrl)
@@ -52,7 +52,7 @@ export interface MetadataContractData {
   /**
    * URL to marketing materials
    */
-  external_url: string;
+  external_url?: string;
   
   /**
    * Token contract address (optional)
@@ -62,18 +62,38 @@ export interface MetadataContractData {
   /**
    * URL to app icon (1024x1024)
    */
-  image: string;
+  image?: string;
   
   /**
    * URLs to app screenshots (max 5)
    * First screenshot is required, others are optional
    * Maximum resolution: 2048x2048
    */
-  screenshotUrls: string[];
+  screenshotUrls?: string[];
   
   /**
    * Nested object containing details for each supported platform.
    * Matches the "platforms" key used in the final JSON.
    */
   platforms?: Platforms;
+  
+  /**
+   * Brief summary of the app
+   */
+  summary?: string;
+  
+  /**
+   * Publisher/developer name
+   */
+  publisher?: string;
+  
+  /**
+   * URL to legal documents (privacy policy, TOS, etc.)
+   */
+  legalUrl?: string;
+  
+  /**
+   * URL to support/help resources
+   */
+  supportUrl?: string;
 } 

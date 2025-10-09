@@ -7,12 +7,28 @@ import type { NFT } from '@/types/nft';
 import { statusToNumber } from './status';
 
 /**
+ * Format version for display following semantic versioning standards
+ * Always show major.minor, only add patch if non-zero
+ * Examples: "2.0" if 2.0.0, "2.1" if 2.1.0, "2.1.3" if 2.1.3
+ */
+function formatVersion(major: number, minor: number, patch: number): string {
+  if (patch !== 0) {
+    return `${major}.${minor}.${patch}`;
+  }
+  return `${major}.${minor}`;
+}
+
+/**
  * Convert AppSummary from contract to NFT for frontend display
  * This centralizes the conversion logic to avoid duplication and errors
  */
 export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT {
-  // Format version string
-  const version = `${app.currentVersion.major}.${app.currentVersion.minor}.${app.currentVersion.patch}`;
+  // Format version string (only show significant parts)
+  const version = formatVersion(
+    app.currentVersion.major,
+    app.currentVersion.minor,
+    app.currentVersion.patch
+  );
   
   // Convert Status type to number
   const statusNum = statusToNumber(app.status);

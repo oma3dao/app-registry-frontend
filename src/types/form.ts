@@ -2,6 +2,16 @@ import type { RegistryContractData } from './registry-contract';
 import type { MetadataContractData } from './metadata-contract';
 
 /**
+ * Interface flags for Step 0
+ * Determines which interface types the app supports
+ */
+export type InterfaceFlags = {
+  human: boolean;
+  api: boolean;
+  smartContract: boolean;
+};
+
+/**
  * Combined form data for the NFT creation wizard
  * Used to manage state across all wizard steps
  */
@@ -11,6 +21,22 @@ export interface WizardFormData extends RegistryContractData {
    * Only used when proceeding beyond step 1 to the full wizard flow
    */
   metadata?: MetadataContractData;
+  
+  /**
+   * Interface flags (from Step 0)
+   * Used to determine which steps to show and compute interfaces bitmap
+   */
+  interfaceFlags?: InterfaceFlags;
+  
+  /**
+   * IWPS Portal URL (distribution field)
+   */
+  iwpsPortalUrl?: string;
+  
+  /**
+   * Internal verification status tracking
+   */
+  _verificationStatus?: 'idle' | 'pending' | 'verified' | 'failed';
 }
 
 /**

@@ -146,8 +146,10 @@ export function NFTMetadataProvider({ children }: { children: ReactNode }) {
       const versionedDID = buildVersionedDID(nft.did, nft.version);
       log(`[NFTMetadataContext] Fetching metadata for: ${versionedDID}`);
       
-      // Call our data-url API endpoint
-      const response = await fetch(`/api/data-url?versionedDID=${encodeURIComponent(versionedDID)}`);
+      // Call our RESTful data-url API endpoint using path-based URL
+      // This matches the URL format stored on-chain in the registry
+      // Next.js dynamic routes handle the path segments automatically
+      const response = await fetch(`/api/data-url/${versionedDID}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));

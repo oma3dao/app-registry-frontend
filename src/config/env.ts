@@ -12,7 +12,6 @@ const Env = z.object({
   NEXT_PUBLIC_METADATA_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   NEXT_PUBLIC_RESOLVER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   NEXT_PUBLIC_DEBUG_ADAPTER: z.enum(['true', 'false']).optional(),
-  NEXT_PUBLIC_APP_BASE_URL: z.string().url().optional(),
 });
 
 const parsed = Env.parse({
@@ -21,7 +20,6 @@ const parsed = Env.parse({
   NEXT_PUBLIC_METADATA_ADDRESS: process.env.NEXT_PUBLIC_METADATA_ADDRESS,
   NEXT_PUBLIC_RESOLVER_ADDRESS: process.env.NEXT_PUBLIC_RESOLVER_ADDRESS,
   NEXT_PUBLIC_DEBUG_ADAPTER: process.env.NEXT_PUBLIC_DEBUG_ADAPTER,
-  NEXT_PUBLIC_APP_BASE_URL: process.env.NEXT_PUBLIC_APP_BASE_URL,
 });
 
 // Get the active chain configuration from the preset
@@ -29,24 +27,34 @@ const activeChain = CHAIN_PRESETS[parsed.NEXT_PUBLIC_ACTIVE_CHAIN];
 
 /**
  * Get the base URL for the application
- * Priority:
- * 1. NEXT_PUBLIC_APP_BASE_URL (explicit override)
- * 2. VERCEL_URL (automatic in Vercel deployments)
- * 3. http://localhost:3000 (development default)
+ * 
+ * The URL is DETERMINISTICALLY derived from the active chain:
+ * - Localhost chain (31337) → http://localhost:3000
+ * - Testnet/Mainnet → https://appregistry.oma3.org (or VERCEL_URL in deployments)
+ * 
+ * CRITICAL: The dataUrl is stored IMMUTABLY on-chain. This function ensures:
+ * 1. Local chain apps use localhost (safe, won't leak to production)
+ * 2. Testnet/mainnet apps ALWAYS use production URLs (even during local dev)
+ * 3. No manual override allowed (prevents misconfiguration)
+ * 
+ * For custom domains: Modify the chain configuration in chains.ts
  */
 function getAppBaseUrl(): string {
-  // Explicit override
-  if (parsed.NEXT_PUBLIC_APP_BASE_URL) {
-    return parsed.NEXT_PUBLIC_APP_BASE_URL;
+  // Chain-aware: Only use localhost for actual localhost chain
+  if (activeChain.id === 31337) {
+    // Local Hardhat chain - use localhost for development
+    return 'http://localhost:3000';
   }
   
-  // Vercel automatic URL (in deployments)
+  // Testnet/Mainnet: Use Vercel URL if available (automatic in deployments)
+  // Otherwise use canonical production domain
   if (process.env.NEXT_PUBLIC_VERCEL_URL) {
     return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
   }
   
-  // Development default
-  return 'http://localhost:3000';
+  // Canonical production domain for testnet/mainnet
+  // This ensures on-chain dataUrls are accessible from anywhere
+  return 'https://appregistry.oma3.org';
 }
 
 /**
@@ -54,7 +62,7 @@ function getAppBaseUrl(): string {
  * - Chain is selected via NEXT_PUBLIC_ACTIVE_CHAIN env var (localhost, omachain-testnet, omachain-mainnet)
  * - Contract addresses can be overridden via NEXT_PUBLIC_REGISTRY_ADDRESS, NEXT_PUBLIC_METADATA_ADDRESS, NEXT_PUBLIC_RESOLVER_ADDRESS
  * - Contract versions are managed via Git branches (not env vars)
- * - App base URL is derived from NEXT_PUBLIC_APP_BASE_URL, VERCEL_URL, or defaults to localhost:3000
+ * - App base URL is DETERMINISTICALLY derived from active chain (no manual override to prevent misconfiguration)
  */
 export const env = {
   // Active chain (from preset)

@@ -122,7 +122,7 @@ export interface MintAppInput {
   initialVersionPatch: number;    // Initial patch version
   
   // Optional fields
-  traitHashes?: string[];         // Trait tags (max 20, empty array if none)
+  traitHashes?: string[];         // Trait hashes (max 20, empty array if none) - generated from traits during minting
   metadataJson?: string;          // On-chain JSON for metadata contract (empty string to skip)
 }
 

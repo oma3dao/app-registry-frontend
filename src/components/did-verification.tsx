@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { useActiveAccount } from "thirdweb/react"
 import { normalizeDidWeb } from "@/lib/utils/did"
+import { env } from "@/config/env"
 
 interface DidVerificationProps {
   did: string;
@@ -24,12 +25,16 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
   const account = useActiveAccount();
 
   const handleVerify = async () => {
+    console.log("[DidVerification] Starting verification...");
+    
     if (!account) {
+      console.log("[DidVerification] No account connected");
       setVerificationError("Please connect your wallet first");
       return;
     }
 
     if (!did || did.trim() === "") {
+      console.log("[DidVerification] No DID provided");
       setVerificationError("Please enter a DID first");
       return;
     }
@@ -37,63 +42,76 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
     setIsVerifying(true);
     setVerificationError(null);
 
+    // Normalize the DID (declare outside try so it's available in catch)
+    const normalizedDid = did.startsWith("did:") ? did : normalizeDidWeb(did);
+
     try {
-      // Normalize the DID
-      const normalizedDid = did.startsWith("did:") ? did : normalizeDidWeb(did);
+      console.log("[DidVerification] Normalized DID:", normalizedDid);
+      console.log("[DidVerification] Connected address:", account.address);
       
-      // Extract domain from DID for SIWE message
-      const domain = normalizedDid.replace("did:web:", "").replace("did:pkh:", "");
-      
-      // Create SIWE-like message (EIP-4361)
-      const timestamp = Math.floor(Date.now() / 1000);
-      const nonce = Math.random().toString(36).substring(7);
-      
-      const siweMessage = `${account.address} wants to verify ownership of ${normalizedDid}
-
-URI: https://${window.location.host}
-Version: 1
-Chain ID: 1
-Nonce: ${nonce}
-Issued At: ${new Date(timestamp * 1000).toISOString()}
-Resources:
-- did:${normalizedDid}`;
-
-      // Request signature from wallet using personal_sign
-      const signature = await account.signMessage({
-        message: siweMessage,
-      });
-
-      // Call verification API
-      const response = await fetch("/api/verify-did", {
+      // Call unified verify-and-attest endpoint
+      const response = await fetch("/api/verify-and-attest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           did: normalizedDid,
-          message: siweMessage,
-          signature,
-          claimedDomain: domain,
+          connectedAddress: account.address,
+          requiredSchemas: ["oma3.ownership.v1"],
         }),
       });
 
       const result = await response.json();
+      console.log("[DidVerification] API response:", result);
 
-      if (response.ok && result.success) {
+      if (response.ok && result.ok && result.status === 'ready') {
+        console.log("[DidVerification] ✅ Verification successful!");
+        if (result.txHashes) {
+          console.log("[DidVerification] Transaction hashes:", result.txHashes);
+        }
         onVerificationComplete(true);
       } else {
-        throw new Error(result.message || result.error || "Verification failed");
+        // Build detailed error message
+        let errorMsg = result.error || "Verification failed";
+        
+        // Add more context based on response
+        if (result.details) {
+          errorMsg += `\n\nDetails: ${JSON.stringify(result.details, null, 2)}`;
+        }
+        
+        // For did:web, remind about DNS/DID document requirements
+        if (normalizedDid.startsWith("did:web:")) {
+          const domain = normalizedDid.replace("did:web:", "");
+          errorMsg += `\n\n⚠️ For did:web verification, ensure you have either:\n` +
+                     `1. DNS TXT record at _omatrust.${domain}\n` +
+                     `2. DID document at https://${domain}/.well-known/did.json\n\n` +
+                     `Check server logs (terminal where 'npm run dev' is running) for detailed debug info.`;
+        }
+        
+        throw new Error(errorMsg);
       }
     } catch (error: any) {
-      console.error("[DidVerification] Verification failed:", error);
+      console.error("[DidVerification] ❌ Verification failed:", error);
       setVerificationError(
         error.message || "Failed to verify DID ownership. Please check your setup and try again."
       );
       onVerificationComplete(false);
     } finally {
       setIsVerifying(false);
+      console.log("[DidVerification] Verification complete");
     }
   };
 
   const renderInstructions = () => {
+    // Extract domain from DID for display
+    const domain = did.replace("did:web:", "").split("/")[0] || "yourdomain.com";
+    
+    // Get connected wallet address and active chain ID
+    const walletAddress = account?.address || "0xYOUR_ADDRESS";
+    const chainId = env.activeChain.chainId;
+    
+    // Format CAIP-10 identifier
+    const caip10 = `eip155:${chainId}:${walletAddress}`;
+    
     return (
       <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
         <div className="flex gap-2 items-start">
@@ -105,16 +123,17 @@ Resources:
             <div className="ml-4 mb-3">
               <p className="font-medium mt-2">Method 1: DID Document</p>
               <ul className="list-disc ml-4 mt-1 space-y-1">
-                <li>Host a DID document at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">https://yourdomain.com/.well-known/did.json</code></li>
+                <li>Host a DID document at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs">https://{domain}/.well-known/did.json</code></li>
                 <li>Include your wallet address in the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">verificationMethod</code> field</li>
-                <li>Format: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">blockchainAccountId: "eip155:1:0xYOUR_ADDRESS"</code></li>
+                <li>Format: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">blockchainAccountId: &quot;{caip10}&quot;</code></li>
               </ul>
 
               <p className="font-medium mt-3">Method 2: DNS TXT Record</p>
               <ul className="list-disc ml-4 mt-1 space-y-1">
-                <li>Add a TXT record at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">_omatrust.yourdomain.com</code></li>
-                <li>Value: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">v=1 caip10=eip155:1:0xYOUR_ADDRESS</code></li>
-                <li>Replace YOUR_ADDRESS with your connected wallet address</li>
+                <li>Add a TXT record at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">_omatrust.{domain}</code></li>
+                <li>Value: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">v=1;caip10={caip10}</code></li>
+                <li className="text-xs text-gray-600 dark:text-gray-400">Note: Use semicolon (;) as separator. Spaces also supported but not recommended.</li>
+                {!account && <li className="text-amber-600 dark:text-amber-400">⚠️ Connect your wallet to see your exact values</li>}
               </ul>
             </div>
 

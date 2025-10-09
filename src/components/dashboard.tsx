@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { PlusIcon } from "lucide-react"
 import NFTGrid from "@/components/nft-grid"
-import NFTMintModal, { WizardStep } from "@/components/nft-mint-modal"
+import NFTMintModal from "@/components/nft-mint-modal"
 import NFTViewModal from "@/components/nft-view-modal"
 import type { NFT } from "@/types/nft"
 import { useAppsByOwner, useMintApp, useUpdateStatus, type Status } from "@/lib/contracts"
@@ -13,6 +13,9 @@ import { useSetMetadata } from "@/lib/contracts"
 import { log } from "@/lib/log"
 import { fetchMetadataImage } from "@/lib/utils"
 import { appSummariesToNFTs } from "@/lib/utils/app-converter"
+import { hashTraits } from "@/lib/utils/traits";
+import { canonicalizeForHash } from "@/lib/utils/dataurl";
+import { buildOffchainMetadataObject } from "@/lib/utils/offchain-json";
 import { toast } from "sonner"
 
 export default function Dashboard() {
@@ -25,7 +28,7 @@ export default function Dashboard() {
   const [isMintModalOpen, setIsMintModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
-  const [currentStep, setCurrentStep] = useState(1);
+  
   const [editMetadata, setEditMetadata] = useState<Record<string, any> | null>(null);
   
   // Use new hooks
@@ -84,7 +87,7 @@ export default function Dashboard() {
     
     setCurrentNft(null);
     setEditMetadata(null);
-    setCurrentStep(1);
+    
     setIsMintModalOpen(true);
     log("Opening mint modal for new NFT");
   }
@@ -94,7 +97,7 @@ export default function Dashboard() {
     log("Opening mint modal for editing metadata", { metadata, nft });
     setCurrentNft(nft);
     setEditMetadata(metadata);
-    setCurrentStep(2);
+    
     setIsViewModalOpen(false); // Close the view modal
     setIsMintModalOpen(true);  // Open the mint modal
   }
@@ -117,8 +120,8 @@ export default function Dashboard() {
   }
 
   // Handles registering a new app from the mint modal
-  const handleRegisterApp = async (nft: NFT, currentStep: number) => {
-    log("handleRegisterApp called with currentStep:", currentStep);
+  const handleRegisterApp = async (nft: NFT) => {
+    log("handleRegisterApp called (submit)");
     log("NFT:", nft);
     try {
       if (!account) {
@@ -126,25 +129,41 @@ export default function Dashboard() {
         return Promise.reject(new Error("No wallet connected"));
       }
 
-      // Extract and remove the isCustomUrls flag
-      const isCustomUrls = 'isCustomUrls' in nft && (nft as any).isCustomUrls;
-      if ('isCustomUrls' in nft) {
-        delete (nft as any).isCustomUrls;
+      // Extract and remove the isCustomUrls flag (temporary flag added by wizard)
+      const nftWithExtras = nft as NFT & { isCustomUrls?: boolean };
+      const isCustomUrls = 'isCustomUrls' in nftWithExtras && nftWithExtras.isCustomUrls;
+      if ('isCustomUrls' in nftWithExtras) {
+        delete nftWithExtras.isCustomUrls;
       }
 
-      // Only register app if in step 1
-      if (currentStep === 1) {
-        log("Registering new app:", nft);
+      // Submit (handled at Step 6 inside modal)
+      log("Registering new app:", nft);
         
         // Parse version string (e.g., "1.0.0" -> {major: 1, minor: 0, patch: 0})
         const versionParts = nft.version.split('.').map(Number);
         const [major = 1, minor = 0, patch = 0] = versionParts;
         
-        // Compute data hash from metadata if available
-        const metadataStr = nft.metadata ? JSON.stringify(nft.metadata) : '';
-        const dataHash = metadataStr ? '0x' + Array.from(
-          new TextEncoder().encode(metadataStr)
-        ).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 64).padEnd(64, '0') : '0x0000000000000000000000000000000000000000000000000000000000000000';
+        // Build the same off-chain object used in Step 6 and compute JCS hash
+        const offchainObj = buildOffchainMetadataObject({
+          name: nft.name,
+          metadata: nft.metadata,
+          extra: {
+            iwpsPortalUrl: nft.iwpsPortalUrl,
+            traits: Array.isArray(nft.traits) ? nft.traits : undefined,
+          }
+        });
+        const jcs = canonicalizeForHash(offchainObj);
+        const dataHash = jcs ? jcs.hash : ('0x' + '0'.repeat(64)) as `0x${string}`;
+        log("[dashboard.tsx:handleRegisterApp] Computed dataHash (JCS keccak256):", dataHash);
+        log(`[dashboard.tsx:handleRegisterApp] Canonical (JCS) JSON length: ${jcs.jcsJson.length}`);
+        
+        // Hash traits if provided
+        const traitHashes = nft.traits ? hashTraits(nft.traits) : [];
+        
+        // Notify user to check wallet for transaction approval
+        toast.info("Please check your wallet to approve the transaction", {
+          duration: 8000,
+        });
         
         // Use the new mint hook with proper structure
         await mint({
@@ -158,31 +177,19 @@ export default function Dashboard() {
           initialVersionMajor: major,
           initialVersionMinor: minor,
           initialVersionPatch: patch,
-          traitHashes: [],
-          metadataJson: metadataStr,
+          traitHashes,
+          metadataJson: jcs.jcsJson,
         });
 
         // Add to local state (it will be refetched automatically but this provides immediate feedback)
         setNfts([...nfts, nft]);
         toast.success("App registered successfully!");
-      }
-
-      // Handle metadata setting if in step 5
-      if (currentStep === 5 && nft.metadata) {
-        log("Submitting metadata for app:", nft);
-        const result = await setMetadata(nft);
-        log("Metadata set result:", result);
-        if (result) {
-          toast.success("Metadata set successfully!");
-          handleCloseMintModal(); // Close modal immediately
-        } else {
-          toast.error("Failed to set metadata");
-        }
-      }
+      handleCloseMintModal(); // Close modal after successful registration
 
       return Promise.resolve();
     } catch (error) {
       console.error("Error in handleRegisterApp:", error);
+      toast.error(`Failed to register app: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return Promise.reject(error);
     }
   };
@@ -260,12 +267,9 @@ export default function Dashboard() {
       {/* Mint Modal - Used for registering new apps and editing metadata */}
       <NFTMintModal 
         isOpen={isMintModalOpen} 
-        handleCloseMintModal={handleCloseMintModal} 
-        onSave={(nft) => handleRegisterApp(nft, currentStep)} 
-        nft={currentNft}
-        initialMetadata={editMetadata}
-        currentStep={currentStep as WizardStep}
-        onStepChange={(step) => setCurrentStep(step)}
+        onClose={handleCloseMintModal} 
+        onSubmit={(nft) => handleRegisterApp(nft)} 
+        initialData={currentNft || undefined}
       />
 
       {/* View Modal - Used for viewing app details and updating status */}

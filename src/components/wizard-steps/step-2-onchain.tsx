@@ -1,0 +1,239 @@
+/**
+ * Step 2: Onchain Data
+ * Collects fields that are stored directly on-chain in the registry contract
+ */
+
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import type { StepRenderContext } from "@/lib/wizard";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Info } from "lucide-react";
+import { Caip10Input } from "@/components/caip10-input";
+import { validateCaipAddress, validateCaip19Token } from "@/lib/validation";
+import { env } from "@/config/env";
+import { UrlValidator } from "@/components/url-validator";
+
+export default function Step2_Onchain(ctx: StepRenderContext) {
+  const { state, updateField, errors } = ctx;
+  
+  // Helper functions to match old API
+  const formData = state;
+  const updateFormData = useCallback((updates: Record<string, any>) => {
+    Object.entries(updates).forEach(([key, value]) => {
+      updateField(key, value);
+    });
+  }, [updateField]);
+  
+  // Local state for custom URL toggle and traits input
+  const [isCustomizingUrl, setIsCustomizingUrl] = useState(false);
+  const [traitsInput, setTraitsInput] = useState("");
+  
+  // Auto-generate dataUrl when not customizing
+  useEffect(() => {
+    if (!isCustomizingUrl && formData.did && formData.version) {
+      const baseUrl = env.appBaseUrl;
+      // Create versionedDID in the format: did:namespace:path/v/version
+      const versionedDID = `${formData.did}/v/${formData.version}`;
+      // Generate RESTful path-based URL (e.g., /api/data-url/did:web:example.com/v/1.0)
+      // This URL is stored on-chain and used for all metadata fetching
+      const generatedUrl = `${baseUrl}/api/data-url/${versionedDID}`;
+      updateFormData({ dataUrl: generatedUrl });
+    }
+  }, [isCustomizingUrl, formData.did, formData.version, updateFormData]);
+
+  const handleCustomUrlToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setIsCustomizingUrl(checked);
+    
+    if (checked) {
+      // Clear the field when customizing
+      updateFormData({ dataUrl: "" });
+    } else {
+      // Recreate the default URL when unchecking
+      if (formData.did && formData.version) {
+        const baseUrl = env.appBaseUrl;
+        const versionedDID = `${formData.did}/v/${formData.version}`;
+        // Generate RESTful path-based URL
+        const generatedUrl = `${baseUrl}/api/data-url/${versionedDID}`;
+        updateFormData({ dataUrl: generatedUrl });
+      }
+    }
+  };
+
+  const handleContractIdChange = (did: string | null) => {
+    updateFormData({ contractId: did || undefined });
+  };
+
+  const handleFungibleTokenIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    updateFormData({ fungibleTokenId: value || undefined });
+  };
+
+  // Parse traits from comma or space-separated input
+  const parseTraits = (input: string): string[] => {
+    if (!input.trim()) return [];
+    
+    // Split by comma or whitespace, filter empty strings
+    return input
+      .split(/[,\s]+/)
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+  };
+
+  const handleTraitsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setTraitsInput(value);
+    
+    // Parse and update - store as raw traits, hashing will happen later
+    const parsed = parseTraits(value);
+    updateFormData({ traits: parsed.length > 0 ? parsed : undefined });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Data URL Section */}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="dataUrl" className="text-base font-semibold">
+            Data URL *
+          </Label>
+          <p className="text-sm text-muted-foreground">
+            Points to the JSON metadata for your app (off-chain data like description, images, etc.)
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="customizeUrl"
+            checked={isCustomizingUrl}
+            onChange={handleCustomUrlToggle}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          <Label
+            htmlFor="customizeUrl"
+            className="text-sm font-normal cursor-pointer"
+          >
+            I want to host metadata at my own URL
+          </Label>
+        </div>
+
+        {isCustomizingUrl ? (
+          <div className="space-y-2">
+            <Input
+              id="dataUrl"
+              type="url"
+              placeholder="https://example.com/metadata.json"
+              value={formData.dataUrl || ""}
+              onChange={(e) => updateFormData({ dataUrl: e.target.value })}
+              className={errors?.dataUrl ? "border-red-500" : ""}
+            />
+            {errors?.dataUrl && (
+              <p className="text-sm text-red-500">{errors.dataUrl}</p>
+            )}
+            <UrlValidator url={formData.dataUrl || ""} />
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>Custom URL Mode:</strong> When you submit, we&apos;ll generate the off‑chain JSON preview for you to copy and host at your URL. The registry stores only the pointer.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Input
+              id="dataUrl"
+              type="url"
+              value={formData.dataUrl || ""}
+              readOnly
+              className="bg-muted"
+            />
+            <p className="text-xs text-muted-foreground">
+              Auto-generated based on your DID and version. If you switch to a custom URL, we’ll still build the JSON for you in Review.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Contract ID (Optional) */}
+      <div className="space-y-2">
+        <Label htmlFor="contractId" className="text-base font-semibold">
+          Contract ID (Optional)
+        </Label>
+        <p className="text-sm text-muted-foreground">
+          If your app is a smart contract, provide its address in CAIP-10 format
+        </p>
+        <Caip10Input
+          value={formData.contractId || ""}
+          onChange={handleContractIdChange}
+          error={errors?.contractId}
+        />
+        {errors?.contractId && (
+          <p className="text-sm text-red-500">{errors.contractId}</p>
+        )}
+      </div>
+
+      {/* Fungible Token ID (Optional) */}
+      <div className="space-y-2">
+        <Label htmlFor="fungibleTokenId" className="text-base font-semibold">
+          Fungible Token ID (Optional)
+        </Label>
+        <p className="text-sm text-muted-foreground">
+          If your app uses or represents a fungible token (ERC-20, ERC-1155), provide its ID in CAIP-19 format
+        </p>
+        <Input
+          id="fungibleTokenId"
+          type="text"
+          placeholder="eip155:1/erc20:0x..."
+          value={formData.fungibleTokenId || ""}
+          onChange={handleFungibleTokenIdChange}
+          className={errors?.fungibleTokenId ? "border-red-500" : ""}
+        />
+        {errors?.fungibleTokenId && (
+          <p className="text-sm text-red-500">{errors.fungibleTokenId}</p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Format: <code className="bg-muted px-1 rounded">namespace:reference/assetNamespace:assetReference</code>
+        </p>
+      </div>
+
+      {/* Traits (Optional) */}
+      <div className="space-y-2">
+        <Label htmlFor="traits" className="text-base font-semibold">
+          Traits (Optional)
+        </Label>
+        <p className="text-sm text-muted-foreground">
+          Enter traits separated by commas or spaces. Each trait represents an app capability or feature. Hashes will be generated automatically during minting.
+        </p>
+        
+        <Input
+          id="traits"
+          type="text"
+          placeholder="gaming, social, defi, nft..."
+          value={traitsInput}
+          onChange={handleTraitsChange}
+        />
+        
+        {/* Show parsed traits */}
+        {formData.traits && formData.traits.length > 0 && (
+          <div className="p-3 bg-muted rounded-md space-y-1">
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              Parsed {formData.traits.length} trait{formData.traits.length !== 1 ? 's' : ''}:
+            </p>
+            {formData.traits.map((trait: string, index: number) => (
+              <code key={index} className="block text-xs">
+                {index + 1}. {trait}
+              </code>
+            ))}
+          </div>
+        )}
+        
+        <p className="text-xs text-muted-foreground">
+          Examples: <code className="bg-muted px-1 rounded">gaming</code>, <code className="bg-muted px-1 rounded">social</code>, <code className="bg-muted px-1 rounded">defi</code>
+        </p>
+      </div>
+    </div>
+  );
+}

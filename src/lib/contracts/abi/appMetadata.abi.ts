@@ -6,4 +6,4 @@
 
 import appMetadataAbiJson from '../../../abi/appMetadata.json';
 
-export const appMetadataAbi = appMetadataAbiJson.abi as any;
+export const appMetadataAbi = appMetadataAbiJson.abi;

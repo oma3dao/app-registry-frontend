@@ -6,7 +6,6 @@ import { prepareContractCall } from 'thirdweb';
 import { getAppMetadataContract } from './client';
 import type { NFT } from "@/types/nft";
 import { buildMetadataJSON, validateMetadataJSON } from './metadata.utils';
-import { buildVersionedDID } from '@/lib/utils';
 import { normalizeEvmError } from './errors';
 
 /**
@@ -23,12 +22,15 @@ export function prepareSetMetadata(nft: NFT) {
     }
     
     const contract = getAppMetadataContract();
-    const versionedDID = buildVersionedDID(nft.did, nft.version);
+    
+    // Parse version string to components
+    const versionParts = nft.version.split('.').map(Number);
+    const [major = 1, minor = 0, patch = 0] = versionParts;
     
     return prepareContractCall({
       contract,
-      method: "function setMetadataJson(string, string)",
-      params: [versionedDID, metadata]
+      method: "function setMetadataJson(string, uint8, uint8, uint8, string)",
+      params: [nft.did, major, minor, patch, metadata]
     });
   } catch (e) {
     throw normalizeEvmError(e);

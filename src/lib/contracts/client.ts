@@ -39,7 +39,7 @@ export function getAppRegistryContract() {
     client,
     chain: getActiveChain(),
     address: env.registryAddress,
-    abi: appRegistryAbi,
+    abi: appRegistryAbi as any, // Thirdweb's strict ABI typing requires this
   });
 }
 
@@ -53,7 +53,7 @@ export function getAppMetadataContract() {
     client,
     chain: getActiveChain(),
     address: env.metadataAddress,
-    abi: appMetadataAbi,
+    abi: appMetadataAbi as any, // Thirdweb's strict ABI typing requires this
   });
 }
 
@@ -68,7 +68,7 @@ export function getResolverContract() {
     client,
     chain: getActiveChain(),
     address: env.resolverAddress,
-    abi: resolverAbi,
+    abi: resolverAbi as any, // Thirdweb's strict ABI typing requires this
   });
 }
 

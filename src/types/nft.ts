@@ -15,6 +15,7 @@ export interface NFT {
     // On-chain optional identifiers
     contractId?: string // CAIP-10 format (e.g., "eip155:1:0x...")
     fungibleTokenId?: string // CAIP-19 format (e.g., "eip155:1/erc20:0x...")
+    traits?: string[] // App traits/capabilities (e.g., ["gaming", "social", "defi"])
     
     status: number // 0: Active, 1: Deprecated, 2: Replaced
     minter: string // Ethereum address of the app creator

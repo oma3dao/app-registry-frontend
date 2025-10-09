@@ -107,3 +107,14 @@ body {
     font-weight: 500; /* Make text slightly bolder */
   }
 }
+
+/* Compact form density helpers for the wizard */
+[data-density="compact"] .form-row {
+  @apply gap-2;
+}
+[data-density="compact"] .input, [data-density="compact"] .select {
+  @apply h-9 py-1;
+}
+[data-density="compact"] .label {
+  @apply text-xs;
+}

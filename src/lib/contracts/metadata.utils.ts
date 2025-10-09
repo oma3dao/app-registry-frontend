@@ -125,9 +125,10 @@ export function buildMetadataStructure(metadataJson: string): MetadataContractDa
     const normalizedMetadata = normalizeMetadata(metadata);
     const structuredMetadata = normalizedMetadata as MetadataContractData;
 
-    if (!validateUrl(structuredMetadata.descriptionUrl) || 
-        !validateUrl(structuredMetadata.external_url) || 
-        !validateUrl(structuredMetadata.image)) {
+    // Validate URLs if they exist
+    if ((structuredMetadata.descriptionUrl && !validateUrl(structuredMetadata.descriptionUrl)) || 
+        (structuredMetadata.external_url && !validateUrl(structuredMetadata.external_url)) || 
+        (structuredMetadata.image && !validateUrl(structuredMetadata.image))) {
       console.warn("Invalid URLs in metadata:", structuredMetadata);
     }
 
@@ -144,27 +145,31 @@ export function buildMetadataStructure(metadataJson: string): MetadataContractDa
  * @throws Error if validation fails
  */
 export function validateMetadata(metadata: MetadataContractData): void {
-  if (!metadata.descriptionUrl || !validateUrl(metadata.descriptionUrl)) {
+  // All URL fields are optional, but if provided must be valid
+  if (metadata.descriptionUrl && !validateUrl(metadata.descriptionUrl)) {
     throw new Error("Invalid description URL");
   }
   
-  if (!metadata.external_url || !validateUrl(metadata.external_url)) {
+  if (metadata.external_url && !validateUrl(metadata.external_url)) {
     throw new Error("Invalid marketing URL");
   }
   
-  if (!metadata.image || !validateUrl(metadata.image)) {
+  if (metadata.image && !validateUrl(metadata.image)) {
     throw new Error("Invalid icon URL");
   }
   
-  if (!metadata.screenshotUrls[0] || !validateUrl(metadata.screenshotUrls[0])) {
-    throw new Error("At least one screenshot URL is required");
-  }
-  
-  metadata.screenshotUrls.slice(1).forEach((url, index) => {
-    if (url && !validateUrl(url)) {
-      throw new Error(`Invalid screenshot URL at position ${index + 1}`);
+  // Screenshot URLs are optional
+  if (metadata.screenshotUrls && metadata.screenshotUrls.length > 0) {
+    if (!validateUrl(metadata.screenshotUrls[0])) {
+      throw new Error("First screenshot URL is invalid");
     }
-  });
+    
+    metadata.screenshotUrls.slice(1).forEach((url, index) => {
+      if (url && !validateUrl(url)) {
+        throw new Error(`Invalid screenshot URL at position ${index + 1}`);
+      }
+    });
+  }
   
   let hasPlatformUrl = false;
   if (metadata.platforms) {

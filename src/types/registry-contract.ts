@@ -32,12 +32,6 @@ export interface RegistryContractData {
   dataUrl: string;
   
   /**
-   * IWPS Portal URL (stored in metadata JSON at dataUrl, not on-chain, optional)
-   * Extracted from dataUrl metadata for display/launch purposes
-   */
-  iwpsPortalUrl?: string;
-  
-  /**
    * Contract address in CAIP-10 format (on-chain, optional)
    * Format: "eip155:1:0x..."
    */
@@ -48,6 +42,14 @@ export interface RegistryContractData {
    * Format: "eip155:1/erc20:0x..."
    */
   fungibleTokenId?: string;
+  
+  /**
+   * Array of traits (on-chain, optional)
+   * Each trait represents an app capability or feature
+   * Will be hashed to bytes32[] during minting
+   * Format: string[] (e.g., ["gaming", "social", "defi"])
+   */
+  traits?: string[];
   
   /**
    * App status: 0=Active, 1=Deprecated, 2=Replaced

@@ -1,145 +1,80 @@
-# OMA3 App Registry Frontend
+# OMATrust App Registry Frontend Code
 
-This directory contains the source code for the OMA3 App Registry frontend application.
+This directory contains the source code for the OMATrust App Registry frontend application.
 
-## Configuration
+## Configuration & Integration (current)
 
-The application uses a centralized configuration system for blockchain-related settings.
+### Chains & Environment
 
-### Blockchain Configuration
+- `src/config/chains.ts` — numeric chain IDs, RPC, explorers, and contract addresses per network
+- `src/config/env.ts` — selects active chain preset and exposes registry/metadata/resolver addresses
 
-#### `src/config/chains.ts`
+### Thirdweb Client & Contracts
 
-This file contains chain configuration data for the blockchains the application interacts with. It defines properties like:
-- Chain IDs
-- RPC endpoints
-- Native currency information
-- Block explorers
-- Contract addresses deployed on each chain
+- `src/app/client.ts` — creates the thirdweb client from `NEXT_PUBLIC_THIRDWEB_CLIENT_ID`
+- `src/lib/contracts/client.ts` — resolves the active chain (`defineChain`) and returns typed contract instances:
+  - `getAppRegistryContract()`
+  - `getAppMetadataContract()`
+  - `getResolverContract()`
 
-```typescript
-// Example: accessing supported testnet configurations
-import { celoAlfajores, omachainTestnet } from "@/config/chains";
+### Registry Interaction (read/write)
 
-// Access Celo Alfajores chain properties
-const celoChainId = celoAlfajores.chainId; // 44787
-const celoRpcUrl = celoAlfajores.rpc; // https://alfajores-forno.celo-testnet.org
-const celoRegistryAddress = celoAlfajores.contracts.OMA3AppRegistry;
+- `src/lib/contracts/registry.hooks.ts` — React hooks (e.g., `useMintApp`, `useUpdateStatus`, `useAppsByOwner`)
+- `src/lib/contracts/registry.write.ts` — pure tx builders (e.g., `prepareMintApp`) used by hooks
+- `src/lib/contracts/metadata.*.ts` — optional App Metadata read/write helpers
 
-// Access OMAchain testnet chain properties
-const omachainId = omachainTestnet.chainId; // 66238
-const omachainRpcUrl = omachainTestnet.rpc; // https://rpc.testnet.chain.oma3.org/
-const omachainRegistryAddress = omachainTestnet.contracts.OMA3AppRegistry;
-```
+### Wizard & Deterministic JSON
 
-#### `src/config/contracts.ts`
+- `src/components/nft-mint-modal.tsx` — modal‑owned step state; calls parent `onSubmit` only at Step 6 (Review & Mint)
+- `src/lib/wizard/registry.tsx` — step definitions, validation, visibility rules
+- `src/lib/wizard/field-requirements.ts` — dynamic requiredness per interface type
+- `src/lib/utils/offchain-json.ts` — builds spec‑aligned DataURL JSON (omits empty fields)
+- `src/lib/utils/dataurl.ts` — JCS canonicalization + keccak256 hashing and verification helpers
 
-This file defines the smart contracts the application interacts with, including their:
-- Chain information
-- Contract addresses (referenced from chains.ts)
-- ABIs (Application Binary Interfaces)
+## Examples
 
-The contract configurations import their addresses from `chains.ts` to maintain a single source of truth.
-
-### How to Configure the OMA3 App Registry Contract
-
-1. First, add your contract address to the appropriate chain in `src/config/chains.ts`:
-   ```ts
-   export const celoAlfajores = {
-     // ...chain configuration
-     contracts: {
-       OMA3AppRegistry: "0xYourContractAddressHere"
-     }
-   };
-   
-   export const omachainTestnet = {
-     // ...chain configuration
-     contracts: {
-       OMA3AppRegistry: "0xYourContractAddressHere"
-     }
-   };
-   ```
-
-2. Add your contract ABI in the `contracts.ts` file:
-   - You can get the ABI from the compiled contract JSON file
-   - Or from blockchain explorers like Celoscan for verified contracts
+### Get a contract instance
 
 ```ts
-export const OMA3_APP_REGISTRY = {
-  name: "OMA3 App Registry",
-  chain: celoAlfajores,
-  address: celoAlfajores.contracts.OMA3AppRegistry,
-  abi: [
-    {
-      "inputs": [],
-      "name": "getAllApps",
-      "outputs": [{ "internalType": "App[]", "name": "", "type": "tuple[]" }],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    // ... more ABI entries
-  ]
-} as const;
+import { getAppRegistryContract } from "@/lib/contracts/client";
+
+const registry = getAppRegistryContract();
 ```
 
-### How to Use Contract Configurations in Components
+### Mint via hook (recommended)
 
-```typescript
-// Example: accessing OMA3 App Registry contract configuration
-import { OMA3_APP_REGISTRY } from "@/config/contracts";
-import { getContract } from "thirdweb";
-import { client } from "@/app/client";
+```ts
+import { useMintApp } from "@/lib/contracts";
 
-// Get contract instance
-const contract = getContract({
-  client,
-  chain: OMA3_APP_REGISTRY.chain,
-  address: OMA3_APP_REGISTRY.address,
-  abi: OMA3_APP_REGISTRY.abi,
+const { mint } = useMintApp();
+
+await mint({
+  did: "did:web:example.com",
+  interfaces: 1,
+  dataUrl: "https://example.com/app.json",
+  dataHash: "0x…", // JCS keccak256 of off-chain JSON
+  dataHashAlgorithm: 0,
+  initialVersionMajor: 1,
+  initialVersionMinor: 0,
+  initialVersionPatch: 0,
+  traitHashes: [],
+  metadataJson: "{…}" // JCS string (optional on-chain mirror)
 });
+```
 
-// Read from contract
-// Example: Get all apps from contract
-async function getAllApps() {
-  try {
-    const result = await contract.read.getApps([0]); // Start from token ID 0
-    return result.apps;
-  } catch (error) {
-    console.error("Error fetching apps:", error);
-    return [];
-  }
-}
+### Build spec‑aligned off‑chain JSON and hash
 
-// Write to contract
-// Example: Register a new app
-async function registerApp(app) {
-  try {
-    // Using the mint function with the app data
-    const result = await contract.write.mint([
-      app.did,
-      app.name,
-      app.version.major,
-      app.version.minor,
-      app.version.patch,
-      app.dataUrl,
-      app.iwpsPortalUri,
-      app.agentPortalUri,
-      app.contractAddress || ""
-    ]);
-    return result;
-  } catch (error) {
-    console.error("Error registering app:", error);
-    throw error;
-  }
-}
+```ts
+import { buildOffchainMetadataObject } from "@/lib/utils/offchain-json";
+import { canonicalizeForHash } from "@/lib/utils/dataurl";
+
+const offchain = buildOffchainMetadataObject({ name, metadata });
+const { jcsJson, hash } = canonicalizeForHash(offchain);
 ```
 
 ## Best Practices
 
-1. **Single Source of Truth**: Chain information is defined in `chains.ts` and contract addresses are stored there. Contract configurations in `contracts.ts` reference these addresses.
-
-2. **Type Safety**: All configurations use TypeScript for type safety.
-
-3. **DRY Principle**: Following the "Don't Repeat Yourself" principle by centralizing blockchain configurations.
-
-4. **Separation of Concerns**: Chain configurations are separate from contract configurations, making it easy to add new chains or contracts independently. 
+1. **Single Source of Truth**: Numeric chain IDs and addresses live in `src/config/chains.ts`; `src/config/env.ts` selects the active preset.
+2. **Deterministic Off‑chain Data**: Always JCS‑canonicalize the spec‑aligned JSON before hashing; use the shared builder to avoid drift.
+3. **Modal‑Owned Flow**: The wizard modal owns step state and only submits on Step 6 for consistency.
+4. **Type Safety**: Prefer typed hooks and tx builders under `src/lib/contracts`. 

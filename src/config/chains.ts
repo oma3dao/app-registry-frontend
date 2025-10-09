@@ -17,10 +17,10 @@ export const localhost = {
   blockExplorers: [],
   testnet: true,
   contracts: {
-    // Update these addresses after running: npx hardhat deploy-system --network localhost
-    registry: "0x5FbDB2315678afecb367f032d93F642f64180aa3",  // From your deployment
-    metadata: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", // TODO: Update from deployment output
-    resolver: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"  // TODO: Update from deployment output
+    // Update these addresses after running: npx hardhat deploy-system --network localhost and copy the addresses from the deployment output to the below fields:
+    registry: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    metadata: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    resolver: "0x24B0B17adb13DB2146995480e0114b2c93Df217f"
   }
 };
 
@@ -49,9 +49,9 @@ export const omachainTestnet = {
   ],
   testnet: true,
   contracts: {
-    registry: "0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83",
-    metadata: "0x13aD113D0DE923Ac117c82401e9E1208F09D7F19",
-    resolver: "0xe4E8FBf35b6f4D975B4334ffAfaEfd0713217cAb"
+    registry: "0xf978773a2f393CC840a7FE9991025ea8a220b4DE",
+    metadata: "0x2b93eeEC89C2899D79516c68e2A5345743418A06",
+    resolver: "0x80C7bC75bc23238cF948eBaedC474DCaCA1835E2"
   }
 };
 
@@ -64,7 +64,7 @@ export const omachainTestnet = {
 export const omachainMainnet = {
   id: 999999, // Placeholder - update when mainnet launches
   chainId: 999999,
-  rpc: "https://rpc.mainnet.chain.oma3.org/", // Placeholder
+  rpc: "https://rpc.chain.oma3.org/", // Placeholder
   name: "OMAchain Mainnet",
   nativeCurrency: {
     name: "OMA",
@@ -74,7 +74,7 @@ export const omachainMainnet = {
   blockExplorers: [
     {
       name: "OMAchain Explorer",
-      url: "https://explorer.mainnet.chain.oma3.org/",
+      url: "https://explorer.chain.oma3.org/",
     },
   ],
   testnet: false,
@@ -90,9 +90,9 @@ export const omachainMainnet = {
  * Order matters - first chain is the default
  */
 export const supportedWalletChains = [
-  localhost,          // Development - local Hardhat node
   omachainTestnet,    // OMAchain testnet for OMA3 ecosystem testing
-  omachainMainnet     // OMAChain mainnet for OMA3 ecosystem
+  // localhost,       // Uncomment only when actively using a local node
+  omachainMainnet  // Placeholder - enable when mainnet is ready
 ];
 
 /**
@@ -100,8 +100,8 @@ export const supportedWalletChains = [
  * Maps NEXT_PUBLIC_ACTIVE_CHAIN env var to chain configurations
  */
 export const CHAIN_PRESETS = {
-  'localhost': localhost,
   'omachain-testnet': omachainTestnet,
+  'localhost': localhost,
   'omachain-mainnet': omachainMainnet,
 } as const;
 

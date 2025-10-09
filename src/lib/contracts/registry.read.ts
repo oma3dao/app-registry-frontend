@@ -14,9 +14,8 @@ import type { AppSummary, Paginated, Status, Version } from './types';
 import { normalizeDidWeb } from '../utils/did';
 import { normalizeEvmError } from './errors';
 import { getCurrentVersion } from '../utils/version';
-import appRegistryArtifact from '../../abi/appRegistry.json';
-
-const appRegistryAbi = appRegistryArtifact.abi as any[];
+import type { AbiFunction } from 'abitype';
+import { appRegistryAbi } from './abi/appRegistry.abi';
 
 /**
  * Convert status number to Status enum
@@ -39,12 +38,15 @@ function parseAppStruct(appData: any): AppSummary {
   // did, fungibleTokenId, contractId, dataUrl, versionHistory[], traitHashes[]
   
   const versionHistory: Version[] = (appData.versionHistory || []).map((v: any) => ({
-    major: Number(v.major || v[0]),
-    minor: Number(v.minor || v[1]),
-    patch: Number(v.patch || v[2]),
+    major: Number(v.major || v[0]) || 0,
+    minor: Number(v.minor || v[1]) || 0,
+    patch: Number(v.patch || v[2]) || 0,
   }));
   
-  const currentVersion = getCurrentVersion(versionHistory);
+  // Get current version with fallback to versionMajor from contract
+  const currentVersion = versionHistory.length > 0
+    ? getCurrentVersion(versionHistory)
+    : { major: Number(appData.versionMajor) || 1, minor: 0, patch: 0 };
   
   return {
     did: appData.did as string,
@@ -93,15 +95,13 @@ export async function getAppByDid(did: string, major?: number): Promise<AppSumma
     }
     
     // Get app data using contract's getApp(string, uint8) method
+    const getAppMethod = (appRegistryAbi as readonly any[]).find(
+      (item: any) => item.name === 'getApp' && item.type === 'function'
+    );
+    
     const appData = await readContract({
       contract,
-      method: {
-        type: 'function',
-        name: 'getApp',
-        inputs: appRegistryAbi.find((item: any) => item.name === 'getApp' && item.type === 'function')?.inputs || [],
-        outputs: appRegistryAbi.find((item: any) => item.name === 'getApp' && item.type === 'function')?.outputs || [],
-        stateMutability: 'view',
-      } as any,
+      method: getAppMethod as AbiFunction,
       params: [normalizedDid, majorVersion],
     }) as any;
     
@@ -137,15 +137,13 @@ export async function getAppsByOwner(owner: `0x${string}`, startIndex: number = 
     const contract = getAppRegistryContract();
     
     // Use contract's getAppsByOwner method (renamed from getAppsByMinter)
+    const getAppsByOwnerMethod = (appRegistryAbi as readonly any[]).find(
+      (item: any) => item.name === 'getAppsByOwner' && item.type === 'function'
+    );
+    
     const result = await readContract({
       contract,
-      method: {
-        type: 'function',
-        name: 'getAppsByOwner',
-        inputs: appRegistryAbi.find((item: any) => item.name === 'getAppsByOwner' && item.type === 'function')?.inputs || [],
-        outputs: appRegistryAbi.find((item: any) => item.name === 'getAppsByOwner' && item.type === 'function')?.outputs || [],
-        stateMutability: 'view',
-      } as any,
+      method: getAppsByOwnerMethod as AbiFunction,
       params: [owner, BigInt(startIndex)],
     }) as any;
     
@@ -189,15 +187,13 @@ export async function listActiveApps(
     const contract = getAppRegistryContract();
     
     // Use contract's getApps method (returns active apps only)
+    const getAppsMethod = (appRegistryAbi as readonly any[]).find(
+      (item: any) => item.name === 'getApps' && item.type === 'function'
+    );
+    
     const result = await readContract({
       contract,
-      method: {
-        type: 'function',
-        name: 'getApps',
-        inputs: appRegistryAbi.find((item: any) => item.name === 'getApps' && item.type === 'function')?.inputs || [],
-        outputs: appRegistryAbi.find((item: any) => item.name === 'getApps' && item.type === 'function')?.outputs || [],
-        stateMutability: 'view',
-      } as any,
+      method: getAppsMethod as AbiFunction,
       params: [BigInt(startIndex)],
     }) as any;
     

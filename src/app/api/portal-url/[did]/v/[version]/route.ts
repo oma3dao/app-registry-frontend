@@ -151,20 +151,21 @@ export async function POST(
             // Use renamed variable
             const webPlatformKey = Object.keys(supportedPlatforms).find(key => key.toLowerCase() === AppConfig.WEB_KEY);
             // Use renamed variable
-            if (webPlatformKey && (supportedPlatforms as any)[webPlatformKey]) { 
+            const platformsRecord = supportedPlatforms as Record<string, any>;
+            if (webPlatformKey && platformsRecord[webPlatformKey]) { 
                 console.log(`[API portal-url] Web platform found. Using as default.`); 
                 // Use renamed variable
-                matchedPlatformDetails = (supportedPlatforms as any)[webPlatformKey]; 
+                matchedPlatformDetails = platformsRecord[webPlatformKey]; 
             } else {
                 const sourcePlatformKey = _sourceOs?.toLowerCase(); 
                 if (sourcePlatformKey) {
                     // Use renamed variable
                     const matchedOsKey = Object.keys(supportedPlatforms).find(key => key.toLowerCase() === sourcePlatformKey);
                     // Use renamed variable
-                    if (matchedOsKey && (supportedPlatforms as any)[matchedOsKey]) { 
+                    if (matchedOsKey && platformsRecord[matchedOsKey]) { 
                         console.log(`[API portal-url] Found matching OS platform: ${matchedOsKey}`); 
                         // Use renamed variable
-                        matchedPlatformDetails = (supportedPlatforms as any)[matchedOsKey]; 
+                        matchedPlatformDetails = platformsRecord[matchedOsKey]; 
                     }
                 }
             }

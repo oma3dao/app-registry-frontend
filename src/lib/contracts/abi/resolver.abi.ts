@@ -6,5 +6,5 @@
 
 import resolverAbiJson from '../../../abi/resolver.json';
 
-export const resolverAbi = resolverAbiJson.abi as any;
+export const resolverAbi = resolverAbiJson.abi;
 

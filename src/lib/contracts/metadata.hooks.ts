@@ -12,6 +12,7 @@ import type { MetadataContractData } from '@/types/metadata-contract';
 import { getMetadata } from './metadata.read';
 import { prepareSetMetadata } from './metadata.write';
 import { formatErrorMessage } from './errors';
+import { ensureWalletOnEnvChain } from './chain-guard';
 
 /**
  * Hook to get metadata for a versioned DID
@@ -66,17 +67,29 @@ export function useSetMetadata() {
     setIsPending(true);
     setError(null);
 
-    try {
+    const sendOnce = async () => {
+      await ensureWalletOnEnvChain(account);
       const transaction = prepareSetMetadata(nft);
-      
-      await sendTransaction({
-        account,
-        transaction
-      });
-      
+      await sendTransaction({ account, transaction });
       return true;
+    };
+
+    try {
+      return await sendOnce();
     } catch (e) {
-      const err = new Error(formatErrorMessage(e));
+      const m1 = formatErrorMessage(e);
+      if (/network/i.test(m1)) {
+        await new Promise((r) => setTimeout(r, 300));
+        try {
+          return await sendOnce();
+        } catch (e2) {
+          const m2 = formatErrorMessage(e2);
+          const err2 = new Error(m2);
+          setError(err2);
+          throw err2;
+        }
+      }
+      const err = new Error(m1);
       setError(err);
       throw err;
     } finally {

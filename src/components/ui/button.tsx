@@ -123,8 +123,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         }),
         createWallet("io.metamask"),
         createWallet("com.coinbase.wallet"),
-        // Temporarily disabled due to session error after thirdweb upgrade
-        // walletConnect()
+        walletConnect()
       ];
       
       // Use React.Suspense to handle the lazy loading

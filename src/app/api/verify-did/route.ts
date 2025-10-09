@@ -489,7 +489,7 @@ async function registerDidInResolver(did: string): Promise<{ success: boolean; t
       client: getClient(),
       chain,
       address: env.resolverAddress,
-      abi: resolverAbi,
+      abi: resolverAbi as any,
     });
     
     console.log(`[verify-did] Preparing resolver.addEntry("${did}")`);

@@ -17,6 +17,7 @@ import {
 } from './registry.read';
 import { prepareMintApp, prepareUpdateStatus } from './registry.write';
 import { normalizeEvmError, formatErrorMessage } from './errors';
+import { ensureWalletOnEnvChain } from './chain-guard';
 import type { AppSummary, Status, MintAppInput, Paginated } from './types';
 
 /**
@@ -156,13 +157,30 @@ export function useMintApp() {
     setError(null);
     setTxHash(null);
 
-    try {
+    const sendOnce = async () => {
+      await ensureWalletOnEnvChain(account);
       const transaction = prepareMintApp(input);
       const result = await sendTransaction({ account, transaction });
       setTxHash(result.transactionHash);
       return result.transactionHash;
+    };
+
+    try {
+      return await sendOnce();
     } catch (e) {
       const normalized = normalizeEvmError(e);
+      if (normalized.code === 'NETWORK_ERROR') {
+        // brief delay then retry once after re-ensuring chain
+        await new Promise((r) => setTimeout(r, 300));
+        try {
+          return await sendOnce();
+        } catch (e2) {
+          const n2 = normalizeEvmError(e2);
+          const err2 = new Error(n2.message);
+          setError(err2);
+          throw err2;
+        }
+      }
       const errorObj = new Error(normalized.message);
       setError(errorObj);
       throw errorObj;
@@ -193,7 +211,8 @@ export function useUpdateStatus() {
     setError(null);
     setTxHash(null);
 
-    try {
+    const sendOnce = async () => {
+      await ensureWalletOnEnvChain(account);
       // Get the app to determine the major version
       const app = await getAppByDid(did);
       if (!app) {
@@ -208,8 +227,23 @@ export function useUpdateStatus() {
       const result = await sendTransaction({ account, transaction });
       setTxHash(result.transactionHash);
       return result.transactionHash;
+    };
+
+    try {
+      return await sendOnce();
     } catch (e) {
       const normalized = normalizeEvmError(e);
+      if (normalized.code === 'NETWORK_ERROR') {
+        await new Promise((r) => setTimeout(r, 300));
+        try {
+          return await sendOnce();
+        } catch (e2) {
+          const n2 = normalizeEvmError(e2);
+          const err2 = new Error(n2.message);
+          setError(err2);
+          throw err2;
+        }
+      }
       const errorObj = new Error(normalized.message);
       setError(errorObj);
       throw errorObj;

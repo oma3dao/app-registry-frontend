@@ -172,7 +172,7 @@ export function Caip10Input({
         <div className="flex gap-2 items-start text-blue-700 dark:text-blue-400 text-sm">
           <InfoIcon size={16} className="mt-0.5 flex-shrink-0" />
           <div>
-            <p className="mt-1">If you know your contract's <strong>CAIP-10 ID</strong> (e.g., <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">eip155:11155111:0xAbc...</code>) paste it here.  If not, click on "CAIP-10 Builder" below.</p>
+            <p className="mt-1">If you know your contract&apos;s <strong>CAIP-10 ID</strong> (e.g., <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">eip155:11155111:0xAbc...</code>) paste it here.  If not, click on &quot;CAIP-10 Builder&quot; below.</p>
           </div>
         </div>
       </div>
