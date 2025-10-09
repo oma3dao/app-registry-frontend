@@ -314,9 +314,9 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                     {/* Interfaces */}
                     <div className="flex items-center gap-2 text-sm">
                       <span className="font-medium text-foreground">Interfaces:</span>
-                      {nft.interfaces & 1 && <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 text-xs">Human</span>}
-                      {nft.interfaces & 2 && <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs">API</span>}
-                      {nft.interfaces & 4 && <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 text-xs">Contract</span>}
+                      {!!(nft.interfaces & 1) && <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 text-xs">Human</span>}
+                      {!!(nft.interfaces & 2) && <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs">API</span>}
+                      {!!(nft.interfaces & 4) && <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 text-xs">Contract</span>}
                     </div>
                     {isOwner && (
                       <span className={`px-2 py-0.5 rounded-full text-xs w-fit ${getStatusClasses(nft.status)}`}>
