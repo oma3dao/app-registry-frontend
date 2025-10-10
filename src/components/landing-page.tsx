@@ -151,7 +151,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-          OMATrust is the open internet&apos;s decentralized trust layer. It brings the security and comfort of curated stores to the whole internet.
+          OMATrust is the open internet&apos;s decentralized trust layer. It brings the security and comfort of curated stores to the whole internet. Get started and register your services today.
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4">
