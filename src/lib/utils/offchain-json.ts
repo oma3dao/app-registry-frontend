@@ -62,7 +62,7 @@ export function buildOffchainMetadataObject(input: OffchainBuildInput): Record<s
     interfaceVersions: Array.isArray(pick('interfaceVersions')) ? pick('interfaceVersions') : [],
 
     // JSON objects
-    platforms: typeof pick('platforms') === 'object' && pick('platforms') !== null ? pick('platforms') : {},
+    platforms: cleanPlatforms(pick('platforms')),
     endpoint: typeof pick('endpoint') === 'object' && pick('endpoint') !== null ? pick('endpoint') : {},
     artifacts: typeof pick('artifacts') === 'object' && pick('artifacts') !== null ? pick('artifacts') : {},
     mcp: typeof pick('mcp') === 'object' && pick('mcp') !== null ? pick('mcp') : {},
@@ -71,6 +71,32 @@ export function buildOffchainMetadataObject(input: OffchainBuildInput): Record<s
 
   // Deep clean: recursively remove empty values
   return deepClean(out);
+}
+
+/**
+ * Clean platforms object - remove artifact-specific fields
+ * Artifact fields should only appear in the artifacts map, not in platforms
+ */
+function cleanPlatforms(platforms: any): any {
+  if (!platforms || typeof platforms !== 'object') return {};
+  
+  const cleaned: any = {};
+  
+  for (const platform in platforms) {
+    const { 
+      artifactType, 
+      artifactOs, 
+      artifactArchitecture,
+      type,  // Also remove if someone used short names
+      os,
+      architecture,
+      ...platformData 
+    } = platforms[platform];
+    // Only keep platform-specific fields (downloadUrl, launchUrl, supported, artifactDid)
+    cleaned[platform] = platformData;
+  }
+  
+  return cleaned;
 }
 
 /**
