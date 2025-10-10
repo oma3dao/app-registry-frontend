@@ -24,7 +24,6 @@ import { isFieldRequired } from "./field-requirements";
 import Step4HumanMediaComponent from "@/components/wizard-steps/step-4-human-media";
 import Step5HumanDistributionComponent from "@/components/wizard-steps/step-5-human-distribution";
 import Step7ApiOnlyComponent from "@/components/wizard-steps/step-7-api-only";
-import Step8ApiContractCommonComponent from "@/components/wizard-steps/step-8-api-contract-common";
 import Step6ReviewComponent from "@/components/wizard-steps/step-6-review";
 
 // ============================================================================
@@ -51,7 +50,7 @@ export const Step1_Verification: StepDef = {
   title: "Verification",
   description: "Verify DID ownership and configure app interfaces",
   
-  fields: ["did", "version", "name", "interfaceFlags"],
+  fields: ["did", "version", "name", "interfaceFlags", "apiType"],
   
   schema: z.object({
     did: DidSchema,
@@ -62,6 +61,16 @@ export const Step1_Verification: StepDef = {
       api: z.boolean(),
       smartContract: z.boolean(),
     }),
+    apiType: z.enum(['openapi', 'graphql', 'jsonrpc', 'mcp', 'a2a']).nullable().optional(),
+  }).superRefine((data, ctx) => {
+    // Require API type if API interface is selected
+    if (data.interfaceFlags.api && !data.apiType) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["apiType"],
+        message: "Please select an API type when API interface is enabled",
+      });
+    }
   }),
 
   guard: (state) => {
@@ -252,62 +261,34 @@ export const Step5_HumanDistribution: StepDef = {
 };
 
 /**
- * Step 7: API Only
- * Conditional: only shown when API interface is enabled
- * Fields: mcp, a2a
+ * Step 7: Endpoint Configuration
+ * Conditional: shown when API OR Smart Contract interface is enabled
+ * Fields: endpoint (required for API), interfaceVersions, mcp (only for MCP type)
  */
 export const Step7_ApiOnly: StepDef = {
-  id: "api-only",
-  title: "API Config",
-  description: "Configure MCP and A2A for AI agents",
-  
-  appliesTo: (flags) => flags.api,
-  fields: ["metadata.mcp", "metadata.a2a"],
-  
-  schema: z.object({
-    metadata: z.object({
-      mcp: z.any().optional(), // Complex object, can be validated as JSON
-      a2a: z.union([z.string().url(), z.literal("")]).optional(),
-    }).optional(),
-  }),
-
-  render: (ctx) => <Step7ApiOnlyComponent {...ctx} />,
-};
-
-/**
- * Step 8: API & Contract Common
- * Conditional: shown when API OR Contract interface is enabled
- * Fields: endpoint, interfaceVersions
- */
-export const Step8_ApiContractCommon: StepDef = {
-  id: "api-contract-common",
+  id: "endpoint-config",
   title: "Endpoint",
-  description: "Configure endpoint and interface versions",
+  description: "Configure endpoint and interface-specific settings",
   
   appliesTo: (flags) => flags.api || flags.smartContract,
-  fields: ["metadata.endpoint", "metadata.interfaceVersions"],
+  fields: ["metadata.endpoint", "metadata.interfaceVersions", "metadata.mcp"],
   
   schema: z.object({
     metadata: z.object({
       endpoint: z.object({
-        url: z.string().url("Must be a valid URL"),
-        format: z.string().optional(),
+        url: z.union([z.string().url(), z.literal("")]).optional(), // Required for API, optional for contract
         schemaUrl: z.union([z.string().url(), z.literal("")]).optional(),
       }).optional(),
       interfaceVersions: z.array(z.string()).optional(),
+      mcp: z.any().optional(), // Complex MCP object for MCP type only
     }).optional(),
   }).superRefine((data, ctx) => {
-    // Require endpoint.url if endpoint object exists
-    if (data.metadata?.endpoint && !data.metadata.endpoint.url) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["metadata", "endpoint", "url"],
-        message: "Endpoint URL is required for API/Contract interfaces",
-      });
-    }
+    // Require endpoint.url for API interfaces (but not for contract-only)
+    // We check this in superRefine since we need access to parent state (interfaceFlags)
+    // This will be validated by the full form validator
   }),
 
-  render: (ctx) => <Step8ApiContractCommonComponent {...ctx} />,
+  render: (ctx) => <Step7ApiOnlyComponent {...ctx} />,
 };
 
 /**
@@ -347,8 +328,7 @@ export const ALL_STEPS: StepDef[] = [
   Step3_Common,
   Step4_HumanMedia,
   Step5_HumanDistribution,
-  Step7_ApiOnly,            // NEW: API-only fields
-  Step8_ApiContractCommon,  // NEW: API & Contract common fields
+  Step7_ApiOnly,            // API configuration (endpoint + interfaceVersions + MCP)
   Step6_Review,             // Always last
 ];
 

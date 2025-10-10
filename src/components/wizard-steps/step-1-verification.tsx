@@ -169,8 +169,41 @@ export default function Step1_Verification({
       <div className="border-t pt-4 mt-4">
         <InterfacesSelector
           value={state.interfaceFlags || { human: true, api: false, smartContract: false }}
-          onChange={(flags) => updateField("interfaceFlags", flags)}
+          onChange={(flags) => {
+            updateField("interfaceFlags", flags);
+            // Clear API type if API is unchecked
+            if (!flags.api) {
+              updateField("apiType", null);
+            }
+          }}
         />
+        
+        {/* API Type Dropdown - Only show when API is checked */}
+        {state.interfaceFlags?.api && (
+          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <Label htmlFor="api-type" className="text-sm font-medium mb-2 block">
+              What type of API? <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={state.apiType || ""}
+              onValueChange={(value) => updateField("apiType", value as any)}
+            >
+              <SelectTrigger id="api-type" className="w-full">
+                <SelectValue placeholder="Select API type..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openapi">OpenAPI / REST</SelectItem>
+                <SelectItem value="graphql">GraphQL</SelectItem>
+                <SelectItem value="jsonrpc">JSON-RPC</SelectItem>
+                <SelectItem value="mcp">MCP Server</SelectItem>
+                <SelectItem value="a2a">A2A Agent</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-2">
+              This will determine which fields appear in later steps and automatically add the corresponding trait (api:mcp, api:a2a, etc.)
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -35,16 +35,12 @@ export const FIELD_REQUIREMENTS: Record<string, { human: boolean; api: boolean; 
   "iwpsPortalUrl":           { human: false, api: false, smartContract: false },
   // Note: platforms requirement is composite; enforced in schema that at least one URL exists
   
-  // Step 7 - API Only
-  "metadata.mcp":            { human: false, api: false, smartContract: false }, // MCP is optional
-  "metadata.a2a":            { human: false, api: false, smartContract: false }, // A2A is optional
-  
-  // Step 8 - API & Contract Common
-  "metadata.endpoint":       { human: false, api: true,  smartContract: true },  // Endpoint required for API/Contract
-  "metadata.endpoint.url":   { human: false, api: true,  smartContract: true },  // Endpoint URL required
-  "metadata.endpoint.format":{ human: false, api: false, smartContract: false }, // Format optional
+  // Step 7 - Endpoint Configuration (API & Smart Contract)
+  "metadata.endpoint":       { human: false, api: true,  smartContract: false }, // Endpoint required for API, optional for contract
+  "metadata.endpoint.url":   { human: false, api: true,  smartContract: false }, // Endpoint URL required for API
   "metadata.endpoint.schemaUrl":{ human: false, api: false, smartContract: false }, // Schema URL optional
-  "metadata.interfaceVersions":{ human: false, api: false, smartContract: false }, // Optional
+  "metadata.interfaceVersions":{ human: false, api: false, smartContract: false }, // Optional for APIs only
+  "metadata.mcp":            { human: false, api: false, smartContract: false }, // MCP optional (only for MCP type)
 };
 
 export function isFieldRequired(fieldPath: string, flags?: InterfaceFlags): boolean {

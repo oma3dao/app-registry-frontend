@@ -35,10 +35,10 @@ export interface Platforms {
 
 /**
  * Endpoint configuration for API/Contract interfaces
+ * Note: API format should be specified in traits (api:rest, api:graphql, etc.)
  */
 export interface EndpointConfig {
   url: string;           // Required: URL of the API endpoint
-  format?: string;       // Optional: API format (REST, GraphQL, etc.)
   schemaUrl?: string;    // Optional: URL to API documentation/schema
 }
 
@@ -153,11 +153,6 @@ export interface MetadataContractData {
    * Model Context Protocol configuration (API for AI agents)
    */
   mcp?: McpConfig;
-  
-  /**
-   * Agent-to-Agent URL (A2A standard)
-   */
-  a2a?: string;
   
   /**
    * Payment mechanisms (x402, manual, etc.)

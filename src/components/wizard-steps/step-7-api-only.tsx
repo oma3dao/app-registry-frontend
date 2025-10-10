@@ -1,156 +1,249 @@
 /**
- * Step 7: API-Only Fields
- * Only shown when API interface is enabled
+ * Step 7: Endpoint Configuration
+ * Shown when API OR Smart Contract interface is enabled
  * 
- * Fields:
- * - mcp (Model Context Protocol) - complex JSON for AI agents
- * - a2a (Agent-to-Agent) - URL to agent card
+ * For APIs:
+ * - endpoint.url (required based on API type)
+ * - endpoint.schemaUrl (optional)
+ * - interfaceVersions (optional)
+ * - mcp config (only for MCP type)
+ * 
+ * For Smart Contracts:
+ * - endpoint.url (optional recommended RPC)
+ * - endpoint.schemaUrl (optional)
  */
 
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import type { StepRenderContext } from "@/lib/wizard";
 import { isFieldRequired } from "@/lib/wizard/field-requirements";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { UrlValidator } from "@/components/url-validator";
-import { Info, Code } from "lucide-react";
+import { McpConfigEditor } from "./mcp-config";
 
 export default function Step7_ApiOnly(ctx: StepRenderContext) {
   const { state, updateField, errors } = ctx;
   const req = (path: string) => isFieldRequired(path, state.interfaceFlags);
   
-  // Toggle between simple and JSON modes
-  const [mcpMode, setMcpMode] = useState<'simple' | 'json'>('simple');
-  const [mcpJsonInput, setMcpJsonInput] = useState("");
+  // Get selected API type (null if only contract)
+  const apiType = state.apiType;
+  const isContractOnly = state.interfaceFlags?.smartContract && !state.interfaceFlags?.api;
+  
+  // If API selected but no API type yet, prompt user
+  if (state.interfaceFlags?.api && !apiType) {
+    return (
+      <div className="p-6 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg text-center">
+        <p className="text-sm text-yellow-900 dark:text-yellow-100">
+          Please select an API type in Step 1 (Verification) to configure API-specific fields.
+        </p>
+      </div>
+    );
+  }
 
-  const handleMcpJsonApply = () => {
-    try {
-      const parsed = JSON.parse(mcpJsonInput);
-      updateField("metadata.mcp", parsed);
-    } catch (error) {
-      // Invalid JSON - show error
-      alert("Invalid JSON format");
+  const endpoint = state.metadata?.endpoint || { url: '', schemaUrl: '' };
+  
+  // Get endpoint labels based on interface type
+  const getEndpointLabels = () => {
+    // Smart contract only
+    if (isContractOnly) {
+      return {
+        url: 'Recommended RPC Endpoint',
+        urlDesc: 'Optional: Recommend a specific RPC endpoint for interacting with your contract',
+        urlPlaceholder: 'https://mainnet.optimism.io or https://opt-mainnet.g.alchemy.com/v2/...',
+        required: false,
+      };
+    }
+    
+    // API types
+    switch (apiType) {
+      case 'a2a':
+        return {
+          url: 'Agent Card URL',
+          urlDesc: 'URL to your .well-known/agent-card.json endpoint',
+          urlPlaceholder: 'https://example.com/.well-known/agent-card.json',
+          required: true,
+        };
+      case 'mcp':
+        return {
+          url: 'MCP Server URL',
+          urlDesc: 'Base URL of your MCP server endpoint',
+          urlPlaceholder: 'https://mcp.example.com',
+          required: true,
+        };
+      case 'graphql':
+        return {
+          url: 'GraphQL Endpoint URL',
+          urlDesc: 'URL to your GraphQL API endpoint',
+          urlPlaceholder: 'https://api.example.com/graphql',
+          required: true,
+        };
+      case 'jsonrpc':
+        return {
+          url: 'JSON-RPC Endpoint URL',
+          urlDesc: 'URL to your JSON-RPC API endpoint',
+          urlPlaceholder: 'https://rpc.example.com',
+          required: true,
+        };
+      default: // openapi
+        return {
+          url: 'API Endpoint URL',
+          urlDesc: 'Base URL of your REST/OpenAPI endpoint',
+          urlPlaceholder: 'https://api.example.com/v1',
+          required: true,
+        };
     }
   };
+  
+  const labels = getEndpointLabels();
 
   return (
     <div className="space-y-6">
-      {/* A2A Agent Card URL */}
-      <div className="space-y-2">
-        <Label htmlFor="a2a" className="text-base font-semibold">
-          A2A Agent Card URL {req("metadata.a2a") ? "*" : "(Optional)"}
-        </Label>
-        <p className="text-sm text-muted-foreground">
-          URL to your agent card following the Agent-to-Agent (A2A) standard
-        </p>
-        <Input
-          id="a2a"
-          type="url"
-          placeholder="https://example.com/.well-known/agent-card.json"
-          value={state.metadata?.a2a || ""}
-          onChange={(e) => updateField("metadata.a2a", e.target.value)}
-          className={errors?.["metadata.a2a"] ? "border-red-500" : ""}
-        />
-        <UrlValidator url={state.metadata?.a2a || ""} />
-        {errors?.["metadata.a2a"] && (
-          <p className="text-sm text-red-500">{errors["metadata.a2a"]}</p>
-        )}
-      </div>
-
-      {/* MCP Configuration */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-base font-semibold">
-            MCP (Model Context Protocol) {req("metadata.mcp") ? "*" : "(Optional)"}
-          </Label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setMcpMode('simple')}
-              className={`px-3 py-1 text-xs rounded ${
-                mcpMode === 'simple'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              Simple
-            </button>
-            <button
-              type="button"
-              onClick={() => setMcpMode('json')}
-              className={`px-3 py-1 text-xs rounded ${
-                mcpMode === 'json'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              JSON
-            </button>
-          </div>
+      {/* Show info about selected type */}
+      {apiType && (
+        <div className="p-3 bg-muted rounded-lg">
+          <p className="text-sm">
+            <strong>Selected API Type:</strong> {apiType.toUpperCase()} 
+            <span className="ml-2 text-xs text-muted-foreground">(Trait: api:{apiType} will be auto-added)</span>
+          </p>
         </div>
-
-        <p className="text-sm text-muted-foreground">
-          Model Context Protocol configuration for AI agents to interact with your API
-        </p>
-
-        {mcpMode === 'json' ? (
-          // JSON Mode - Paste full MCP config
+      )}
+      
+      {isContractOnly && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>Smart Contract Configuration</strong>
+          </p>
+          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+            Your contract address and chain ID are already specified in your DID. 
+            You can optionally recommend an RPC endpoint for optimal performance.
+          </p>
+        </div>
+      )}
+      
+      {state.interfaceFlags?.api && state.interfaceFlags?.smartContract && (
+        <div className="p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded">
+          <p className="text-sm text-yellow-900 dark:text-yellow-100">
+            <strong>Note:</strong> You&apos;ve selected both API and Smart Contract interfaces.
+          </p>
+          <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+            The endpoint URL will be used for your <strong>{apiType?.toUpperCase()} API</strong>. 
+            Your smart contract&apos;s chain and address are already in the DID (did:pkh).
+          </p>
+        </div>
+      )}
+      
+      {/* Endpoint Configuration - Required for ALL API types */}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">Endpoint Configuration</Label>
+          <p className="text-sm text-muted-foreground">
+            Configure the endpoint where clients can access your API
+          </p>
+        </div>
+        
+        {/* Endpoint URL */}
+        <div className="space-y-2">
+          <Label htmlFor="endpoint-url" className="text-sm font-medium">
+            {labels.url} {labels.required && <span className="text-red-500">*</span>}
+          </Label>
+          <p className="text-xs text-muted-foreground">{labels.urlDesc}</p>
+          <Input
+            id="endpoint-url"
+            type="url"
+            placeholder={labels.urlPlaceholder}
+            value={endpoint.url || ""}
+            onChange={(e) => updateField("metadata.endpoint.url", e.target.value)}
+            className={errors?.["metadata.endpoint.url"] ? "border-red-500" : ""}
+          />
+          <UrlValidator url={endpoint.url || ""} />
+          {errors?.["metadata.endpoint.url"] && (
+            <p className="text-sm text-red-500">{errors["metadata.endpoint.url"]}</p>
+          )}
+        </div>
+        
+        {/* Schema/Documentation URL */}
+        <div className="space-y-2">
+          <Label htmlFor="endpoint-schema-url" className="text-sm font-medium">
+            Schema / Documentation URL (Optional)
+          </Label>
+          <p className="text-xs text-muted-foreground mb-1">
+            <strong>Preferred:</strong> Machine-readable schema file for client auto-configuration. 
+            <strong>Fallback:</strong> Human-readable documentation page.
+          </p>
+          <Input
+            id="endpoint-schema-url"
+            type="url"
+            placeholder={
+              apiType === 'graphql' ? 'https://api.example.com/graphql?sdl' :
+              apiType === 'openapi' ? 'https://api.example.com/openapi.json' :
+              apiType === 'jsonrpc' ? 'https://api.example.com/schema.json' :
+              isContractOnly ? 'https://etherscan.io/address/0x...' :
+              'https://api.example.com/schema.json'
+            }
+            value={endpoint.schemaUrl || ""}
+            onChange={(e) => updateField("metadata.endpoint.schemaUrl", e.target.value)}
+          />
+          <UrlValidator url={endpoint.schemaUrl || ""} />
+          <p className="text-xs text-muted-foreground">
+            {apiType === 'graphql' && 'Ideally: GraphQL SDL/schema file. Fallback: Documentation page'}
+            {apiType === 'openapi' && 'Ideally: OpenAPI/Swagger JSON spec. Fallback: Documentation page'}
+            {apiType === 'jsonrpc' && 'Ideally: JSON schema defining methods. Fallback: Documentation page'}
+            {apiType === 'a2a' && 'Ideally: Agent capabilities schema. Fallback: Documentation page'}
+            {apiType === 'mcp' && 'Ideally: MCP server schema. Fallback: Documentation page'}
+            {isContractOnly && 'Ideally: ABI JSON file. Fallback: Block explorer or documentation'}
+          </p>
+        </div>
+        
+        {/* Interface Versions - Only for APIs, not contracts */}
+        {!isContractOnly && (
           <div className="space-y-2">
-            <Textarea
-              placeholder='{"tools": [...], "resources": [...], "prompts": [...], "transport": {...}, "authentication": {...}}'
-              value={mcpJsonInput || JSON.stringify(state.metadata?.mcp || {}, null, 2)}
-              onChange={(e) => setMcpJsonInput(e.target.value)}
-              className="font-mono text-xs"
-              rows={12}
+            <Label htmlFor="interface-versions" className="text-sm font-medium">
+              Interface Versions (Optional)
+            </Label>
+            <Input
+              id="interface-versions"
+              type="text"
+              placeholder="v1, v2, v3 or 1.0.0, 2.0.0"
+              value={state.metadata?.interfaceVersions?.join(", ") || ""}
+              onChange={(e) => {
+                const versions = e.target.value
+                  .split(",")
+                  .map(v => v.trim())
+                  .filter(v => v.length > 0);
+                updateField("metadata.interfaceVersions", versions.length > 0 ? versions : undefined);
+              }}
             />
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleMcpJsonApply}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded text-sm"
-              >
-                Apply JSON
-              </button>
-            </div>
-            <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded">
-              <div className="flex gap-2 items-start text-blue-700 dark:text-blue-400 text-xs">
-                <Info size={14} className="mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-medium mb-1">MCP Format</p>
-                  <p>Paste your complete MCP configuration JSON. See the MCP specification at modelcontextprotocol.io for details.</p>
-                </div>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              {apiType === 'mcp' && 'MCP versions your server supports (e.g., "1.0", "2.0")'}
+              {apiType === 'a2a' && 'A2A protocol versions you support'}
+              {apiType === 'graphql' && 'GraphQL specification versions'}
+              {!apiType || (apiType !== 'mcp' && apiType !== 'a2a' && apiType !== 'graphql') && 'API versions your endpoint supports'}
+            </p>
           </div>
-        ) : (
-          // Simple Mode - Show that MCP is complex, link to docs
-          <div className="p-4 bg-muted rounded-lg space-y-3">
-            <div className="flex gap-2 items-start text-sm">
-              <Code size={18} className="mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium mb-2">MCP Configuration</p>
-                <p className="text-xs text-muted-foreground mb-3">
-                  The Model Context Protocol (MCP) allows AI agents to interact with your API. 
-                  It requires a complex JSON structure with tools, resources, prompts, transport, and authentication.
-                </p>
-                <p className="text-xs">
-                  <strong>Recommendation:</strong> Use JSON mode to paste a complete MCP configuration, or skip this field if you don&apos;t have an MCP server.
-                </p>
-                <p className="text-xs mt-2">
-                  Learn more: <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">modelcontextprotocol.io</a>
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {errors?.["metadata.mcp"] && (
-          <p className="text-sm text-red-500">{errors["metadata.mcp"]}</p>
         )}
       </div>
+      {/* MCP Configuration - Only for MCP type (additional to endpoint) */}
+      {apiType === 'mcp' && (
+        <div className="space-y-3">
+          <Label className="text-base font-semibold">
+            MCP (Model Context Protocol) Configuration
+          </Label>
+          <p className="text-sm text-muted-foreground">
+            Configure tools, resources, and prompts for AI agents
+          </p>
+          
+          <McpConfigEditor
+            value={state.metadata?.mcp}
+            onChange={(mcpConfig) => updateField("metadata.mcp", mcpConfig)}
+          />
+          
+          {errors?.["metadata.mcp"] && (
+            <p className="text-sm text-red-500">{errors["metadata.mcp"]}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

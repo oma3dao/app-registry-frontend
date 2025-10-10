@@ -12,6 +12,11 @@ export type InterfaceFlags = {
 };
 
 /**
+ * API type selection for API interface
+ */
+export type ApiType = 'openapi' | 'graphql' | 'jsonrpc' | 'mcp' | 'a2a' | null;
+
+/**
  * Combined form data for the NFT creation wizard
  * Used to manage state across all wizard steps
  */
@@ -27,6 +32,11 @@ export interface WizardFormData extends RegistryContractData {
    * Used to determine which steps to show and compute interfaces bitmap
    */
   interfaceFlags?: InterfaceFlags;
+  
+  /**
+   * API type selection (only when API interface is enabled)
+   */
+  apiType?: ApiType;
   
   /**
    * IWPS Portal URL (distribution field)

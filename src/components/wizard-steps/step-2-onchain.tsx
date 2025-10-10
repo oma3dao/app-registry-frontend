@@ -30,6 +30,16 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
   const [isCustomizingUrl, setIsCustomizingUrl] = useState(false);
   const [traitsInput, setTraitsInput] = useState("");
   
+  // Sync traitsInput with formData.traits on mount and when traits change externally
+  useEffect(() => {
+    const currentTraits = formData.traits || [];
+    const currentInput = currentTraits.join(", ");
+    // Only update if different to avoid cursor jumping
+    if (currentInput !== traitsInput) {
+      setTraitsInput(currentInput);
+    }
+  }, [formData.traits]);
+  
   // Auto-generate dataUrl when not customizing
   useEffect(() => {
     if (!isCustomizingUrl && formData.did && formData.version) {
@@ -100,6 +110,34 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
       .filter(t => t.length > 0);
   };
 
+  // Auto-manage API trait based on selected API type
+  useEffect(() => {
+    const currentTraits = formData.traits || [];
+    const allApiTraits = ['api:openapi', 'api:graphql', 'api:jsonrpc', 'api:mcp', 'api:a2a'];
+    
+    // Remove all API traits first (clean slate)
+    let cleanedTraits = currentTraits.filter((t: string) => !allApiTraits.includes(t));
+    
+    // If API interface is enabled and type is selected, add the correct trait
+    if (formData.interfaceFlags?.api && formData.apiType) {
+      const apiTrait = `api:${formData.apiType}`;
+      
+      // Check if we can add (max 20 traits)
+      if (cleanedTraits.length < 20) {
+        cleanedTraits.push(apiTrait);
+      } else {
+        // Max traits reached - show warning but don't add
+        // (Warning is already shown in UI)
+        return;
+      }
+    }
+    
+    // Update if changed
+    if (JSON.stringify(cleanedTraits) !== JSON.stringify(currentTraits)) {
+      updateFormData({ traits: cleanedTraits.length > 0 ? cleanedTraits : undefined });
+    }
+  }, [formData.apiType, formData.interfaceFlags?.api]);
+  
   const handleTraitsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setTraitsInput(value);
@@ -225,6 +263,15 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
         <p className="text-sm text-muted-foreground">
           Enter traits separated by commas or spaces. Each trait represents an app capability or feature. Hashes will be generated automatically during minting.
         </p>
+        
+        {/* Warning if max traits reached and API trait can't be auto-added */}
+        {formData.interfaceFlags?.api && formData.apiType && (formData.traits?.length || 0) >= 20 && !formData.traits?.includes(`api:${formData.apiType}`) && (
+          <div className="p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded">
+            <p className="text-sm text-yellow-900 dark:text-yellow-100">
+              <strong>Maximum traits reached (20).</strong> Remove a trait to auto-add <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">api:{formData.apiType}</code> for your selected API type.
+            </p>
+          </div>
+        )}
         
         <Input
           id="traits"

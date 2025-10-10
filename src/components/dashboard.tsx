@@ -97,7 +97,14 @@ export default function Dashboard() {
   // Opens the mint modal specifically for editing metadata (starts at step 2)
   const handleOpenMintModalFromView = (metadata: Record<string, any>, nft: NFT) => {
     log("Opening mint modal for editing metadata", { metadata, nft });
-    setCurrentNft(nft);
+    
+    // Populate name from metadata if nft.name is empty
+    const nftWithName = {
+      ...nft,
+      name: nft.name || metadata.name || "Unnamed App"
+    };
+    
+    setCurrentNft(nftWithName);
     setEditMetadata(metadata);
     
     setIsViewModalOpen(false); // Close the view modal
@@ -258,7 +265,7 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold mb-1">My Registered Applications</h1>
       </div>
 
-      {/* Testnet Faucet Notice */}
+      {/* Testnet Faucet Notice - Only show on testnet (66238), hide on mainnet (999999) and localhost (31337) */}
       {env.chainId === 66238 && (
         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
           <div className="flex gap-3 items-start">

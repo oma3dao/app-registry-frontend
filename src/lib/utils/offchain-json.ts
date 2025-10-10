@@ -14,13 +14,11 @@ export interface OffchainBuildInput {
     interfaceVersions: string[];
     endpoint: Record<string, any> | {
       url?: string;
-      format?: string;
       schemaUrl?: string;
     };
     payments: Record<string, any>[];
     artifacts: Record<string, any>;
     mcp: Record<string, any>;
-    a2a: string;
     videoUrls: string[];
     threeDAssetUrls: string[]; // maps to 3dAssetUrls in output
   }>;
@@ -71,28 +69,55 @@ export function buildOffchainMetadataObject(input: OffchainBuildInput): Record<s
     payments: Array.isArray(pick('payments')) ? pick('payments') : [],
   } as Record<string, any>;
 
-  // Remove undefined, empty strings, empty arrays, and empty objects
-  Object.keys(out).forEach((k) => {
-    const v = out[k];
-    if (typeof v === 'undefined') {
-      delete out[k];
-      return;
-    }
-    if (typeof v === 'string' && v.trim().length === 0) {
-      delete out[k];
-      return;
-    }
-    if (Array.isArray(v) && v.length === 0) {
-      delete out[k];
-      return;
-    }
-    if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) {
-      delete out[k];
-      return;
-    }
-  });
+  // Deep clean: recursively remove empty values
+  return deepClean(out);
+}
 
-  return out;
+/**
+ * Recursively remove empty values from an object or array
+ * Removes: undefined, null, empty strings, empty arrays, empty objects
+ */
+function deepClean(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return undefined;
+  }
+  
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    const cleaned = obj
+      .map(item => deepClean(item))
+      .filter(item => item !== undefined);
+    return cleaned.length > 0 ? cleaned : undefined;
+  }
+  
+  // Handle objects
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    
+    for (const key in obj) {
+      const value = obj[key];
+      
+      // Skip undefined
+      if (value === undefined || value === null) continue;
+      
+      // Skip empty strings
+      if (typeof value === 'string' && value.trim() === '') continue;
+      
+      // Recursively clean nested structures
+      const cleanedValue = deepClean(value);
+      
+      // Only add if not empty
+      if (cleanedValue !== undefined) {
+        cleaned[key] = cleanedValue;
+      }
+    }
+    
+    // Return undefined if object is now empty
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }
+  
+  // Primitives (strings, numbers, booleans)
+  return obj;
 }
 
 
