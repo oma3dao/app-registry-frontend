@@ -12,7 +12,11 @@ export interface OffchainBuildInput {
     iwpsPortalUrl: string;
     traits: string[];
     interfaceVersions: string[];
-    endpoint: Record<string, any>;
+    endpoint: Record<string, any> | {
+      url?: string;
+      format?: string;
+      schemaUrl?: string;
+    };
     payments: Record<string, any>[];
     artifacts: Record<string, any>;
     mcp: Record<string, any>;

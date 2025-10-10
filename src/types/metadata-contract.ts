@@ -34,6 +34,46 @@ export interface Platforms {
 }
 
 /**
+ * Endpoint configuration for API/Contract interfaces
+ */
+export interface EndpointConfig {
+  url: string;           // Required: URL of the API endpoint
+  format?: string;       // Optional: API format (REST, GraphQL, etc.)
+  schemaUrl?: string;    // Optional: URL to API documentation/schema
+}
+
+/**
+ * MCP (Model Context Protocol) configuration for AI agents
+ */
+export interface McpConfig {
+  tools?: Array<{
+    name: string;
+    description: string;
+    inputSchema: any;
+    annotations?: any;
+  }>;
+  resources?: Array<{
+    uri: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+  }>;
+  prompts?: Array<{
+    name: string;
+    description: string;
+    arguments?: any[];
+  }>;
+  transport?: {
+    http?: any;
+    stdio?: any;
+  };
+  authentication?: {
+    oauth2?: any;
+    blockchain?: any;
+  };
+}
+
+/**
  * Metadata contract data structure
  * Contains all fields that are stored in the app metadata contract
  * This structure is useful for developers integrating directly with the metadata contract
@@ -96,4 +136,50 @@ export interface MetadataContractData {
    * URL to support/help resources
    */
   supportUrl?: string;
+  
+  // === API/Contract Interface Fields ===
+  
+  /**
+   * Array of interface versions supported (API/Contract)
+   */
+  interfaceVersions?: string[];
+  
+  /**
+   * API/Contract endpoint configuration
+   */
+  endpoint?: EndpointConfig;
+  
+  /**
+   * Model Context Protocol configuration (API for AI agents)
+   */
+  mcp?: McpConfig;
+  
+  /**
+   * Agent-to-Agent URL (A2A standard)
+   */
+  a2a?: string;
+  
+  /**
+   * Payment mechanisms (x402, manual, etc.)
+   */
+  payments?: Array<{
+    type: 'x402' | 'manual';
+    url?: string;
+    chains?: string[];
+  }>;
+  
+  /**
+   * Artifact verification (for downloadable binaries)
+   */
+  artifacts?: Record<string, any>;
+  
+  /**
+   * Video URLs (human interface)
+   */
+  videoUrls?: string[];
+  
+  /**
+   * 3D asset URLs (human interface)
+   */
+  threeDAssetUrls?: string[];
 } 

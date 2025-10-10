@@ -288,36 +288,34 @@ export default function NFTMintModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step Indicator */}
-        <div className="flex items-center justify-between px-4 py-3 bg-muted/50 rounded-lg">
+        {/* Step Indicator - Compact Vertical */}
+        <div className="flex items-stretch justify-between px-2 py-2 bg-muted/50 rounded-lg gap-1 overflow-x-auto">
           {steps.map((step, index) => {
             const isActive = index === currentStepIndex;
             const isCompleted = index < currentStepIndex;
             const status = stepStatus[step.id];
 
             return (
-              <div
-                key={step.id}
-                className="flex items-center"
-              >
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-colors ${
-                    isActive
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : isCompleted
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-muted-foreground/30 bg-background"
-                  }`}
-                >
-                  {isCompleted ? (
-                    <CheckIcon className="w-4 h-4" />
-                  ) : (
-                    <span className="text-xs font-medium">{index + 1}</span>
-                  )}
-                </div>
-                <div className="ml-2 hidden sm:block">
+              <React.Fragment key={step.id}>
+                <div className="flex flex-col items-center gap-1 flex-shrink-0 min-w-0">
                   <div
-                    className={`text-sm font-medium ${
+                    className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${
+                      isActive
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : isCompleted
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground/30 bg-background"
+                    }`}
+                    title={step.title}
+                  >
+                    {isCompleted ? (
+                      <CheckIcon className="w-3 h-3" />
+                    ) : (
+                      <span className="text-xs font-medium">{index + 1}</span>
+                    )}
+                  </div>
+                  <div
+                    className={`text-xs leading-tight text-center font-medium max-w-[70px] ${
                       isActive
                         ? "text-foreground"
                         : "text-muted-foreground"
@@ -327,9 +325,11 @@ export default function NFTMintModal({
                   </div>
                 </div>
                 {index < steps.length - 1 && (
-                  <div className="w-8 h-px bg-muted-foreground/30 mx-2" />
+                  <div className="flex items-center">
+                    <div className="w-1 h-px bg-muted-foreground/30" />
+                  </div>
                 )}
-              </div>
+              </React.Fragment>
             );
           })}
         </div>

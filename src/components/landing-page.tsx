@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import NFTGrid from "@/components/nft-grid"
-import { useTotalApps, useAppsList } from "@/lib/contracts"
+import { useAppsList } from "@/lib/contracts"
+import { getTotalActiveApps, listActiveApps } from "@/lib/contracts/registry.read"
 import type { NFT } from "@/types/nft"
 import { LANDING_PAGE_NUM_APPS } from "@/config/app-config"
 import NFTViewModal from "@/components/nft-view-modal"
@@ -20,9 +21,50 @@ export default function LandingPage() {
   const [shouldLoadNFTs, setShouldLoadNFTs] = useState(false)
   const [startIndex, setStartIndex] = useState(1)
   
-  // Use the new hooks
-  const { data: totalAppsCount } = useTotalApps()
-  const { data: appsData, isLoading: isLoadingApps } = useAppsList(startIndex, LANDING_PAGE_NUM_APPS)
+  // Fetch total and latest apps (client-side for landing page)
+  const [totalAppsCount, setTotalAppsCount] = useState(0);
+  const [appsData, setAppsData] = useState<{ items: any[] } | null>(null);
+  const [isLoadingApps, setIsLoadingApps] = useState(false);
+  
+  // Fetch total apps count
+  useEffect(() => {
+    if (!shouldLoadNFTs) return;
+    
+    getTotalActiveApps()
+      .then(count => {
+        setTotalAppsCount(count);
+        log(`[LandingPage] Total active apps: ${count}`);
+      })
+      .catch(error => {
+        console.error('[LandingPage] Error fetching total apps:', error);
+        setTotalAppsCount(0);
+      });
+  }, [shouldLoadNFTs]);
+  
+  // Fetch latest apps
+  useEffect(() => {
+    if (!shouldLoadNFTs || totalAppsCount === 0) return;
+    
+    setIsLoadingApps(true);
+    // Contract uses 0-based indexing, so start from 0 for the latest apps
+    const calculatedStartIndex = Math.max(0, totalAppsCount - LANDING_PAGE_NUM_APPS);
+    
+    log(`[LandingPage] Querying from index ${calculatedStartIndex}, pageSize ${LANDING_PAGE_NUM_APPS}`);
+    
+    listActiveApps(calculatedStartIndex, LANDING_PAGE_NUM_APPS)
+      .then(result => {
+        log(`[LandingPage] Result:`, result);
+        log(`[LandingPage] Fetched ${result.items?.length || 0} apps`);
+        setAppsData(result);
+      })
+      .catch(error => {
+        console.error('[LandingPage] Error fetching apps:', error);
+        setAppsData({ items: [] });
+      })
+      .finally(() => {
+        setIsLoadingApps(false);
+      });
+  }, [shouldLoadNFTs, totalAppsCount]);
   
   
   // Redirect to dashboard if wallet is connected
@@ -31,15 +73,6 @@ export default function LandingPage() {
       window.location.href = "/dashboard";
     }
   }, [account])
-  
-  // Calculate start index when total apps changes
-  useEffect(() => {
-    if (totalAppsCount > 0) {
-      const calculatedStartIndex = Math.max(1, totalAppsCount - LANDING_PAGE_NUM_APPS + 1)
-      log(`Total apps: ${totalAppsCount}, calculated start index: ${calculatedStartIndex}`)
-      setStartIndex(calculatedStartIndex)
-    }
-  }, [totalAppsCount])
   
   // Process and augment apps when data changes
   useEffect(() => {
@@ -113,42 +146,81 @@ export default function LandingPage() {
     <div className="flex flex-col items-center justify-center px-4 text-center">
       <div className="max-w-5xl mx-auto space-y-8 pb-12">
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl pt-12">
-          <span className="block text-primary">OMA3 App Registry</span>
-          <span className="block text-slate-700 dark:text-slate-300">Developer Portal</span>
+          <span className="block text-primary">OMATrust App Registry</span>
+          <span className="block text-slate-700 dark:text-slate-300">Trust for Online Services</span>
         </h1>
 
         <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-          Register your applications as NFTs on the blockchain to make them discoverable by any application store, including OMA3&apos;s Spatial Store.<br/><br/>Connect your wallet to get started.
+          OMATrust is the open internet&apos;s decentralized trust layer. It brings the security and comfort of curated stores to the whole internet.
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <Button size="lg" isConnectButton />
         </div>
 
-        <div className="pt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-medium mb-2">Register</h3>
-            <p className="text-slate-600 dark:text-slate-400">
-              Register your applications as NFTs on the blockchain
-            </p>
+        {/* Row 1: Core Actions */}
+        <div className="pt-8">
+          <h3 className="text-3xl font-bold mb-6 text-slate-700 dark:text-slate-300">How It Works</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
+              <h4 className="text-lg font-medium mb-2">Register & Manage</h4>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
+                Tokenize your apps and make them discoverable by websites, app stores, and agents. 
+                Update metadata and ownership information as your apps evolve.
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
+              <h4 className="text-lg font-medium mb-2">Build Reputation</h4>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
+                Collect attestations and grow your app's reputation. Integrate user review widgets and encourage your community to visit {' '}
+                <a 
+                  href="https://reputation.oma3.org" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  reputation.oma3.org
+                </a>
+                {' '}to vouch for your app.
+              </p>
+            </div>
           </div>
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-medium mb-2">Manage</h3>
-            <p className="text-slate-600 dark:text-slate-400">
-              Update the status of your applications
-            </p>
-          </div>
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-medium mb-2">Dev Tools</h3>
-            <p className="text-slate-600 dark:text-slate-400">
-              Coming soon
-            </p>
+        </div>
+
+        {/* Row 2: Example Use Cases */}
+        <div className="pt-8">
+          <h3 className="text-3xl font-bold mb-6 text-slate-700 dark:text-slate-300">What You Can Register</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
+              <h4 className="text-lg font-medium mb-2">Websites and Binaries</h4>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
+                Submit your app domain to make your site and downloadables verifiable through OMATrust.
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
+              <h4 className="text-lg font-medium mb-2">API Endpoints</h4>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
+                Publish metadata and reputation for your API endpoints, enabling clients to verify authenticity and uptime.
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
+              <h4 className="text-lg font-medium mb-2">AI Agents</h4>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
+                Register A2A agents and MCP servers to display certifications and enable trusted agent-to-agent interactions.
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
+              <h4 className="text-lg font-medium mb-2">Smart Contracts</h4>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
+                Declare your smart contracts to enable verifiable cybersecurity audits and signal authenticity.
+              </p>
+            </div>
           </div>
         </div>
         
         {shouldLoadNFTs && (
           <div className="pt-16 w-full">
-            <h1 className="text-3xl font-bold mb-8 text-left">Latest Registered Apps</h1>
+            <h1 className="text-3xl font-bold mb-8 text-left">Latest Registrations</h1>
             <NFTGrid 
               nfts={latestApps} 
               onNFTCardClick={handleOpenViewModal}

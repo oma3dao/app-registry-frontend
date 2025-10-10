@@ -13,15 +13,11 @@ interface InterfacesSelectorProps {
 
 /**
  * Interfaces selector component for Step 0
- * Currently only Human is enabled; API and Smart Contract are visible but disabled
+ * All interfaces (Human, API, Smart Contract) are now enabled
  */
 export function InterfacesSelector({ value, onChange, className = "" }: InterfacesSelectorProps) {
   const handleChange = (key: keyof InterfaceFlags) => (checked: boolean | "indeterminate") => {
     if (typeof checked !== "boolean") return;
-    
-    // Only allow changing Human for now
-    if (key !== "human") return;
-    
     onChange({ ...value, [key]: checked });
   };
 
@@ -36,28 +32,22 @@ export function InterfacesSelector({ value, onChange, className = "" }: Interfac
         <span className="text-sm font-medium">Human</span>
       </label>
 
-      {/* API - Disabled (Coming Soon) */}
-      <label className="flex items-center gap-2 opacity-60 cursor-not-allowed">
+      {/* API - Now Enabled */}
+      <label className="flex items-center gap-2 cursor-pointer">
         <Checkbox 
           checked={value.api} 
-          disabled 
           onCheckedChange={handleChange("api")} 
         />
-        <span className="text-sm font-medium">
-          API <span className="text-xs ml-1 text-muted-foreground">(soon)</span>
-        </span>
+        <span className="text-sm font-medium">API</span>
       </label>
 
-      {/* Smart Contract - Disabled (Coming Soon) */}
-      <label className="flex items-center gap-2 opacity-60 cursor-not-allowed">
+      {/* Smart Contract - Now Enabled */}
+      <label className="flex items-center gap-2 cursor-pointer">
         <Checkbox 
           checked={value.smartContract} 
-          disabled 
           onCheckedChange={handleChange("smartContract")} 
         />
-        <span className="text-sm font-medium">
-          Smart Contract <span className="text-xs ml-1 text-muted-foreground">(soon)</span>
-        </span>
+        <span className="text-sm font-medium">Smart Contract</span>
       </label>
     </div>
   );

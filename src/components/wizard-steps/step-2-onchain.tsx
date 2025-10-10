@@ -71,6 +71,24 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
     updateFormData({ fungibleTokenId: value || undefined });
   };
 
+  // Get trait suggestions based on selected interfaces
+  const getTraitSuggestions = (): string => {
+    const suggestions: string[] = [];
+    
+    // Payment trait (applies to all)
+    suggestions.push("pay:x402");
+    
+    // API-specific traits
+    if (formData.interfaceFlags?.api) {
+      suggestions.push("api:mcp", "api:a2a", "api:openapi", "api:graphql", "api:jsonrpc");
+    }
+    
+    // General traits (always show)
+    suggestions.push("pay:x402", "social", "defi", "nft", "gaming");
+    
+    return suggestions.join(", ");
+  };
+  
   // Parse traits from comma or space-separated input
   const parseTraits = (input: string): string[] => {
     if (!input.trim()) return [];
@@ -211,7 +229,7 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
         <Input
           id="traits"
           type="text"
-          placeholder="gaming, social, defi, nft..."
+          placeholder={getTraitSuggestions()}
           value={traitsInput}
           onChange={handleTraitsChange}
         />
@@ -230,9 +248,26 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
           </div>
         )}
         
-        <p className="text-xs text-muted-foreground">
-          Examples: <code className="bg-muted px-1 rounded">gaming</code>, <code className="bg-muted px-1 rounded">social</code>, <code className="bg-muted px-1 rounded">defi</code>
-        </p>
+        <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded text-xs">
+          <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">Trait Suggestions:</p>
+          <div className="text-blue-700 dark:text-blue-300 space-y-1">
+            <p><strong>Payment:</strong> <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">pay:x402</code> (applies to all interfaces)</p>
+            {formData.interfaceFlags?.api && (
+              <p><strong>API:</strong> <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">api:mcp</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">api:rest</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">api:graphql</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">api:grpc</code></p>
+            )}
+            <p><strong>General:</strong> <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">gaming</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">social</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">defi</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">nft</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">metaverse</code></p>
+            <p className="text-xs mt-2">
+              <a 
+                href="https://github.com/oma3dao/omatrust-docs/blob/main/specification/omatrust-specification.md#appendix-c---trait-names" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                View full trait list in specification →
+              </a>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

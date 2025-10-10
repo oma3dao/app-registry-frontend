@@ -11,13 +11,13 @@ import { NFTMetadataProvider } from "@/lib/nft-metadata-context";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "OMA3 App Registry Developer Portal",
-  description: "Register and manage your applications on the OMA3 App Registry",
-  keywords: ["OMA3", "Web3", "App Registry", "Blockchain", "NFT", "Developer Portal"],
+  title: "OMATrust Registry Developer Portal",
+  description: "Register and manage your applications on the OMATrust App Registry",
+  keywords: ["OMA3", "OMATrust", "Web3", "App Registry", "Blockchain", "NFT", "Developer Portal"],
   authors: [{ name: "OMA3" }],
   openGraph: {
-    title: "OMA3 App Registry Developer Portal",
-    description: "Register and manage your applications on the OMA3 network",
+    title: "OMATrust Registry Developer Portal",
+    description: "Register and manage your applications on OMATrust",
     type: "website",
     url: "https://oma3.org",
   },

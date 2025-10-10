@@ -130,13 +130,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       return (
         <React.Suspense fallback={
           <button className={cn(buttonVariants({ variant, size, className }))}>
-            Connect Wallet
+            Get Started
           </button>
         }>
           <ThirdwebConnectButton
             client={client}
             appMetadata={{
-              name: "OMA3 App Registry",
+              name: "OMATrust App Registry",
               url: "https://oma3.org",
             }}
             className={className}
@@ -151,6 +151,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             connectModal={{
               size: "wide",
               showThirdwebBranding: false,
+            }}
+            connectButton={{
+              label: "Get Started",
             }}
             {...restProps}
           />

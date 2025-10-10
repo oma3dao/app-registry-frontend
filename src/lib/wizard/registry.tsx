@@ -16,14 +16,15 @@
 import { z } from "zod";
 import type { StepDef, InterfaceFlags, RegistryMeta } from "./types";
 
-// Import step components (will be created/migrated in Phase 2)
-// For now, these are placeholders that wrap existing components
+// Import step components
 import Step1VerificationComponent from "@/components/wizard-steps/step-1-verification";
 import Step2OnchainComponent from "@/components/wizard-steps/step-2-onchain";
 import Step3CommonComponent from "@/components/wizard-steps/step-3-common";
 import { isFieldRequired } from "./field-requirements";
 import Step4HumanMediaComponent from "@/components/wizard-steps/step-4-human-media";
 import Step5HumanDistributionComponent from "@/components/wizard-steps/step-5-human-distribution";
+import Step7ApiOnlyComponent from "@/components/wizard-steps/step-7-api-only";
+import Step8ApiContractCommonComponent from "@/components/wizard-steps/step-8-api-contract-common";
 import Step6ReviewComponent from "@/components/wizard-steps/step-6-review";
 
 // ============================================================================
@@ -251,6 +252,65 @@ export const Step5_HumanDistribution: StepDef = {
 };
 
 /**
+ * Step 7: API Only
+ * Conditional: only shown when API interface is enabled
+ * Fields: mcp, a2a
+ */
+export const Step7_ApiOnly: StepDef = {
+  id: "api-only",
+  title: "API Config",
+  description: "Configure MCP and A2A for AI agents",
+  
+  appliesTo: (flags) => flags.api,
+  fields: ["metadata.mcp", "metadata.a2a"],
+  
+  schema: z.object({
+    metadata: z.object({
+      mcp: z.any().optional(), // Complex object, can be validated as JSON
+      a2a: z.union([z.string().url(), z.literal("")]).optional(),
+    }).optional(),
+  }),
+
+  render: (ctx) => <Step7ApiOnlyComponent {...ctx} />,
+};
+
+/**
+ * Step 8: API & Contract Common
+ * Conditional: shown when API OR Contract interface is enabled
+ * Fields: endpoint, interfaceVersions
+ */
+export const Step8_ApiContractCommon: StepDef = {
+  id: "api-contract-common",
+  title: "Endpoint",
+  description: "Configure endpoint and interface versions",
+  
+  appliesTo: (flags) => flags.api || flags.smartContract,
+  fields: ["metadata.endpoint", "metadata.interfaceVersions"],
+  
+  schema: z.object({
+    metadata: z.object({
+      endpoint: z.object({
+        url: z.string().url("Must be a valid URL"),
+        format: z.string().optional(),
+        schemaUrl: z.union([z.string().url(), z.literal("")]).optional(),
+      }).optional(),
+      interfaceVersions: z.array(z.string()).optional(),
+    }).optional(),
+  }).superRefine((data, ctx) => {
+    // Require endpoint.url if endpoint object exists
+    if (data.metadata?.endpoint && !data.metadata.endpoint.url) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["metadata", "endpoint", "url"],
+        message: "Endpoint URL is required for API/Contract interfaces",
+      });
+    }
+  }),
+
+  render: (ctx) => <Step8ApiContractCommonComponent {...ctx} />,
+};
+
+/**
  * Step 6: Review
  * Always visible. Final review before minting.
  */
@@ -287,7 +347,9 @@ export const ALL_STEPS: StepDef[] = [
   Step3_Common,
   Step4_HumanMedia,
   Step5_HumanDistribution,
-  Step6_Review,
+  Step7_ApiOnly,            // NEW: API-only fields
+  Step8_ApiContractCommon,  // NEW: API & Contract common fields
+  Step6_Review,             // Always last
 ];
 
 /**

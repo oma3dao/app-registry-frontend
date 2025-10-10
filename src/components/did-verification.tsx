@@ -131,6 +131,7 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
               <p className="font-medium mt-3">Method 2: DNS TXT Record</p>
               <ul className="list-disc ml-4 mt-1 space-y-1">
                 <li>Add a TXT record at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">_omatrust.{domain}</code></li>
+                <li>Name: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">_omatrust</code></li>
                 <li>Value: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">v=1;caip10={caip10}</code></li>
                 <li className="text-xs text-gray-600 dark:text-gray-400">Note: Use semicolon (;) as separator. Spaces also supported but not recommended.</li>
                 {!account && <li className="text-amber-600 dark:text-amber-400">⚠️ Connect your wallet to see your exact values</li>}
