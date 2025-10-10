@@ -172,7 +172,7 @@ export default function LandingPage() {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
               <h4 className="text-lg font-medium mb-2">Build Reputation</h4>
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Collect attestations and grow your app's reputation. Integrate user review widgets and encourage your community to visit {' '}
+                Collect attestations and grow your app&apos;s reputation. Integrate user review widgets and encourage your community to visit {' '}
                 <a 
                   href="https://reputation.oma3.org" 
                   target="_blank" 

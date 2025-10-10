@@ -137,7 +137,7 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
                   It requires a complex JSON structure with tools, resources, prompts, transport, and authentication.
                 </p>
                 <p className="text-xs">
-                  <strong>Recommendation:</strong> Use JSON mode to paste a complete MCP configuration, or skip this field if you don't have an MCP server.
+                  <strong>Recommendation:</strong> Use JSON mode to paste a complete MCP configuration, or skip this field if you don&apos;t have an MCP server.
                 </p>
                 <p className="text-xs mt-2">
                   Learn more: <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">modelcontextprotocol.io</a>

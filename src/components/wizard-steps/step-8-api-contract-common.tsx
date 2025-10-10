@@ -128,7 +128,7 @@ export default function Step8_ApiContractCommon(ctx: StepRenderContext) {
           <p className="text-sm text-red-500">{errors["metadata.interfaceVersions"]}</p>
         )}
         <p className="text-xs text-muted-foreground">
-          Examples: "v1, v2" or "1.0.0, 2.0.0, 3.0.0"
+          Examples: &quot;v1, v2&quot; or &quot;1.0.0, 2.0.0, 3.0.0&quot;
         </p>
       </div>
 
