@@ -17,6 +17,8 @@ import { hashTraits } from "@/lib/utils/traits";
 import { canonicalizeForHash } from "@/lib/utils/dataurl";
 import { buildOffchainMetadataObject } from "@/lib/utils/offchain-json";
 import { toast } from "sonner"
+import { env } from "@/config/env"
+import { ExternalLinkIcon, InfoIcon } from "lucide-react"
 
 export default function Dashboard() {
   log("Component rendering");
@@ -255,6 +257,33 @@ export default function Dashboard() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-1">My Registered Applications</h1>
       </div>
+
+      {/* Testnet Faucet Notice */}
+      {env.chainId === 66238 && (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex gap-3 items-start">
+            <InfoIcon size={20} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-grow">
+              <p className="text-sm text-blue-900 dark:text-blue-100 font-medium mb-1">
+                Need testnet OMA tokens?
+              </p>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Get free OMA tokens from the{' '}
+                <a 
+                  href="https://faucet.testnet.chain.oma3.org/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                >
+                  OMAchain Testnet Faucet
+                  <ExternalLinkIcon size={14} />
+                </a>
+                {' '}to register apps and pay for transactions.  You can find your wallet address (it starts with 0x) by clicking the button in the top right corner of the screen.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <NFTGrid 
         nfts={nfts} 
