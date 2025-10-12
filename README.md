@@ -143,6 +143,88 @@ The front-end gives users the option to create an embedded wallet using social l
 2. Paste in your wallet address
 3. Request the test OMA tokens
 
+## Deployment
+
+### Production Deployment (registry.omatrust.org)
+
+The application is deployed on Vercel and accessible at [registry.omatrust.org](https://registry.omatrust.org).
+
+**Branch:** `main`  
+**Chain:** OMAchain Testnet (66238) - will switch to mainnet when launched
+
+### Environment Variables
+
+**Required (Public):**
+- `NEXT_PUBLIC_THIRDWEB_CLIENT_ID` - Thirdweb client ID for RPC access
+- `NEXT_PUBLIC_ACTIVE_CHAIN` - Active chain: `localhost`, `omachain-testnet`, or `omachain-mainnet`
+
+**Required (Server-side, Production only):**
+- `THIRDWEB_SECRET_KEY` - Thirdweb secret key for managed wallets (HSM-backed)
+- `THIRDWEB_SERVER_WALLET_ADDRESS` - Server wallet address for signing attestations
+
+**Optional:**
+- `NEXT_PUBLIC_DEBUG_ADAPTER` - Set to `true` for debug logging
+- `NEXT_PUBLIC_APP_BASE_URL` - Override base URL (auto-detected by default)
+
+See `.env.example` for complete list and descriptions.
+
+### Server Wallets
+
+Server wallets are HSM-backed wallets managed by Thirdweb for secure transaction signing in production.
+
+**Testnet Wallet:**
+- **Address:** `0x9F34eCb069d3990228b9796B0d89b9DbF0522A50`
+- **Smart Wallet:** `0xaB732b128B0a30e107B849B65A787de6C977C5C3`
+- **Network:** OMAchain Testnet (66238)
+- **Purpose:** DID verification attestations
+
+**Production Wallet (Mainnet):**
+- **Address:** `0x899cFF436F62caDa923f8Ae7F2660Ecd2e99Bf76`
+- **Smart Wallet:** `0x603B04a8D4E1228171447a0b1CF83CB389142CfC`
+- **Network:** OMAchain Mainnet
+- **Purpose:** DID verification attestations (when mainnet launches)
+
+To list current wallets:
+```bash
+cd ../app-registry-evm-solidity
+./scripts/deploy/list-server-wallets.sh
+```
+
+### Contract Addresses
+
+Contract addresses are configured in `src/config/chains.ts`.
+
+**OMAchain Testnet (66238):**
+- **Registry:** `0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83`
+- **Metadata:** `0x13aD113D0DE923Ac117c82401e9E1208F09D7F19`
+- **Resolver:** `0xe4E8FBf35b6f4D975B4334ffAfaEfd0713217cAb`
+- **Deployer:** `0xC8cb41dD6F509f28cA4194f8e1574911281354eF`
+- **Deployed:** 2025-10-04 21:45:35 UTC
+
+**OMAchain Mainnet:**
+- **Status:** Not deployed yet
+- Contracts will be deployed when mainnet launches
+
+### Local Development
+
+Local development uses `~/.ssh/test-evm-deployment-key` for signing (same key as deployment scripts).
+
+**No server wallet configuration needed for local dev!**
+
+Required `.env.local`:
+```bash
+NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_client_id_here
+NEXT_PUBLIC_ACTIVE_CHAIN=localhost
+NEXT_PUBLIC_DEBUG_ADAPTER=true
+```
+
+### Security Notes
+
+1. **Server Wallet Private Keys:** Never exposed - managed by Thirdweb's HSM
+2. **Secret Key Storage:** Stored in Bitwarden, set in Vercel environment variables
+3. **SSH Private Key:** For local dev only, never committed to git
+4. **Contract Ownership:** Contracts owned by deployer wallet, not server wallet
+
 ## Frontend Architecture
 
 For more information on the source code for this frontend, visit [src/README.md](src/README.md).

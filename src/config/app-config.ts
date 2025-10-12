@@ -215,6 +215,7 @@ export const IWPS_DEFAULT_NACK_URL = "";
  * Dynamically includes the current deployment URL
  */
 export const METADATA_EDIT_ELIGIBLE_BASE_URLS = [
-  new URL(env.appBaseUrl).hostname, // Current deployment (localhost, preregistry.oma3.org, appregistry.oma3.org)
-  "appregistry.oma3.org",           // Production (always allowed)
+  new URL(env.appBaseUrl).hostname,    // Current deployment (localhost, registry.omatrust.org)
+  "registry.omatrust.org",             // Production (always allowed)
+  "appregistry.oma3.org",              // Legacy domain (for backwards compatibility)
 ];

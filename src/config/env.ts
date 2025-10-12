@@ -30,7 +30,7 @@ const activeChain = CHAIN_PRESETS[parsed.NEXT_PUBLIC_ACTIVE_CHAIN];
  * 
  * The URL is DETERMINISTICALLY derived from the active chain:
  * - Localhost chain (31337) → http://localhost:3000
- * - Testnet/Mainnet → https://appregistry.oma3.org (or VERCEL_URL in deployments)
+ * - Testnet/Mainnet → https://registry.omatrust.org (or VERCEL_URL in deployments)
  * 
  * CRITICAL: The dataUrl is stored IMMUTABLY on-chain. This function ensures:
  * 1. Local chain apps use localhost (safe, won't leak to production)
@@ -45,16 +45,16 @@ function getAppBaseUrl(): string {
     // Local Hardhat chain - use localhost for development
     return 'http://localhost:3000';
   }
-  
+
   // Testnet/Mainnet: Use Vercel URL if available (automatic in deployments)
   // Otherwise use canonical production domain
   if (process.env.NEXT_PUBLIC_VERCEL_URL) {
     return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
   }
-  
+
   // Canonical production domain for testnet/mainnet
   // This ensures on-chain dataUrls are accessible from anywhere
-  return 'https://appregistry.oma3.org';
+  return 'https://registry.omatrust.org';
 }
 
 /**
@@ -69,15 +69,15 @@ export const env = {
   activeChain,
   chainId: activeChain.id,
   rpcUrl: activeChain.rpc,
-  
+
   // Contract addresses (from chain config or overridden via env vars)
   registryAddress: parsed.NEXT_PUBLIC_REGISTRY_ADDRESS || activeChain.contracts.registry,
   metadataAddress: parsed.NEXT_PUBLIC_METADATA_ADDRESS || activeChain.contracts.metadata,
   resolverAddress: parsed.NEXT_PUBLIC_RESOLVER_ADDRESS || activeChain.contracts.resolver || "0x0000000000000000000000000000000000000000",
-  
+
   // Application base URL (for API routes)
   appBaseUrl: getAppBaseUrl(),
-  
+
   // Flags
   debugAdapter: parsed.NEXT_PUBLIC_DEBUG_ADAPTER === 'true',
 };

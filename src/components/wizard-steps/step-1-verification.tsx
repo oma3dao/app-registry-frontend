@@ -136,7 +136,7 @@ export default function Step1_Verification({
                   🚧 Smart Contract DIDs - Coming Soon
                 </p>
                 <p className="text-yellow-800 dark:text-yellow-200 mb-3">
-                  We're currently building the verification system for smart contract DIDs (did:pkh). 
+                  We&apos;re currently building the verification system for smart contract DIDs (did:pkh). 
                   This feature will support:
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-yellow-800 dark:text-yellow-200 ml-2">
