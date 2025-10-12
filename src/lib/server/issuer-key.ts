@@ -81,8 +81,8 @@ export function loadIssuerPrivateKey(): `0x${string}` {
 }
 
 /**
- * Alternative key loader for verify-did route compatibility
- * Returns null on error instead of throwing
+ * Alternative key loader that returns null on error instead of throwing
+ * Used for graceful fallback in server routes
  */
 export async function loadIssuerPrivateKeyOrNull(): Promise<string | null> {
   try {
