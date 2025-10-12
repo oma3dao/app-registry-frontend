@@ -126,14 +126,43 @@ export default function Step1_Verification({
       )}
 
       {didType === "did:pkh" && (
-        <Caip10Input
-          value={state.did?.startsWith("did:pkh:") ? state.did.replace("did:pkh:", "") : ""}
-          onChange={(caip10) => {
-            const newDid = caip10 ? `did:pkh:${caip10}` : "";
-            updateField("did", newDid);
-          }}
-          error={errors?.did}
-        />
+        <div className="space-y-4">
+          {/* Coming Soon Message */}
+          <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg">
+            <div className="flex gap-3 items-start">
+              <InfoIcon size={20} className="mt-0.5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
+              <div className="text-sm">
+                <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                  🚧 Smart Contract DIDs - Coming Soon
+                </p>
+                <p className="text-yellow-800 dark:text-yellow-200 mb-3">
+                  We're currently building the verification system for smart contract DIDs (did:pkh). 
+                  This feature will support:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-yellow-800 dark:text-yellow-200 ml-2">
+                  <li><strong>Automated verification</strong> - Check contract owner/admin matches your wallet</li>
+                  <li><strong>Delegate access</strong> - Prove ownership via deterministic token transfer</li>
+                  <li><strong>Multi-chain support</strong> - Works across EVM and non-EVM chains</li>
+                </ul>
+                <p className="text-yellow-800 dark:text-yellow-200 mt-3">
+                  For now, please use <strong>did:web</strong> (website-based DIDs) which are fully supported.
+                </p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">
+                  Expected availability: Q4 2025
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Disabled Input (for visual reference) */}
+          <div className="opacity-50 pointer-events-none">
+            <Caip10Input
+              value=""
+              onChange={() => {}}
+              error={undefined}
+            />
+          </div>
+        </div>
       )}
 
       {/* DID Verification - only for did:web */}
@@ -146,22 +175,6 @@ export default function Step1_Verification({
             }}
             isVerified={state._verificationStatus === "ready"}
           />
-        </div>
-      )}
-
-      {/* did:pkh ownership info */}
-      {didType === "did:pkh" && state.did && (
-        <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md mt-4">
-          <div className="flex gap-2 items-start text-blue-700 dark:text-blue-400">
-            <InfoIcon size={18} className="mt-0.5 flex-shrink-0" />
-            <div className="text-sm">
-              <p className="font-medium">Smart Contract DIDs</p>
-              <p className="mt-1">
-                Smart contract DIDs (did:pkh) require verification of contract ownership.
-                We will check the contract admin/owner wallet matches your connected wallet.
-              </p>
-            </div>
-          </div>
         </div>
       )}
 

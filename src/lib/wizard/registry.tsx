@@ -33,7 +33,11 @@ import Step6ReviewComponent from "@/components/wizard-steps/step-6-review";
 const SemverSchema = z.string().regex(/^\d+\.\d+(\.\d+)?$/, "Version must be x.y or x.y.z");
 const DidSchema = z.string()
   .min(1, "DID is required")
-  .regex(/^did:(web|pkh):.+$/, "Only did:web and did:pkh are supported");
+  .regex(/^did:(web|pkh):.+$/, "Only did:web and did:pkh are supported")
+  .refine(
+    (did) => !did.startsWith("did:pkh:"),
+    "Smart contract DIDs (did:pkh) are coming soon. Please use did:web for now."
+  );
 const UrlSchema = z.string().url("Must be a valid URL");
 const OptionalUrlSchema = z.union([z.string().url(), z.literal("")]).optional();
 
@@ -74,13 +78,21 @@ export const Step1_Verification: StepDef = {
   }),
 
   guard: (state) => {
+    const did = (state.did || "").trim();
+    
+    // Block did:pkh until verification is implemented
+    if (did.startsWith("did:pkh:")) {
+      return { 
+        ok: false, 
+        reason: "Smart contract DIDs (did:pkh) are coming soon. Please use did:web for now." 
+      };
+    }
+
     // Check if verification status is ready (set by verification component)
     const verificationReady = state._verificationStatus === "ready";
 
-    // Enforce verification for both did:web and did:pkh (ownership check required for both)
-    const did = (state.did || "").trim();
-    const requiresVerification = did.startsWith("did:web:") || did.startsWith("did:pkh:");
-    if (requiresVerification && !verificationReady) {
+    // Enforce verification for did:web
+    if (did.startsWith("did:web:") && !verificationReady) {
       return { ok: false, reason: "Complete DID verification before proceeding" };
     }
 
