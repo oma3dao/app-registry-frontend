@@ -23,6 +23,14 @@ import resolverAbi from '@/abi/resolver.json';
 import dns from 'dns';
 import { promisify } from 'util';
 
+// Verification result types
+interface VerificationResult {
+  success: boolean;
+  error?: string;
+  details?: string;
+  method?: 'dns' | 'did-document' | 'contract';
+}
+
 const resolveTxt = promisify(dns.resolveTxt);
 
 /**
@@ -52,34 +60,34 @@ async function checkExistingAttestations(
   clientId: string
 ): Promise<{ present: string[]; missing: string[] }> {
   debug('check-attestations', `Checking DID ownership for: ${did}`);
-  
+
   const client = createThirdwebClient({ clientId });
   const chain = defineChain(chainId);
-  const resolver = getContract({ 
-    client, 
-    chain, 
+  const resolver = getContract({
+    client,
+    chain,
     address: resolverAddress,
     abi: resolverAbi as any,
   });
-  
+
   // For ownership schema, check if current owner matches connected address
   const didHash = ethers.id(did) as `0x${string}`;
   debug('check-attestations', `DID hash (ethers.id): ${didHash}`);
-  
+
   try {
     const currentOwner = await readContract({
       contract: resolver,
       method: 'function currentOwner(bytes32 didHash) view returns (address)',
       params: [didHash],
     }) as string;
-    
+
     debug('check-attestations', `Current owner from contract: ${currentOwner}`);
-    
+
     // If current owner matches connected address and is not zero address
-    const hasValidOwnership = currentOwner && 
-                              currentOwner.toLowerCase() !== '0x0000000000000000000000000000000000000000' &&
-                              currentOwner.toLowerCase() === connectedAddress.toLowerCase();
-    
+    const hasValidOwnership = currentOwner &&
+      currentOwner.toLowerCase() !== '0x0000000000000000000000000000000000000000' &&
+      currentOwner.toLowerCase() === connectedAddress.toLowerCase();
+
     if (hasValidOwnership) {
       debug('check-attestations', `✅ Valid DID ownership attestation exists`);
       return { present: requiredSchemas, missing: [] };
@@ -96,241 +104,334 @@ async function checkExistingAttestations(
 /**
  * Check DNS TXT record for did:web verification
  */
-async function checkDidWebViaDns(domain: string, connectedAddress: string): Promise<boolean> {
+async function checkDidWebViaDns(domain: string, connectedAddress: string): Promise<VerificationResult> {
   const txtRecordName = `_omatrust.${domain}`;
   debug('verify-did-web', `Checking DNS TXT record: ${txtRecordName}`);
-  
+
   try {
     const records = await resolveTxt(txtRecordName);
     debug('verify-did-web', `Found ${records.length} TXT records`, records);
-    
+
+    if (records.length === 0) {
+      return {
+        success: false,
+        error: 'No DNS TXT record found',
+        details: `No TXT record found at ${txtRecordName}. Create a TXT record with value: v=1 caip10=eip155:66238:${connectedAddress}`
+      };
+    }
+
+    let foundValidRecord = false;
+    let foundAddresses: string[] = [];
+
     // Parse records looking for v=1 and caip10 entries
     for (const record of records) {
       const recordText = Array.isArray(record) ? record.join('') : record;
       debug('verify-did-web', `Parsing record: ${recordText}`);
-      
+
       // Split by semicolon OR whitespace (to handle both "v=1;caip10=..." and "v=1 caip10=...")
       const entries = recordText.split(/[;\s]+/).map(e => e.trim()).filter(e => e.length > 0);
       debug('verify-did-web', `Parsed entries:`, entries);
-      
+
       const hasVersion = entries.some(e => e === 'v=1');
-      
+
       if (!hasVersion) {
         debug('verify-did-web', 'No v=1 found, skipping record');
         continue;
       }
-      
+
+      foundValidRecord = true;
       const caip10Entries = entries.filter(e => e.startsWith('caip10='));
       debug('verify-did-web', `Found ${caip10Entries.length} CAIP-10 entries`);
-      
+
       for (const entry of caip10Entries) {
         const caip10 = entry.replace('caip10=', '').trim();
         debug('verify-did-web', `Checking CAIP-10: ${caip10}`);
-        
+
         // Extract address from CAIP-10 (format: namespace:reference:address)
         const parts = caip10.split(':');
         if (parts.length === 3) {
           const address = parts[2];
+          foundAddresses.push(address);
           debug('verify-did-web', `Extracted address: ${address}`);
-          
+
           if (address.toLowerCase() === connectedAddress.toLowerCase()) {
             debug('verify-did-web', '✅ DNS TXT: Address match found!');
-            return true;
+            return { success: true };
           }
         }
       }
     }
-    
+
+    if (!foundValidRecord) {
+      return {
+        success: false,
+        error: 'Invalid DNS TXT record format',
+        details: `Found TXT record at ${txtRecordName} but missing "v=1". Record should be: v=1 caip10=eip155:66238:${connectedAddress}`
+      };
+    }
+
+    if (foundAddresses.length === 0) {
+      return {
+        success: false,
+        error: 'No CAIP-10 address in DNS TXT record',
+        details: `Found valid TXT record at ${txtRecordName} but no caip10 address. Add: caip10=eip155:66238:${connectedAddress}`
+      };
+    }
+
     debug('verify-did-web', 'DNS TXT: No matching address found');
-    return false;
+    return {
+      success: false,
+      error: 'Address mismatch in DNS TXT record',
+      details: `Found addresses [${foundAddresses.join(', ')}] in TXT record at ${txtRecordName}, but expected ${connectedAddress}`
+    };
   } catch (error) {
     debug('verify-did-web', 'DNS TXT lookup failed:', error);
-    return false;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: 'DNS lookup failed',
+      details: `Failed to query DNS TXT record at ${txtRecordName}: ${errorMsg}`
+    };
   }
 }
 
 /**
  * Check DID document for did:web verification
  */
-async function checkDidWebViaDidDoc(domain: string, connectedAddress: string): Promise<boolean> {
+async function checkDidWebViaDidDoc(domain: string, connectedAddress: string): Promise<VerificationResult> {
   const didDocUrl = `https://${domain}/.well-known/did.json`;
   debug('verify-did-web', `Fetching DID document: ${didDocUrl}`);
-  
+
   try {
     const response = await fetch(didDocUrl, {
       headers: { 'Accept': 'application/json' },
       // 10 second timeout
       signal: AbortSignal.timeout(10000),
     });
-    
+
     if (!response.ok) {
       debug('verify-did-web', `DID document fetch failed: ${response.status} ${response.statusText}`);
-      return false;
+      return {
+        success: false,
+        error: 'DID document not accessible',
+        details: `Failed to fetch DID document at ${didDocUrl}: ${response.status} ${response.statusText}. Ensure the file exists and is publicly accessible.`
+      };
     }
-    
+
     const didDoc = await response.json();
     debug('verify-did-web', 'DID document fetched successfully');
-    
+
     // Look for connected address in verificationMethod
     const verificationMethods = didDoc.verificationMethod || [];
     debug('verify-did-web', `Found ${verificationMethods.length} verification methods`);
-    
+
+    if (verificationMethods.length === 0) {
+      return {
+        success: false,
+        error: 'No verification methods in DID document',
+        details: `DID document at ${didDocUrl} exists but has no verificationMethod array. Add a verification method with your address.`
+      };
+    }
+
+    let foundAddresses: string[] = [];
+
     for (const method of verificationMethods) {
       // Check blockchainAccountId field (CAIP-10 format)
       if (method.blockchainAccountId) {
         debug('verify-did-web', `Checking blockchainAccountId: ${method.blockchainAccountId}`);
-        
+
         // Extract address from CAIP-10 (format: namespace:reference:address)
         const parts = method.blockchainAccountId.split(':');
         if (parts.length === 3) {
           const address = parts[2];
+          foundAddresses.push(address);
           debug('verify-did-web', `Extracted address: ${address}`);
-          
+
           if (address.toLowerCase() === connectedAddress.toLowerCase()) {
             debug('verify-did-web', '✅ DID document: Address match found!');
-            return true;
+            return { success: true };
           }
         }
       }
-      
+
       // Also check publicKeyHex field (Ethereum address without 0x)
       if (method.publicKeyHex) {
         const pubKeyAddress = '0x' + method.publicKeyHex;
+        foundAddresses.push(pubKeyAddress);
         debug('verify-did-web', `Checking publicKeyHex: ${pubKeyAddress}`);
-        
+
         if (pubKeyAddress.toLowerCase() === connectedAddress.toLowerCase()) {
           debug('verify-did-web', '✅ DID document: Address match found via publicKeyHex!');
-          return true;
+          return { success: true };
         }
       }
     }
-    
+
     debug('verify-did-web', 'DID document: No matching address found');
-    return false;
+    return {
+      success: false,
+      error: 'Address not found in DID document',
+      details: `Found addresses [${foundAddresses.join(', ')}] in DID document at ${didDocUrl}, but expected ${connectedAddress}. Update your verificationMethod to include your address.`
+    };
   } catch (error) {
     debug('verify-did-web', 'DID document fetch/parse failed:', error);
-    return false;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: 'DID document fetch failed',
+      details: `Failed to fetch or parse DID document at ${didDocUrl}: ${errorMsg}`
+    };
   }
 }
 
 /**
  * Verify did:web ownership via DNS TXT record (fast) or DID document (fallback)
  */
-async function verifyDidWeb(did: string, connectedAddress: string): Promise<boolean> {
+async function verifyDidWeb(did: string, connectedAddress: string): Promise<VerificationResult> {
   debug('verify-did-web', `Verifying ${did} for address ${connectedAddress}`);
-  
+
   if (!did.startsWith('did:web:')) {
     debug('verify-did-web', 'Invalid did:web format');
-    return false;
+    return {
+      success: false,
+      error: 'Invalid DID format',
+      details: 'DID must start with "did:web:"'
+    };
   }
-  
+
   const domain = normalizeDomain(did.replace('did:web:', ''));
   debug('verify-did-web', `Normalized domain: ${domain}`);
-  
+
   // Method 1: Check DNS TXT record (fast, preferred)
   const dnsResult = await checkDidWebViaDns(domain, connectedAddress);
-  if (dnsResult) {
-    return true;
+  if (dnsResult.success) {
+    return { success: true, method: 'dns' };
   }
-  
+
   // Method 2: Check DID document (fallback, slower)
   debug('verify-did-web', 'DNS verification failed, trying DID document...');
   const didDocResult = await checkDidWebViaDidDoc(domain, connectedAddress);
-  
-  if (!didDocResult) {
-    debug('verify-did-web', '❌ Both verification methods failed');
+
+  if (didDocResult.success) {
+    return { success: true, method: 'did-document' };
   }
-  
-  return didDocResult;
+
+  // Both methods failed - return detailed error
+  debug('verify-did-web', '❌ Both verification methods failed');
+  return {
+    success: false,
+    error: 'DID ownership verification failed',
+    details: `DNS check: ${dnsResult.error || 'Failed'}. DID document check: ${didDocResult.error || 'Failed'}. Ensure you have either: 1) DNS TXT record at _omatrust.${domain} with value "v=1 caip10=eip155:66238:${connectedAddress}" OR 2) DID document at https://${domain}/.well-known/did.json with your address in verificationMethod`
+  };
 }
 
 /**
  * Verify did:pkh ownership via contract ownership checks
  */
-async function verifyDidPkh(did: string, connectedAddress: string): Promise<boolean> {
+async function verifyDidPkh(did: string, connectedAddress: string): Promise<VerificationResult> {
   debug('verify-did-pkh', `Verifying ${did} for address ${connectedAddress}`);
-  
+
   if (!did.startsWith('did:pkh:')) {
     debug('verify-did-pkh', 'Invalid did:pkh format');
-    return false;
+    return {
+      success: false,
+      error: 'Invalid DID format',
+      details: 'DID must start with "did:pkh:"'
+    };
   }
-  
+
   const caip10 = did.replace('did:pkh:', '');
   debug('verify-did-pkh', `CAIP-10: ${caip10}`);
-  
+
   const parts = caip10.split(':');
   if (parts.length !== 3) {
     debug('verify-did-pkh', 'Invalid CAIP-10 format');
-    return false;
+    return {
+      success: false,
+      error: 'Invalid CAIP-10 format',
+      details: 'CAIP-10 must be in format "namespace:reference:address"'
+    };
   }
-  
+
   const [namespace, reference, contractAddress] = parts;
   debug('verify-did-pkh', `Namespace: ${namespace}, Chain: ${reference}, Contract: ${contractAddress}`);
-  
+
   if (namespace !== 'eip155') {
     debug('verify-did-pkh', 'Only EVM chains (eip155) supported');
-    return false;
+    return {
+      success: false,
+      error: 'Unsupported blockchain',
+      details: 'Only EVM chains (eip155) are supported'
+    };
   }
-  
+
   const chainId = parseInt(reference, 10);
   debug('verify-did-pkh', `Chain ID: ${chainId}`);
-  
+
   // Get RPC URL
   const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
   if (!clientId) {
     debug('verify-did-pkh', 'Missing NEXT_PUBLIC_THIRDWEB_CLIENT_ID');
-    return false;
+    return {
+      success: false,
+      error: 'Server configuration error',
+      details: 'Missing Thirdweb client ID'
+    };
   }
-  
+
   const rpcUrl = getRpcUrl(chainId);
   debug('verify-did-pkh', `Using RPC: ${rpcUrl}`);
-  
+
   // Create ethers provider
   const provider = new ethers.JsonRpcProvider(rpcUrl);
-  
+
   // Try multiple ownership patterns
   const patterns = [
     { name: 'owner()', sig: 'function owner() view returns (address)' },
     { name: 'admin()', sig: 'function admin() view returns (address)' },
     { name: 'getOwner()', sig: 'function getOwner() view returns (address)' },
   ];
-  
+
   for (const pattern of patterns) {
     try {
       debug('verify-did-pkh', `Trying pattern: ${pattern.name}`);
       const contract = new ethers.Contract(contractAddress, [pattern.sig], provider);
       const ownerAddress = await withRetry(() => contract[pattern.name.replace('()', '')]());
-      
+
       debug('verify-did-pkh', `Owner from ${pattern.name}: ${ownerAddress}`);
-      
+
       if (ownerAddress.toLowerCase() === connectedAddress.toLowerCase()) {
         debug('verify-did-pkh', `✅ Ownership verified via ${pattern.name}`);
-        return true;
+        return { success: true, method: 'contract' };
       }
     } catch (error) {
       debug('verify-did-pkh', `Pattern ${pattern.name} failed:`, error);
     }
   }
-  
+
   // Try EIP-1967 proxy admin slot
   try {
     debug('verify-did-pkh', 'Trying EIP-1967 admin slot');
     const adminSlot = '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103';
     const adminValue = await provider.getStorage(contractAddress, adminSlot);
     const adminAddress = ethers.getAddress('0x' + adminValue.slice(-40));
-    
+
     debug('verify-did-pkh', `Admin from EIP-1967: ${adminAddress}`);
-    
+
     if (adminAddress.toLowerCase() === connectedAddress.toLowerCase()) {
       debug('verify-did-pkh', '✅ Ownership verified via EIP-1967');
-      return true;
+      return { success: true, method: 'contract' };
     }
   } catch (error) {
     debug('verify-did-pkh', 'EIP-1967 check failed:', error);
   }
-  
+
   debug('verify-did-pkh', '❌ No ownership match found');
-  return false;
+  return {
+    success: false,
+    error: 'Contract ownership verification failed',
+    details: `You are not the owner of contract ${contractAddress} on chain ${chainId}. Tried owner(), admin(), getOwner() functions and EIP-1967 proxy admin slot.`
+  };
 }
 
 /**
@@ -344,41 +445,41 @@ async function writeAttestation(
   chainId: number
 ): Promise<string> {
   debug('write-attestation', `Writing attestation for ${did}, schema: ${schema}`);
-  
+
   // For ownership schema, we use upsertDirect
   // didHash = keccak256(did string)
   // controllerAddress = owner address padded to bytes32
   const didHash = ethers.id(did) as `0x${string}`;
   const controllerAddress = ethers.zeroPadValue(connectedAddress, 32) as `0x${string}`;
-  
+
   debug('write-attestation', `DID hash (ethers.id): ${didHash}`);
   debug('write-attestation', `Controller: ${controllerAddress}`);
-  
+
   const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
   if (!clientId) {
     throw new Error('Missing NEXT_PUBLIC_THIRDWEB_CLIENT_ID');
   }
-  
+
   const client = createThirdwebClient({ clientId });
   const chain = defineChain(chainId);
   const resolver = getContract({ client, chain, address: resolverAddress });
-  
+
   // Check for Thirdweb Managed Vault (highest priority - production ready)
   const managedWallet = getThirdwebManagedWallet();
-  
+
   let txHash: string;
-  
+
   if (managedWallet) {
     // Production: Use Thirdweb Managed Vault (HSM-secured)
     debug('write-attestation', 'Using Thirdweb Transactions API');
-    
+
     // Prepare the transaction
     const tx = prepareContractCall({
       contract: resolver,
       method: 'function upsertDirect(bytes32 didHash, bytes32 controllerAddress, uint64 expiresAt)',
       params: [didHash, controllerAddress, 0n], // 0 = never expires
     });
-    
+
     // Send via Thirdweb Transactions API
     const response = await fetch(`https://embedded-wallet.thirdweb.com/api/2023-11-30/transaction/send`, {
       method: 'POST',
@@ -392,45 +493,45 @@ async function writeAttestation(
         from: managedWallet.walletAddress,
       }),
     });
-    
+
     if (!response.ok) {
       const error = await response.text();
       debug('write-attestation', 'Thirdweb API error:', error);
       throw new Error(`Thirdweb API error: ${error}`);
     }
-    
+
     const result = await response.json();
     txHash = result.transactionHash;
     debug('write-attestation', `Transaction sent via Thirdweb: ${txHash}`);
-    
+
   } else {
     // Testnet/Development: Use direct private key signing
     debug('write-attestation', 'Using direct private key signing (ISSUER_PRIVATE_KEY or SSH file)');
-    
+
     const privateKey = loadIssuerPrivateKey();
     const account = privateKeyToAccount({ client, privateKey: privateKey as `0x${string}` });
-    
+
     debug('write-attestation', `Signer address: ${account.address}`);
-    
+
     const tx = prepareContractCall({
       contract: resolver,
       method: 'function upsertDirect(bytes32 didHash, bytes32 controllerAddress, uint64 expiresAt)',
       params: [didHash, controllerAddress, 0n],
     });
-    
+
     const result = await sendTransaction({
       transaction: tx,
       account,
     });
-    
+
     txHash = result.transactionHash;
     debug('write-attestation', `Transaction sent: ${txHash}`);
   }
-  
+
   // Wait for 1 confirmation (fast for testnets)
   debug('write-attestation', 'Waiting for confirmation...');
   await new Promise(resolve => setTimeout(resolve, 3000)); // Simple wait
-  
+
   debug('write-attestation', '✅ Attestation written successfully');
   return txHash;
 }
@@ -441,28 +542,28 @@ async function writeAttestation(
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   debug('main', '=== NEW REQUEST ===');
-  
+
   try {
     const body = await request.json();
     const { did, connectedAddress, requiredSchemas = ['oma3.ownership.v1'] } = body;
-    
+
     debug('main', 'Request body:', { did, connectedAddress, requiredSchemas });
-    
+
     // Validate inputs
     if (!did || typeof did !== 'string') {
       debug('main', 'Invalid DID');
       return NextResponse.json({ ok: false, error: 'DID is required' }, { status: 400 });
     }
-    
+
     if (!connectedAddress || typeof connectedAddress !== 'string') {
       debug('main', 'Invalid connected address');
       return NextResponse.json({ ok: false, error: 'Connected address is required' }, { status: 400 });
     }
-    
+
     // Get active chain config
     const activeChainEnv = process.env.NEXT_PUBLIC_ACTIVE_CHAIN || 'localhost';
     debug('main', `Active chain: ${activeChainEnv}`);
-    
+
     let activeChain: any;
     if (activeChainEnv === 'localhost') {
       activeChain = localhost;
@@ -474,20 +575,20 @@ export async function POST(request: NextRequest) {
       debug('main', 'Invalid active chain');
       return NextResponse.json({ ok: false, error: 'Invalid active chain' }, { status: 500 });
     }
-    
+
     if (!activeChain?.contracts?.resolver) {
       debug('main', 'Resolver not configured');
       return NextResponse.json({ ok: false, error: 'Resolver not configured' }, { status: 500 });
     }
-    
+
     debug('main', `Using resolver: ${activeChain.contracts.resolver} on chain ${activeChain.chainId}`);
-    
+
     const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
     if (!clientId) {
       debug('main', 'Missing Thirdweb client ID');
       return NextResponse.json({ ok: false, error: 'Thirdweb client ID not configured' }, { status: 500 });
     }
-    
+
     // Step 1: Check for existing attestations
     debug('main', '--- STEP 1: CHECK EXISTING ATTESTATIONS ---');
     const { present, missing } = await checkExistingAttestations(
@@ -498,7 +599,7 @@ export async function POST(request: NextRequest) {
       activeChain.chainId,
       clientId
     );
-    
+
     if (missing.length === 0) {
       debug('main', '✅ All attestations already exist (fast path)');
       const elapsed = Date.now() - startTime;
@@ -514,39 +615,41 @@ export async function POST(request: NextRequest) {
         elapsed: `${elapsed}ms`,
       });
     }
-    
+
     // Step 2: Verify DID ownership
     debug('main', '--- STEP 2: VERIFY DID OWNERSHIP ---');
-    let verified = false;
-    
+    let verificationResult: VerificationResult;
+
     if (did.startsWith('did:web:')) {
-      verified = await verifyDidWeb(did, connectedAddress);
+      verificationResult = await verifyDidWeb(did, connectedAddress);
     } else if (did.startsWith('did:pkh:')) {
-      verified = await verifyDidPkh(did, connectedAddress);
+      verificationResult = await verifyDidPkh(did, connectedAddress);
     } else {
       debug('main', 'Unsupported DID type');
       return NextResponse.json({ ok: false, error: 'Unsupported DID type' }, { status: 400 });
     }
-    
-    if (!verified) {
+
+    if (!verificationResult.success) {
       debug('main', '❌ DID verification failed');
       const elapsed = Date.now() - startTime;
       return NextResponse.json({
         ok: false,
         status: 'failed',
-        error: 'DID ownership verification failed',
+        error: verificationResult.error || 'DID ownership verification failed',
+        details: verificationResult.details,
+        method: verificationResult.method,
         attestations: { present, missing },
         elapsed: `${elapsed}ms`,
       }, { status: 403 });
     }
-    
+
     debug('main', '✅ DID ownership verified');
-    
+
     // Step 3: Write missing attestations
     debug('main', '--- STEP 3: WRITE ATTESTATIONS ---');
     const txHashes: string[] = [];
     const writeErrors: { schema: string; error: string }[] = [];
-    
+
     for (const schema of missing) {
       try {
         const txHash = await writeAttestation(
@@ -562,22 +665,22 @@ export async function POST(request: NextRequest) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
         debug('main', `❌ Failed to write attestation for schema ${schema}:`, error);
-        writeErrors.push({ 
-          schema, 
+        writeErrors.push({
+          schema,
           error: errorMsg,
           ...(errorStack && { stack: errorStack.split('\n').slice(0, 5).join('\n') }) // First 5 lines of stack
         });
       }
     }
-    
+
     debug('main', `Wrote ${txHashes.length}/${missing.length} attestations`);
-    
+
     // Check if all required attestations were written
     if (writeErrors.length > 0 && txHashes.length === 0) {
       // All writes failed
       debug('main', '❌ All attestation writes failed');
       const elapsed = Date.now() - startTime;
-      
+
       // Get diagnostic info for error response
       let signerInfo = 'Unknown';
       try {
@@ -593,7 +696,7 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         signerInfo = `Error loading signer: ${e instanceof Error ? e.message : String(e)}`;
       }
-      
+
       return NextResponse.json({
         ok: false,
         status: 'failed',
@@ -617,7 +720,7 @@ export async function POST(request: NextRequest) {
         elapsed: `${elapsed}ms`,
       }, { status: 500 });
     }
-    
+
     // Success: at least some attestations were written (or all were already present)
     // Re-check current owner after writes
     let currentOwnerAfter: string | null = null;
@@ -638,7 +741,7 @@ export async function POST(request: NextRequest) {
 
     const elapsed = Date.now() - startTime;
     debug('main', `=== REQUEST COMPLETE (${elapsed}ms) ===`);
-    
+
     return NextResponse.json({
       ok: true,
       status: 'ready',
@@ -655,11 +758,11 @@ export async function POST(request: NextRequest) {
       },
       elapsed: `${elapsed}ms`,
     });
-    
+
   } catch (error) {
     const elapsed = Date.now() - startTime;
     debug('main', '❌ ERROR:', error);
-    
+
     return NextResponse.json({
       ok: false,
       status: 'failed',
