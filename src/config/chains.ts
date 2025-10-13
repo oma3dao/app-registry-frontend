@@ -18,9 +18,9 @@ export const localhost = {
   testnet: true,
   contracts: {
     // Update these addresses after running: npx hardhat deploy-system --network localhost and copy the addresses from the deployment output to the below fields:
-    registry: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-    metadata: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-    resolver: "0x24B0B17adb13DB2146995480e0114b2c93Df217f"
+    registry: "0x9AFBaA695D801b0C5d1F2c5F153ce7518cD04861",
+    metadata: "0x84724AB9899455ca6EC292C285978c535b7982aC",
+    resolver: "0x77E058106762AeA4A567f2919Ef896bb6A82f914"
   }
 };
 
