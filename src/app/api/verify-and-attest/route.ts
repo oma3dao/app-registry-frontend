@@ -560,8 +560,13 @@ export async function POST(request: NextRequest) {
         debug('main', `✅ Attestation written for schema ${schema}: ${txHash}`);
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
         debug('main', `❌ Failed to write attestation for schema ${schema}:`, error);
-        writeErrors.push({ schema, error: errorMsg });
+        writeErrors.push({ 
+          schema, 
+          error: errorMsg,
+          ...(errorStack && { stack: errorStack.split('\n').slice(0, 5).join('\n') }) // First 5 lines of stack
+        });
       }
     }
     
@@ -572,12 +577,43 @@ export async function POST(request: NextRequest) {
       // All writes failed
       debug('main', '❌ All attestation writes failed');
       const elapsed = Date.now() - startTime;
+      
+      // Get diagnostic info for error response
+      let signerInfo = 'Unknown';
+      try {
+        const managedWallet = getThirdwebManagedWallet();
+        if (managedWallet) {
+          signerInfo = `Thirdweb Managed Wallet: ${managedWallet.walletAddress}`;
+        } else {
+          const privateKey = loadIssuerPrivateKey();
+          const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID! });
+          const account = privateKeyToAccount({ client, privateKey: privateKey as `0x${string}` });
+          signerInfo = `Direct Private Key: ${account.address}`;
+        }
+      } catch (e) {
+        signerInfo = `Error loading signer: ${e instanceof Error ? e.message : String(e)}`;
+      }
+      
       return NextResponse.json({
         ok: false,
         status: 'failed',
         error: 'Failed to write attestations to blockchain',
         details: writeErrors,
         attestations: { present, missing },
+        debug: {
+          did,
+          didHash: ethers.id(did),
+          connectedAddress,
+          activeChain: activeChain.name,
+          chainId: activeChain.chainId,
+          resolverAddress: activeChain.contracts.resolver,
+          signerInfo,
+          contractAddresses: {
+            registry: activeChain.contracts.registry,
+            metadata: activeChain.contracts.metadata,
+            resolver: activeChain.contracts.resolver,
+          }
+        },
         elapsed: `${elapsed}ms`,
       }, { status: 500 });
     }
