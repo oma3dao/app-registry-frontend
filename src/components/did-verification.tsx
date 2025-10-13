@@ -2,12 +2,12 @@
 
 import React, { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { 
-  AlertCircleIcon, 
-  CheckCircleIcon, 
-  ExternalLinkIcon, 
+import {
+  AlertCircleIcon,
+  CheckCircleIcon,
+  ExternalLinkIcon,
   InfoIcon,
-  Loader2Icon 
+  Loader2Icon
 } from "lucide-react"
 import { useActiveAccount } from "thirdweb/react"
 import { normalizeDidWeb } from "@/lib/utils/did"
@@ -26,7 +26,7 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
 
   const handleVerify = async () => {
     console.log("[DidVerification] Starting verification...");
-    
+
     if (!account) {
       console.log("[DidVerification] No account connected");
       setVerificationError("Please connect your wallet first");
@@ -48,7 +48,7 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
     try {
       console.log("[DidVerification] Normalized DID:", normalizedDid);
       console.log("[DidVerification] Connected address:", account.address);
-      
+
       // Call unified verify-and-attest endpoint
       const response = await fetch("/api/verify-and-attest", {
         method: "POST",
@@ -70,30 +70,38 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
         }
         onVerificationComplete(true);
       } else {
-        // Build detailed error message
-        let errorMsg = result.error || "Verification failed";
-        
-        // Add more context based on response
-        if (result.details) {
-          errorMsg += `\n\nDetails: ${JSON.stringify(result.details, null, 2)}`;
+        // Log full error response to console for debugging
+        console.error("[DidVerification] ❌ Verification failed - Full response:", result);
+
+        // If there are error details, parse and log them
+        if (result.details && Array.isArray(result.details)) {
+          result.details.forEach((detail: any) => {
+            console.error(`[DidVerification] 🔴 Error for schema "${detail.schema}":`, detail.error);
+
+            // Try to parse the error string as JSON for better display
+            try {
+              const parsedError = JSON.parse(detail.error);
+              console.error("[DidVerification] 📋 Parsed error object:", parsedError);
+            } catch {
+              // If not JSON, it's already a readable string
+            }
+
+            if (detail.diagnostics) {
+              console.error("[DidVerification] 📊 Diagnostics:", detail.diagnostics);
+            }
+          });
         }
-        
-        // For did:web, remind about DNS/DID document requirements
-        if (normalizedDid.startsWith("did:web:")) {
-          const domain = normalizedDid.replace("did:web:", "");
-          errorMsg += `\n\n⚠️ For did:web verification, ensure you have either:\n` +
-                     `1. DNS TXT record at _omatrust.${domain}\n` +
-                     `2. DID document at https://${domain}/.well-known/did.json\n\n` +
-                     `Check server logs (terminal where 'npm run dev' is running) for detailed debug info.`;
-        }
-        
-        throw new Error(errorMsg);
+
+        // Show simple user-friendly message in UI
+        const userMessage = result.error || "Verification failed. Check the console for details.";
+        throw new Error(userMessage);
       }
     } catch (error: any) {
       console.error("[DidVerification] ❌ Verification failed:", error);
-      setVerificationError(
-        error.message || "Failed to verify DID ownership. Please check your setup and try again."
-      );
+
+      // Show simple error message in UI
+      const userMessage = error.message || "Verification failed. Check the console for details.";
+      setVerificationError(userMessage);
       onVerificationComplete(false);
     } finally {
       setIsVerifying(false);
@@ -104,14 +112,14 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
   const renderInstructions = () => {
     // Extract domain from DID for display
     const domain = did.replace("did:web:", "").split("/")[0] || "yourdomain.com";
-    
+
     // Get connected wallet address and active chain ID
     const walletAddress = account?.address || "0xYOUR_ADDRESS";
     const chainId = env.activeChain.chainId;
-    
+
     // Format CAIP-10 identifier
     const caip10 = `eip155:${chainId}:${walletAddress}`;
-    
+
     return (
       <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
         <div className="flex gap-2 items-start">
@@ -119,7 +127,7 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
           <div className="text-sm text-blue-900 dark:text-blue-100">
             <p className="font-medium mb-2">Website DID (did:web) Requirements:</p>
             <p className="mb-2">To prove ownership of a website DID, you must use ONE of these methods:</p>
-            
+
             <div className="ml-4 mb-3">
               <p className="font-medium mt-2">Method 1: DID Document</p>
               <ul className="list-disc ml-4 mt-1 space-y-1">
@@ -164,8 +172,8 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
             <div className="text-sm">
               <p className="font-medium">⏱️ Important: DNS/Setup Propagation</p>
               <p className="mt-1">
-                After setting up your DID document or DNS TXT record, <strong>wait at least 15 minutes</strong> before 
-                clicking the verification button. This allows DNS changes to propagate globally and ensures the 
+                After setting up your DID document or DNS TXT record, <strong>wait at least 15 minutes</strong> before
+                clicking the verification button. This allows DNS changes to propagate globally and ensures the
                 verification server can see your settings.
               </p>
               <p className="mt-2">
@@ -210,6 +218,9 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
               <div className="text-sm">
                 <p className="font-medium">Verification Failed</p>
                 <p className="mt-1">{verificationError}</p>
+                <p className="mt-2 text-xs opacity-75">
+                  💡 Open your browser's JavaScript console (F12) for detailed error information.
+                </p>
               </div>
             </div>
           </div>

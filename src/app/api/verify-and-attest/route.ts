@@ -46,19 +46,6 @@ function debug(section: string, message: string, data?: any) {
   console.log(`[verify-and-attest:${section}] ${message}`, data || '');
 }
 
-// Error codes for better client handling
-enum ErrorCode {
-  INVALID_INPUT = 'INVALID_INPUT',
-  DNS_LOOKUP_FAILED = 'DNS_LOOKUP_FAILED',
-  DID_DOC_NOT_FOUND = 'DID_DOC_NOT_FOUND',
-  ADDRESS_MISMATCH = 'ADDRESS_MISMATCH',
-  VERIFICATION_FAILED = 'VERIFICATION_FAILED',
-  CONTRACT_WRITE_FAILED = 'CONTRACT_WRITE_FAILED',
-  RPC_ERROR = 'RPC_ERROR',
-  CONFIG_ERROR = 'CONFIG_ERROR',
-  UNSUPPORTED_DID = 'UNSUPPORTED_DID',
-}
-
 // Validate Ethereum address format
 function isValidEthereumAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
@@ -582,7 +569,6 @@ export async function POST(request: NextRequest) {
       debug('main', 'Invalid DID');
       return NextResponse.json({
         ok: false,
-        code: ErrorCode.INVALID_INPUT,
         error: 'DID is required'
       }, { status: 400 });
     }
@@ -591,7 +577,6 @@ export async function POST(request: NextRequest) {
       debug('main', 'Invalid connected address');
       return NextResponse.json({
         ok: false,
-        code: ErrorCode.INVALID_INPUT,
         error: 'Connected address is required'
       }, { status: 400 });
     }
@@ -601,7 +586,6 @@ export async function POST(request: NextRequest) {
       debug('main', 'Invalid Ethereum address format');
       return NextResponse.json({
         ok: false,
-        code: ErrorCode.INVALID_INPUT,
         error: 'Invalid Ethereum address format',
         details: 'Address must be a valid Ethereum address (0x followed by 40 hex characters)'
       }, { status: 400 });
@@ -695,7 +679,6 @@ export async function POST(request: NextRequest) {
       debug('main', 'Unsupported DID type');
       return NextResponse.json({
         ok: false,
-        code: ErrorCode.UNSUPPORTED_DID,
         error: 'Unsupported DID type',
         details: 'Only did:web: and did:pkh: are supported'
       }, { status: 400 });
@@ -706,7 +689,6 @@ export async function POST(request: NextRequest) {
       const elapsed = Date.now() - startTime;
       return NextResponse.json({
         ok: false,
-        code: ErrorCode.VERIFICATION_FAILED,
         status: 'failed',
         error: verificationResult.error || 'DID ownership verification failed',
         details: verificationResult.details,
@@ -737,8 +719,7 @@ export async function POST(request: NextRequest) {
     const txHashes: string[] = [];
     const writeErrors: {
       schema: string;
-      error: string;
-      stack?: string;
+      error: string;  // Stringified error object
       diagnostics?: {
         issuerAddress: string;
         contractAddress: string;
@@ -761,30 +742,25 @@ export async function POST(request: NextRequest) {
         txHashes.push(txHash);
         debug('main', `✅ Attestation written for schema ${schema}: ${txHash}`);
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        const errorStack = error instanceof Error ? error.stack : undefined;
         debug('main', `❌ Failed to write attestation for schema ${schema}:`, error);
 
-        // Use already-derived issuer information
-
-        const didHash = ethers.id(did);
-        const controllerAddress = ethers.zeroPadValue(connectedAddress, 32);
-
+        // Just stringify the entire error - no parsing, no reconstruction
+        const errorString = JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
+        
         writeErrors.push({
           schema,
-          error: errorMsg,
+          error: errorString,
           // Only include sensitive debug info in debug mode
           ...(isDebugMode && {
-            stack: errorStack?.split('\n').slice(0, 5).join('\n'),
             diagnostics: {
               issuerAddress,
               contractAddress: activeChain.contracts.resolver,
               chainId: activeChain.chainId,
-              didHash,
-              controllerAddress,
+              didHash: ethers.id(did),
+              controllerAddress: ethers.zeroPadValue(connectedAddress, 32),
               payload: {
                 method: 'upsertDirect',
-                params: [didHash, controllerAddress, '0'], // 0 = never expires
+                params: [ethers.id(did), ethers.zeroPadValue(connectedAddress, 32), '0'],
                 did,
                 connectedAddress,
                 schema
@@ -808,7 +784,6 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         ok: false,
-        code: ErrorCode.CONTRACT_WRITE_FAILED,
         status: 'failed',
         error: 'Failed to write attestations to blockchain',
         details: writeErrors,
@@ -894,7 +869,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: false,
-      code: ErrorCode.RPC_ERROR,
       status: 'failed',
       error: 'Internal server error',
       ...(isDebugMode && {
