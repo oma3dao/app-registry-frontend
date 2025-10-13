@@ -33,19 +33,35 @@ interface VerificationResult {
 
 const resolveTxt = promisify(dns.resolveTxt);
 
-/**
- * Convert schema string to bytes32 hash
- */
-function schemaToBytes32(schema: string): `0x${string}` {
-  return ethers.id(schema) as `0x${string}`;
-}
+
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
 
+// Check if debug mode is enabled
+const isDebugMode = process.env.NEXT_PUBLIC_DEBUG_ADAPTER === 'true';
+
 // Debug logger
 function debug(section: string, message: string, data?: any) {
   console.log(`[verify-and-attest:${section}] ${message}`, data || '');
+}
+
+// Error codes for better client handling
+enum ErrorCode {
+  INVALID_INPUT = 'INVALID_INPUT',
+  DNS_LOOKUP_FAILED = 'DNS_LOOKUP_FAILED',
+  DID_DOC_NOT_FOUND = 'DID_DOC_NOT_FOUND',
+  ADDRESS_MISMATCH = 'ADDRESS_MISMATCH',
+  VERIFICATION_FAILED = 'VERIFICATION_FAILED',
+  CONTRACT_WRITE_FAILED = 'CONTRACT_WRITE_FAILED',
+  RPC_ERROR = 'RPC_ERROR',
+  CONFIG_ERROR = 'CONFIG_ERROR',
+  UNSUPPORTED_DID = 'UNSUPPORTED_DID',
+}
+
+// Validate Ethereum address format
+function isValidEthereumAddress(address: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
 
 /**
@@ -96,7 +112,14 @@ async function checkExistingAttestations(
       return { present: [], missing: requiredSchemas };
     }
   } catch (error) {
-    debug('check-attestations', `Error checking ownership:`, error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    debug('check-attestations', `Error checking ownership: ${errorMsg}`, error);
+
+    // RPC errors mean we can't verify existing attestations, so assume missing
+    if (errorMsg.includes('timeout') || errorMsg.includes('network') || errorMsg.includes('connection')) {
+      debug('check-attestations', 'RPC/network error - assuming attestations are missing');
+    }
+
     return { present: [], missing: requiredSchemas };
   }
 }
@@ -543,6 +566,11 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   debug('main', '=== NEW REQUEST ===');
 
+  // Declare variables outside try block for catch block access
+  let issuerAddress = 'Unknown';
+  let issuerType = 'Unknown';
+  let activeChain: any = null;
+
   try {
     const body = await request.json();
     const { did, connectedAddress, requiredSchemas = ['oma3.ownership.v1'] } = body;
@@ -552,19 +580,36 @@ export async function POST(request: NextRequest) {
     // Validate inputs
     if (!did || typeof did !== 'string') {
       debug('main', 'Invalid DID');
-      return NextResponse.json({ ok: false, error: 'DID is required' }, { status: 400 });
+      return NextResponse.json({
+        ok: false,
+        code: ErrorCode.INVALID_INPUT,
+        error: 'DID is required'
+      }, { status: 400 });
     }
 
     if (!connectedAddress || typeof connectedAddress !== 'string') {
       debug('main', 'Invalid connected address');
-      return NextResponse.json({ ok: false, error: 'Connected address is required' }, { status: 400 });
+      return NextResponse.json({
+        ok: false,
+        code: ErrorCode.INVALID_INPUT,
+        error: 'Connected address is required'
+      }, { status: 400 });
+    }
+
+    // Validate Ethereum address format
+    if (!isValidEthereumAddress(connectedAddress)) {
+      debug('main', 'Invalid Ethereum address format');
+      return NextResponse.json({
+        ok: false,
+        code: ErrorCode.INVALID_INPUT,
+        error: 'Invalid Ethereum address format',
+        details: 'Address must be a valid Ethereum address (0x followed by 40 hex characters)'
+      }, { status: 400 });
     }
 
     // Get active chain config
     const activeChainEnv = process.env.NEXT_PUBLIC_ACTIVE_CHAIN || 'localhost';
     debug('main', `Active chain: ${activeChainEnv}`);
-
-    let activeChain: any;
     if (activeChainEnv === 'localhost') {
       activeChain = localhost;
     } else if (activeChainEnv === 'omachain-testnet') {
@@ -589,6 +634,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Thirdweb client ID not configured' }, { status: 500 });
     }
 
+    // Derive issuer information once at the beginning
+    try {
+      const managedWallet = getThirdwebManagedWallet();
+      if (managedWallet) {
+        issuerAddress = managedWallet.walletAddress;
+        issuerType = 'Thirdweb Managed Wallet';
+      } else {
+        const privateKey = loadIssuerPrivateKey();
+        const client = createThirdwebClient({ clientId });
+        const account = privateKeyToAccount({ client, privateKey: privateKey as `0x${string}` });
+        issuerAddress = account.address;
+        issuerType = 'Direct Private Key';
+      }
+      debug('main', `Issuer: ${issuerType} (${issuerAddress})`);
+    } catch (e) {
+      issuerAddress = `Error: ${e instanceof Error ? e.message : String(e)}`;
+      issuerType = 'Error';
+      debug('main', `Issuer derivation failed: ${issuerAddress}`);
+    }
+
     // Step 1: Check for existing attestations
     debug('main', '--- STEP 1: CHECK EXISTING ATTESTATIONS ---');
     const { present, missing } = await checkExistingAttestations(
@@ -607,10 +672,12 @@ export async function POST(request: NextRequest) {
         ok: true,
         status: 'ready',
         attestations: { present, missing },
-        debug: {
-          did,
-          didHash: ethers.id(did),
-        },
+        ...(isDebugMode && {
+          debug: {
+            did,
+            didHash: ethers.id(did),
+          }
+        }),
         message: 'All attestations already exist',
         elapsed: `${elapsed}ms`,
       });
@@ -626,7 +693,12 @@ export async function POST(request: NextRequest) {
       verificationResult = await verifyDidPkh(did, connectedAddress);
     } else {
       debug('main', 'Unsupported DID type');
-      return NextResponse.json({ ok: false, error: 'Unsupported DID type' }, { status: 400 });
+      return NextResponse.json({
+        ok: false,
+        code: ErrorCode.UNSUPPORTED_DID,
+        error: 'Unsupported DID type',
+        details: 'Only did:web: and did:pkh: are supported'
+      }, { status: 400 });
     }
 
     if (!verificationResult.success) {
@@ -634,11 +706,26 @@ export async function POST(request: NextRequest) {
       const elapsed = Date.now() - startTime;
       return NextResponse.json({
         ok: false,
+        code: ErrorCode.VERIFICATION_FAILED,
         status: 'failed',
         error: verificationResult.error || 'DID ownership verification failed',
         details: verificationResult.details,
         method: verificationResult.method,
         attestations: { present, missing },
+        ...(isDebugMode && {
+          debug: {
+            did,
+            didHash: ethers.id(did),
+            connectedAddress,
+            activeChain: activeChain.name,
+            chainId: activeChain.chainId,
+            contractAddresses: {
+              registry: activeChain.contracts.registry,
+              metadata: activeChain.contracts.metadata,
+              resolver: activeChain.contracts.resolver,
+            }
+          }
+        }),
         elapsed: `${elapsed}ms`,
       }, { status: 403 });
     }
@@ -648,7 +735,19 @@ export async function POST(request: NextRequest) {
     // Step 3: Write missing attestations
     debug('main', '--- STEP 3: WRITE ATTESTATIONS ---');
     const txHashes: string[] = [];
-    const writeErrors: { schema: string; error: string }[] = [];
+    const writeErrors: {
+      schema: string;
+      error: string;
+      stack?: string;
+      diagnostics?: {
+        issuerAddress: string;
+        contractAddress: string;
+        chainId: number;
+        didHash: string;
+        controllerAddress: string;
+        payload: any;
+      };
+    }[] = [];
 
     for (const schema of missing) {
       try {
@@ -665,10 +764,33 @@ export async function POST(request: NextRequest) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
         debug('main', `❌ Failed to write attestation for schema ${schema}:`, error);
+
+        // Use already-derived issuer information
+
+        const didHash = ethers.id(did);
+        const controllerAddress = ethers.zeroPadValue(connectedAddress, 32);
+
         writeErrors.push({
           schema,
           error: errorMsg,
-          ...(errorStack && { stack: errorStack.split('\n').slice(0, 5).join('\n') }) // First 5 lines of stack
+          // Only include sensitive debug info in debug mode
+          ...(isDebugMode && {
+            stack: errorStack?.split('\n').slice(0, 5).join('\n'),
+            diagnostics: {
+              issuerAddress,
+              contractAddress: activeChain.contracts.resolver,
+              chainId: activeChain.chainId,
+              didHash,
+              controllerAddress,
+              payload: {
+                method: 'upsertDirect',
+                params: [didHash, controllerAddress, '0'], // 0 = never expires
+                did,
+                connectedAddress,
+                schema
+              }
+            }
+          })
         });
       }
     }
@@ -681,42 +803,32 @@ export async function POST(request: NextRequest) {
       debug('main', '❌ All attestation writes failed');
       const elapsed = Date.now() - startTime;
 
-      // Get diagnostic info for error response
-      let signerInfo = 'Unknown';
-      try {
-        const managedWallet = getThirdwebManagedWallet();
-        if (managedWallet) {
-          signerInfo = `Thirdweb Managed Wallet: ${managedWallet.walletAddress}`;
-        } else {
-          const privateKey = loadIssuerPrivateKey();
-          const client = createThirdwebClient({ clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID! });
-          const account = privateKeyToAccount({ client, privateKey: privateKey as `0x${string}` });
-          signerInfo = `Direct Private Key: ${account.address}`;
-        }
-      } catch (e) {
-        signerInfo = `Error loading signer: ${e instanceof Error ? e.message : String(e)}`;
-      }
+      // Use already-derived issuer information
+      const signerInfo = `${issuerType}: ${issuerAddress}`;
 
       return NextResponse.json({
         ok: false,
+        code: ErrorCode.CONTRACT_WRITE_FAILED,
         status: 'failed',
         error: 'Failed to write attestations to blockchain',
         details: writeErrors,
         attestations: { present, missing },
-        debug: {
-          did,
-          didHash: ethers.id(did),
-          connectedAddress,
-          activeChain: activeChain.name,
-          chainId: activeChain.chainId,
-          resolverAddress: activeChain.contracts.resolver,
-          signerInfo,
-          contractAddresses: {
-            registry: activeChain.contracts.registry,
-            metadata: activeChain.contracts.metadata,
-            resolver: activeChain.contracts.resolver,
+        ...(isDebugMode && {
+          debug: {
+            did,
+            didHash: ethers.id(did),
+            connectedAddress,
+            activeChain: activeChain.name,
+            chainId: activeChain.chainId,
+            resolverAddress: activeChain.contracts.resolver,
+            signerInfo,
+            contractAddresses: {
+              registry: activeChain.contracts.registry,
+              metadata: activeChain.contracts.metadata,
+              resolver: activeChain.contracts.resolver,
+            }
           }
-        },
+        }),
         elapsed: `${elapsed}ms`,
       }, { status: 500 });
     }
@@ -751,22 +863,49 @@ export async function POST(request: NextRequest) {
       },
       txHashes,
       ...(writeErrors.length > 0 && { warnings: writeErrors }),
-      debug: {
-        did,
-        didHash: ethers.id(did),
-        currentOwnerAfter,
-      },
+      ...(isDebugMode && {
+        debug: {
+          did,
+          didHash: ethers.id(did),
+          currentOwnerAfter,
+          issuerAddress,
+          issuerType,
+          contractAddresses: {
+            registry: activeChain.contracts.registry,
+            metadata: activeChain.contracts.metadata,
+            resolver: activeChain.contracts.resolver,
+          },
+          chainInfo: {
+            name: activeChain.name,
+            chainId: activeChain.chainId,
+            rpc: activeChain.rpc,
+          }
+        }
+      }),
       elapsed: `${elapsed}ms`,
     });
 
   } catch (error) {
     const elapsed = Date.now() - startTime;
-    debug('main', '❌ ERROR:', error);
+    debug('main', '❌ UNHANDLED ERROR:', error);
+
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
 
     return NextResponse.json({
       ok: false,
+      code: ErrorCode.RPC_ERROR,
       status: 'failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Internal server error',
+      ...(isDebugMode && {
+        details: errorMsg,
+        stack: errorStack?.split('\n').slice(0, 10).join('\n'),
+        debug: {
+          issuerAddress,
+          issuerType,
+          activeChain: activeChain?.name,
+        }
+      }),
       elapsed: `${elapsed}ms`,
     }, { status: 500 });
   }
