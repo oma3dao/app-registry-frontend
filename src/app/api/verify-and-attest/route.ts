@@ -15,10 +15,12 @@ import { createThirdwebClient, getContract, readContract, prepareContractCall, s
 import { defineChain } from 'thirdweb/chains';
 import { privateKeyToAccount } from 'thirdweb/wallets';
 import { ethers } from 'ethers';
+import { SiweMessage } from 'siwe';
 import { localhost, omachainTestnet, omachainMainnet } from '@/config/chains';
 import { getRpcUrl, withRetry } from '@/lib/rpc';
 import { normalizeDomain } from '@/lib/utils/did';
 import { loadIssuerPrivateKey, getThirdwebManagedWallet } from '@/lib/server/issuer-key';
+import { verifyNonceToken } from '@/lib/server/siwe-nonce';
 import resolverAbi from '@/abi/resolver.json';
 import dns from 'dns';
 import { promisify } from 'util';
@@ -821,9 +823,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { did, connectedAddress, requiredSchemas = ['oma3.ownership.v1'], txHash } = body;
+    const { did, siweMessage, siweSignature, requiredSchemas = ['oma3.ownership.v1'], txHash } = body;
 
-    debug('main', 'Request body:', { did, connectedAddress, requiredSchemas, txHash });
+    debug('main', 'Request body keys:', Object.keys(body));
     debug('main', `🔍 Verification method: ${txHash ? '🔄 TRANSFER (txHash provided)' : '⚡ AUTOMATED (no txHash)'}`);
 
     // Validate inputs
@@ -835,12 +837,58 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (!connectedAddress || typeof connectedAddress !== 'string') {
-      debug('main', 'Invalid connected address');
+    if (!siweMessage || typeof siweMessage !== 'string') {
+      debug('main', 'Missing SIWE message');
       return NextResponse.json({
         ok: false,
-        error: 'Connected address is required'
+        error: 'SIWE message is required for authentication'
       }, { status: 400 });
+    }
+
+    if (!siweSignature || typeof siweSignature !== 'string') {
+      debug('main', 'Missing SIWE signature');
+      return NextResponse.json({
+        ok: false,
+        error: 'SIWE signature is required for authentication'
+      }, { status: 400 });
+    }
+
+    // Verify SIWE signature
+    debug('main', '🔐 Verifying SIWE signature...');
+    let siwe: SiweMessage;
+    let connectedAddress: string;
+    
+    try {
+      siwe = new SiweMessage(siweMessage);
+      const result = await siwe.verify({ signature: siweSignature });
+      
+      if (!result.success) {
+        debug('main', '❌ SIWE verification failed');
+        return NextResponse.json({
+          ok: false,
+          error: 'Invalid signature'
+        }, { status: 401 });
+      }
+      
+      // Verify nonce token (stateless verification)
+      const verifiedNonce = verifyNonceToken(siwe.nonce);
+      if (!verifiedNonce) {
+        debug('main', '❌ Invalid or expired nonce token');
+        return NextResponse.json({
+          ok: false,
+          error: 'Invalid or expired nonce'
+        }, { status: 401 });
+      }
+      
+      connectedAddress = siwe.address;
+      debug('main', '✅ SIWE verified, address:', connectedAddress);
+      
+    } catch (error) {
+      debug('main', '❌ SIWE verification error:', error);
+      return NextResponse.json({
+        ok: false,
+        error: 'Failed to verify signature'
+      }, { status: 401 });
     }
 
     // Validate Ethereum address format

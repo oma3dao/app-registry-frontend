@@ -49,13 +49,39 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
       console.log("[DidVerification] Normalized DID:", normalizedDid);
       console.log("[DidVerification] Connected address:", account.address);
 
-      // Call unified verify-and-attest endpoint
+      // Step 1: Get SIWE nonce
+      console.log("[DidVerification] Getting SIWE nonce...");
+      const nonceResponse = await fetch("/api/siwe/nonce");
+      const { nonce } = await nonceResponse.json();
+
+      // Step 2: Create and sign SIWE message
+      console.log("[DidVerification] Creating SIWE message...");
+      const { SiweMessage } = await import('siwe');
+      const message = new SiweMessage({
+        domain: window.location.host,
+        address: account.address,
+        statement: 'Sign in to OMA3 App Registry to verify DID ownership',
+        uri: window.location.origin,
+        version: '1',
+        chainId: 1,
+        nonce,
+        issuedAt: new Date().toISOString(),
+      });
+
+      const messageString = message.prepareMessage();
+      
+      console.log("[DidVerification] Requesting signature from wallet...");
+      const signature = await account.signMessage({ message: messageString });
+      console.log("[DidVerification] Signature obtained");
+
+      // Step 3: Call unified verify-and-attest endpoint with SIWE
       const response = await fetch("/api/verify-and-attest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           did: normalizedDid,
-          connectedAddress: account.address,
+          siweMessage: messageString,
+          siweSignature: signature,
           requiredSchemas: ["oma3.ownership.v1"],
         }),
       });

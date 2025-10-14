@@ -71,12 +71,33 @@ export function DidPkhVerification({
     setError(null);
 
     try {
+      // Get SIWE nonce
+      const nonceResponse = await fetch("/api/siwe/nonce");
+      const { nonce } = await nonceResponse.json();
+
+      // Create and sign SIWE message
+      const { SiweMessage } = await import('siwe');
+      const message = new SiweMessage({
+        domain: window.location.host,
+        address: account.address,
+        statement: 'Prove you own this wallet with a signature',
+        uri: window.location.origin,
+        version: '1',
+        chainId: 1,
+        nonce,
+        issuedAt: new Date().toISOString(),
+      });
+
+      const messageString = message.prepareMessage();
+      const signature = await account.signMessage({ message: messageString });
+
       const response = await fetch("/api/verify-and-attest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           did,
-          connectedAddress: account.address,
+          siweMessage: messageString,
+          siweSignature: signature,
           requiredSchemas: ["oma3.ownership.v1"],
         }),
       });
@@ -114,12 +135,33 @@ export function DidPkhVerification({
     setError(null);
 
     try {
+      // Get SIWE nonce
+      const nonceResponse = await fetch("/api/siwe/nonce");
+      const { nonce } = await nonceResponse.json();
+
+      // Create and sign SIWE message
+      const { SiweMessage } = await import('siwe');
+      const message = new SiweMessage({
+        domain: window.location.host,
+        address: account.address,
+        statement: 'Prove you own this wallet with a signature',
+        uri: window.location.origin,
+        version: '1',
+        chainId: 1,
+        nonce,
+        issuedAt: new Date().toISOString(),
+      });
+
+      const messageString = message.prepareMessage();
+      const signature = await account.signMessage({ message: messageString });
+
       const response = await fetch("/api/verify-and-attest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           did,
-          connectedAddress: account.address,
+          siweMessage: messageString,
+          siweSignature: signature,
           requiredSchemas: ["oma3.ownership.v1"],
           txHash, // Include txHash for transfer verification
         }),
