@@ -30,7 +30,7 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
   const [isCustomizingUrl, setIsCustomizingUrl] = useState(false);
   const [traitsInput, setTraitsInput] = useState("");
   
-  // Sync traitsInput with formData.traits on mount and when traits change externally
+  // Sync traitsInput with formData.traits when navigating back to this step
   useEffect(() => {
     const currentTraits = formData.traits || [];
     const currentInput = currentTraits.join(", ");
@@ -141,9 +141,12 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
   const handleTraitsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setTraitsInput(value);
-    
-    // Parse and update - store as raw traits, hashing will happen later
-    const parsed = parseTraits(value);
+    // Don't parse immediately - let user type commas and spaces
+  };
+
+  const handleTraitsBlur = () => {
+    // Parse only when user leaves the field
+    const parsed = parseTraits(traitsInput);
     updateFormData({ traits: parsed.length > 0 ? parsed : undefined });
   };
 
@@ -279,6 +282,7 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
           placeholder={getTraitSuggestions()}
           value={traitsInput}
           onChange={handleTraitsChange}
+          onBlur={handleTraitsBlur}
         />
         
         {/* Show parsed traits */}

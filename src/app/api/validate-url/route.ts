@@ -19,7 +19,7 @@ export async function OPTIONS() {
 export async function POST(request: Request) {
   try {
     const { url } = await request.json();
-    
+
     if (!url) {
       return NextResponse.json(
         { success: false, error: 'URL is required' },
@@ -38,40 +38,88 @@ export async function POST(request: Request) {
       );
     }
 
-    // Simple HEAD request to check if URL is accessible
+    // Try multiple methods to validate the endpoint
     try {
       const controller = new AbortController();
-      // 5 second timeout
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(url, {
-        method: 'HEAD',  // HEAD request doesn't download content
+      // 10 second timeout (longer for RPC endpoints)
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      console.log('[validate-url] Testing URL:', url);
+      console.log('[validate-url] Step 1: Trying HEAD request...');
+
+      let response = await fetch(url, {
+        method: 'HEAD',
         headers: {
           'User-Agent': 'OMA3-App-Registry/1.0',
         },
         signal: controller.signal,
       });
-      
+
+      console.log('[validate-url] HEAD response:', response.status, response.statusText);
+
+      // If HEAD fails, try GET
+      if (!response.ok && (response.status === 405 || response.status === 400 || response.status === 404)) {
+        console.log('[validate-url] Step 2: Trying GET request...');
+        response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'OMA3-App-Registry/1.0',
+          },
+          signal: controller.signal,
+        });
+        console.log('[validate-url] GET response:', response.status, response.statusText);
+      }
+
+      // If GET also fails, try a JSON-RPC POST request
+      if (!response.ok && (response.status === 405 || response.status === 400 || response.status === 404)) {
+        console.log('[validate-url] Step 3: Trying JSON-RPC POST request...');
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'OMA3-App-Registry/1.0',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_chainId',
+            params: [],
+            id: 1
+          }),
+          signal: controller.signal,
+        });
+        console.log('[validate-url] POST response:', response.status, response.statusText);
+      }
+
       clearTimeout(timeoutId);
-      
-      // Return basic metadata about the URL
+
+      // Consider it valid if we get any response (even errors mean the endpoint exists)
+      // Any 4xx or 5xx error means the server is responding, just doesn't like our request
+      const isAccessible = response.ok ||
+        (response.status >= 400 && response.status < 600); // Any client or server error means endpoint exists
+
+      console.log('[validate-url] Final decision - isAccessible:', isAccessible, 'status:', response.status);
+
       return NextResponse.json({
         success: true,
         status: response.status,
         statusText: response.statusText,
         contentType: response.headers.get('content-type'),
         hostname: urlObj.hostname,
-        isValid: response.ok  // true if status is 2xx
+        isValid: isAccessible,
+        note: !response.ok && isAccessible ? 'Endpoint exists but may require specific request format' : undefined
       }, { headers: corsHeaders });
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // If it's an abort error, it's a timeout
       const isTimeout = error instanceof DOMException && error.name === 'AbortError';
-      
+
+      console.log('[validate-url] Error occurred:', errorMessage);
+      console.log('[validate-url] Is timeout:', isTimeout);
+
       return NextResponse.json(
-        { 
+        {
           success: false,
           error: isTimeout ? 'Request timed out' : 'Failed to access URL',
           details: errorMessage,
@@ -83,7 +131,7 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         success: false,
         error: 'Server error processing request',
         details: error instanceof Error ? error.message : String(error),

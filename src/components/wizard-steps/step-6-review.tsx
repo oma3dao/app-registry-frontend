@@ -19,7 +19,7 @@ function dashIfEmpty(v: any): string {
 
 export default function Step6_Review({ state }: StepRenderContext) {
   const interfacesBitmap = useMemo(() => {
-    const flags = state.interfaceFlags || { human: true, api: false, smartContract: false };
+    const flags = state.interfaceFlags || { human: false, api: false, smartContract: false };
     return computeInterfacesBitmap(flags);
   }, [state.interfaceFlags]);
 
@@ -63,7 +63,7 @@ export default function Step6_Review({ state }: StepRenderContext) {
     }
   }, [metadataPreview, state.metadata]);
 
-  const flags = state.interfaceFlags || { human: true, api: false, smartContract: false };
+  const flags = state.interfaceFlags || { human: false, api: false, smartContract: false };
 
   return (
     <div className="space-y-6">
@@ -76,7 +76,7 @@ export default function Step6_Review({ state }: StepRenderContext) {
         <div className="space-y-1">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Identifiers</div>
           <div className="text-sm">Name: {dashIfEmpty(state.name)}</div>
-          <div className="text-sm">DID: {dashIfEmpty(state.did)}</div>
+          <div className="text-sm break-all">DID: {dashIfEmpty(state.did)}</div>
           <div className="text-sm">Version: {dashIfEmpty(state.version)}</div>
         </div>
         <div className="space-y-1">

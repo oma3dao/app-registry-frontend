@@ -28,7 +28,7 @@ interface VerificationResult {
   success: boolean;
   error?: string;
   details?: string;
-  method?: 'dns' | 'did-document' | 'contract';
+  method?: 'dns' | 'did-document' | 'contract' | 'minting-wallet';
 }
 
 const resolveTxt = promisify(dns.resolveTxt);
@@ -336,9 +336,202 @@ async function verifyDidWeb(did: string, connectedAddress: string): Promise<Veri
 }
 
 /**
- * Verify did:pkh ownership via contract ownership checks
+ * Verify ownership via onchain transfer (Section 5.1.3.1.2.2)
+ * 
+ * Verifies that a deterministic amount was sent from controlling wallet to minting wallet
  */
-async function verifyDidPkh(did: string, connectedAddress: string): Promise<VerificationResult> {
+async function verifyViaTransfer(
+  did: string,
+  controllingWallet: string,
+  mintingWallet: string,
+  chainId: number,
+  txHash: string,
+  provider: ethers.JsonRpcProvider
+): Promise<VerificationResult> {
+  debug('verify-transfer', `Verifying transfer: ${txHash}`);
+
+  try {
+    // 1. Get transaction
+    const tx = await provider.getTransaction(txHash);
+    if (!tx) {
+      return {
+        success: false,
+        error: 'Transaction not found',
+        details: `Transaction ${txHash} not found on chain ${chainId}`
+      };
+    }
+
+    debug('verify-transfer', `Transaction found:`);
+    debug('verify-transfer', `  From: ${tx.from}`);
+    debug('verify-transfer', `  To: ${tx.to}`);
+    debug('verify-transfer', `  Value: ${tx.value.toString()} wei (${ethers.formatEther(tx.value)} OMA)`);
+    debug('verify-transfer', `  Block: ${tx.blockNumber}`);
+
+    // 2. Get receipt for confirmation
+    const receipt = await provider.getTransactionReceipt(txHash);
+    if (!receipt) {
+      return {
+        success: false,
+        error: 'Transaction not confirmed',
+        details: 'Transaction exists but is not yet confirmed. Please wait for confirmation.'
+      };
+    }
+
+    debug('verify-transfer', `Transaction confirmed in block ${receipt.blockNumber}`);
+
+    // 3. Check minimum confirmations (3 blocks)
+    const currentBlock = await provider.getBlockNumber();
+    const confirmations = currentBlock - receipt.blockNumber;
+    
+    debug('verify-transfer', `Current block: ${currentBlock}`);
+    debug('verify-transfer', `Transaction block: ${receipt.blockNumber}`);
+    debug('verify-transfer', `Confirmations: ${confirmations}`);
+    debug('verify-transfer', `✅ Transaction is confirmed (included in block)`);
+    
+    // Note: We don't require multiple confirmations because:
+    // 1. On optimistic rollups, blocks aren't created frequently
+    // 2. The receipt proves the transaction was included
+    // 3. Similar to did:web, we verify the proof exists, not wait for finality
+
+    // 4. Verify sender
+    debug('verify-transfer', `Verifying sender:`);
+    debug('verify-transfer', `  Expected (controlling wallet): ${controllingWallet}`);
+    debug('verify-transfer', `  Actual (tx.from): ${tx.from}`);
+    debug('verify-transfer', `  Match: ${tx.from.toLowerCase() === controllingWallet.toLowerCase()}`);
+    
+    if (tx.from.toLowerCase() !== controllingWallet.toLowerCase()) {
+      return {
+        success: false,
+        error: 'Wrong sender',
+        details: `Transaction sender is ${tx.from}, but expected controlling wallet ${controllingWallet}`
+      };
+    }
+
+    // 5. Verify recipient
+    debug('verify-transfer', `Verifying recipient:`);
+    debug('verify-transfer', `  Expected (minting wallet): ${mintingWallet}`);
+    debug('verify-transfer', `  Actual (tx.to): ${tx.to}`);
+    debug('verify-transfer', `  Match: ${tx.to?.toLowerCase() === mintingWallet.toLowerCase()}`);
+    
+    if (!tx.to || tx.to.toLowerCase() !== mintingWallet.toLowerCase()) {
+      return {
+        success: false,
+        error: 'Wrong recipient',
+        details: `Transaction recipient is ${tx.to}, but expected minting wallet ${mintingWallet}`
+      };
+    }
+
+    // 6. Calculate expected amount using spec formula
+    // Import the calculation function
+    const { calculateTransferAmount } = await import('@/lib/verification/onchain-transfer');
+    const expectedAmount = calculateTransferAmount(did, mintingWallet, chainId);
+
+    debug('verify-transfer', `Verifying amount:`);
+    debug('verify-transfer', `  Expected: ${expectedAmount.toString()} wei (${ethers.formatEther(expectedAmount)} OMA)`);
+    debug('verify-transfer', `  Actual: ${tx.value.toString()} wei (${ethers.formatEther(tx.value)} OMA)`);
+    debug('verify-transfer', `  Match: ${tx.value === expectedAmount}`);
+
+    // 7. Verify amount
+    if (tx.value !== expectedAmount) {
+      return {
+        success: false,
+        error: 'Wrong amount',
+        details: `Transaction amount is ${tx.value.toString()} wei, but expected ${expectedAmount.toString()} wei. The amount must be exact.`
+      };
+    }
+
+    // 8. Log transaction age (for debugging, but no restriction)
+    const block = await provider.getBlock(receipt.blockNumber);
+    if (block) {
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const age = currentTimestamp - block.timestamp;
+      debug('verify-transfer', `Transaction age: ${age} seconds (${Math.floor(age / 60)} minutes)`);
+      // Note: We don't restrict transaction age because:
+      // 1. Similar to did:web, ownership proof is valid regardless of when it was created
+      // 2. The transfer itself is the proof of ownership at that point in time
+      // 3. If ownership changes later, a new attestation can be created
+    }
+
+    // 9. Success!
+    debug('verify-transfer', '✅ Transfer verified successfully');
+    return {
+      success: true,
+      method: 'contract',
+      details: `Verified via onchain transfer (tx: ${txHash})`
+    };
+
+  } catch (error) {
+    debug('verify-transfer', 'Error:', error);
+    return {
+      success: false,
+      error: 'Transfer verification failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+/**
+ * Discover the controlling wallet of a contract (without verification)
+ */
+async function discoverControllingWallet(
+  chainId: number,
+  contractAddress: string,
+  provider: ethers.JsonRpcProvider
+): Promise<string | null> {
+  debug('discover-wallet', `Discovering controlling wallet for ${contractAddress}`);
+
+  // Try multiple ownership patterns
+  const patterns = [
+    { name: 'owner()', sig: 'function owner() view returns (address)' },
+    { name: 'admin()', sig: 'function admin() view returns (address)' },
+    { name: 'getOwner()', sig: 'function getOwner() view returns (address)' },
+  ];
+
+  for (const pattern of patterns) {
+    try {
+      debug('discover-wallet', `Trying pattern: ${pattern.name}`);
+      const contract = new ethers.Contract(contractAddress, [pattern.sig], provider);
+      const ownerAddress = await withRetry(() => contract[pattern.name.replace('()', '')]());
+
+      debug('discover-wallet', `Owner from ${pattern.name}: ${ownerAddress}`);
+
+      if (ownerAddress && ownerAddress !== '0x0000000000000000000000000000000000000000') {
+        return ownerAddress;
+      }
+    } catch (error) {
+      debug('discover-wallet', `Pattern ${pattern.name} failed`);
+    }
+  }
+
+  // Try EIP-1967 proxy admin slot
+  try {
+    debug('discover-wallet', 'Trying EIP-1967 admin slot');
+    const adminSlot = '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103';
+    const adminValue = await provider.getStorage(contractAddress, adminSlot);
+
+    if (adminValue && adminValue !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+      const adminAddress = ethers.getAddress('0x' + adminValue.slice(-40));
+      debug('discover-wallet', `Admin from EIP-1967: ${adminAddress}`);
+
+      if (adminAddress !== '0x0000000000000000000000000000000000000000') {
+        return adminAddress;
+      }
+    }
+  } catch (error) {
+    debug('discover-wallet', 'EIP-1967 check failed');
+  }
+
+  return null;
+}
+
+/**
+ * Verify did:pkh ownership via contract ownership checks or transfer
+ */
+async function verifyDidPkh(
+  did: string,
+  connectedAddress: string,
+  txHash?: string
+): Promise<VerificationResult> {
   debug('verify-did-pkh', `Verifying ${did} for address ${connectedAddress}`);
 
   if (!did.startsWith('did:pkh:')) {
@@ -395,12 +588,55 @@ async function verifyDidPkh(did: string, connectedAddress: string): Promise<Veri
   // Create ethers provider
   const provider = new ethers.JsonRpcProvider(rpcUrl);
 
-  // Try multiple ownership patterns
+  // If txHash provided, use transfer verification method (5.1.3.1.2.2)
+  if (txHash) {
+    debug('verify-did-pkh', `🔄 Using TRANSFER verification method`);
+    debug('verify-did-pkh', `Transaction hash: ${txHash}`);
+
+    // First, discover the controlling wallet
+    const controllingWallet = await discoverControllingWallet(chainId, contractAddress, provider);
+
+    if (!controllingWallet) {
+      return {
+        success: false,
+        error: 'Could not discover controlling wallet',
+        details: 'Contract does not have standard ownership functions (owner, admin, getOwner) or EIP-1967 proxy admin slot'
+      };
+    }
+
+    debug('verify-did-pkh', `Discovered controlling wallet: ${controllingWallet}`);
+
+    // Verify the transfer
+    const transferResult = await verifyViaTransfer(
+      did,
+      controllingWallet,
+      connectedAddress,
+      chainId,
+      txHash,
+      provider
+    );
+
+    if (transferResult.success) {
+      debug('verify-did-pkh', '✅ Ownership verified via onchain transfer');
+      return transferResult;
+    } else {
+      debug('verify-did-pkh', `❌ Transfer verification failed: ${transferResult.error}`);
+      return transferResult;
+    }
+  }
+
+  // Otherwise, use automated address matching (5.1.3.1.2.1)
+  debug('verify-did-pkh', '⚡ Using AUTOMATED address matching method');
+  debug('verify-did-pkh', `Will check if connectedAddress (${connectedAddress}) owns or IS the contract (${contractAddress})`);
+
+  // First, check if connectedAddress directly owns/controls the contract
   const patterns = [
     { name: 'owner()', sig: 'function owner() view returns (address)' },
     { name: 'admin()', sig: 'function admin() view returns (address)' },
     { name: 'getOwner()', sig: 'function getOwner() view returns (address)' },
   ];
+
+  let controllingWallet: string | null = null;
 
   for (const pattern of patterns) {
     try {
@@ -409,6 +645,11 @@ async function verifyDidPkh(did: string, connectedAddress: string): Promise<Veri
       const ownerAddress = await withRetry(() => contract[pattern.name.replace('()', '')]());
 
       debug('verify-did-pkh', `Owner from ${pattern.name}: ${ownerAddress}`);
+
+      // Store the controlling wallet for later check
+      if (!controllingWallet && ownerAddress !== ethers.ZeroAddress) {
+        controllingWallet = ownerAddress;
+      }
 
       if (ownerAddress.toLowerCase() === connectedAddress.toLowerCase()) {
         debug('verify-did-pkh', `✅ Ownership verified via ${pattern.name}`);
@@ -428,6 +669,10 @@ async function verifyDidPkh(did: string, connectedAddress: string): Promise<Veri
 
     debug('verify-did-pkh', `Admin from EIP-1967: ${adminAddress}`);
 
+    if (!controllingWallet && adminAddress !== ethers.ZeroAddress) {
+      controllingWallet = adminAddress;
+    }
+
     if (adminAddress.toLowerCase() === connectedAddress.toLowerCase()) {
       debug('verify-did-pkh', '✅ Ownership verified via EIP-1967');
       return { success: true, method: 'contract' };
@@ -436,11 +681,27 @@ async function verifyDidPkh(did: string, connectedAddress: string): Promise<Veri
     debug('verify-did-pkh', 'EIP-1967 check failed:', error);
   }
 
+  // If connectedAddress doesn't own the contract, check if it's the minting wallet
+  // and the controlling wallet exists
+  debug('verify-did-pkh', `Connected address doesn't own contract. Checking if it's the minting wallet...`);
+  debug('verify-did-pkh', `Contract address (minting wallet): ${contractAddress}`);
+  debug('verify-did-pkh', `Connected address: ${connectedAddress}`);
+  debug('verify-did-pkh', `Controlling wallet: ${controllingWallet}`);
+
+  if (contractAddress.toLowerCase() === connectedAddress.toLowerCase() && controllingWallet) {
+    debug('verify-did-pkh', '✅ Connected address IS the minting wallet (contract address)');
+    return {
+      success: true,
+      method: 'minting-wallet',
+      details: `Verified: connected address matches the DID contract address (minting wallet). Controlling wallet: ${controllingWallet}`
+    };
+  }
+
   debug('verify-did-pkh', '❌ No ownership match found');
   return {
     success: false,
     error: 'Contract ownership verification failed',
-    details: `You are not the owner of contract ${contractAddress} on chain ${chainId}. Tried owner(), admin(), getOwner() functions and EIP-1967 proxy admin slot.`
+    details: `Connected address ${connectedAddress} is neither the contract owner/admin (${controllingWallet || 'not found'}) nor the minting wallet (${contractAddress}). Please connect the correct wallet or use the transfer verification method.`
   };
 }
 
@@ -560,9 +821,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { did, connectedAddress, requiredSchemas = ['oma3.ownership.v1'] } = body;
+    const { did, connectedAddress, requiredSchemas = ['oma3.ownership.v1'], txHash } = body;
 
-    debug('main', 'Request body:', { did, connectedAddress, requiredSchemas });
+    debug('main', 'Request body:', { did, connectedAddress, requiredSchemas, txHash });
+    debug('main', `🔍 Verification method: ${txHash ? '🔄 TRANSFER (txHash provided)' : '⚡ AUTOMATED (no txHash)'}`);
 
     // Validate inputs
     if (!did || typeof did !== 'string') {
@@ -674,7 +936,7 @@ export async function POST(request: NextRequest) {
     if (did.startsWith('did:web:')) {
       verificationResult = await verifyDidWeb(did, connectedAddress);
     } else if (did.startsWith('did:pkh:')) {
-      verificationResult = await verifyDidPkh(did, connectedAddress);
+      verificationResult = await verifyDidPkh(did, connectedAddress, txHash);
     } else {
       debug('main', 'Unsupported DID type');
       return NextResponse.json({
@@ -746,7 +1008,7 @@ export async function POST(request: NextRequest) {
 
         // Just stringify the entire error - no parsing, no reconstruction
         const errorString = JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
-        
+
         writeErrors.push({
           schema,
           error: errorString,

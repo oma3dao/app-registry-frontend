@@ -6,7 +6,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type { StepRenderContext } from "@/lib/wizard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import {
 import { DidWebInput } from "@/components/did-web-input";
 import { Caip10Input } from "@/components/caip10-input";
 import { DidVerification } from "@/components/did-verification";
+import { DidPkhVerification } from "@/components/did-pkh-verification";
 import { InterfacesSelector } from "@/components/interfaces-selector";
 import {
   NAME_PLACEHOLDER,
@@ -37,6 +38,33 @@ export default function Step1_Verification({
     state.did?.startsWith("did:web:") ? "did:web" :
     state.did?.startsWith("did:pkh:") ? "did:pkh" : ""
   );
+  
+  // Track if we've already scrolled to the API dropdown
+  const hasScrolledToApiRef = useRef(false);
+  const apiDropdownRef = useRef<HTMLDivElement>(null);
+  const versionFieldRef = useRef<HTMLDivElement>(null);
+  
+  // Scroll to API dropdown only once when it first appears
+  useEffect(() => {
+    if (state.interfaceFlags?.api && !hasScrolledToApiRef.current && apiDropdownRef.current) {
+      hasScrolledToApiRef.current = true;
+      setTimeout(() => {
+        apiDropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
+    
+    // Reset the flag if API is unchecked
+    if (!state.interfaceFlags?.api) {
+      hasScrolledToApiRef.current = false;
+    }
+  }, [state.interfaceFlags?.api]);
+  
+  // Scroll to first error field when errors appear
+  useEffect(() => {
+    if (errors?.version && versionFieldRef.current) {
+      versionFieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [errors?.version]);
 
   const handleDidTypeChange = (newType: string) => {
     setDidType(newType as "did:web" | "did:pkh" | "");
@@ -63,7 +91,7 @@ export default function Step1_Verification({
       </div>
 
       {/* Version */}
-      <div className="space-y-2">
+      <div ref={versionFieldRef} className="space-y-2">
         <Label htmlFor="version">Version</Label>
         <Input
           id="version"
@@ -126,49 +154,34 @@ export default function Step1_Verification({
       )}
 
       {didType === "did:pkh" && (
-        <div className="space-y-4">
-          {/* Coming Soon Message */}
-          <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg">
-            <div className="flex gap-3 items-start">
-              <InfoIcon size={20} className="mt-0.5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
-              <div className="text-sm">
-                <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                  🚧 Smart Contract DIDs - Coming Soon
-                </p>
-                <p className="text-yellow-800 dark:text-yellow-200 mb-3">
-                  We&apos;re currently building the verification system for smart contract DIDs (did:pkh). 
-                  This feature will support:
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-yellow-800 dark:text-yellow-200 ml-2">
-                  <li><strong>Automated verification</strong> - Check contract owner/admin matches your wallet</li>
-                  <li><strong>Delegate access</strong> - Prove ownership via deterministic token transfer</li>
-                  <li><strong>Multi-chain support</strong> - Works across EVM and non-EVM chains</li>
-                </ul>
-                <p className="text-yellow-800 dark:text-yellow-200 mt-3">
-                  For now, please use <strong>did:web</strong> (website-based DIDs) which are fully supported.
-                </p>
-                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">
-                  Expected availability: Q4 2025
-                </p>
-              </div>
-            </div>
-          </div>
+        <Caip10Input
+          value={state.did?.startsWith("did:pkh:") ? state.did.replace("did:pkh:", "") : ""}
+          onChange={(caip10) => {
+            const newDid = caip10 ? `did:pkh:${caip10}` : "";
+            updateField("did", newDid);
+            updateField("_verificationStatus", "idle"); // Reset verification when DID changes
+          }}
+          error={errors?.did}
+        />
+      )}
 
-          {/* Disabled Input (for visual reference) */}
-          <div className="opacity-50 pointer-events-none">
-            <Caip10Input
-              value=""
-              onChange={() => {}}
-              error={undefined}
-            />
-          </div>
+      {/* DID Verification - for did:web */}
+      {didType === "did:web" && (
+        <div className="border-t pt-4 mt-2">
+          <DidVerification
+            did={state.did || ""}
+            onVerificationComplete={(verified) => {
+              updateField("_verificationStatus", verified ? "ready" : "idle");
+            }}
+            isVerified={state._verificationStatus === "ready"}
+          />
         </div>
       )}
 
-      {/* DID Verification - only for did:web */}
-      {didType === "did:web" && state.did && (
+      {/* DID Verification - for did:pkh */}
+      {didType === "did:pkh" && state.did && (
         <div className="border-t pt-4 mt-2">
-          <DidVerification
+          <DidPkhVerification
             did={state.did}
             onVerificationComplete={(verified) => {
               updateField("_verificationStatus", verified ? "ready" : "idle");
@@ -181,7 +194,7 @@ export default function Step1_Verification({
       {/* Interface Selector */}
       <div className="border-t pt-4 mt-4">
         <InterfacesSelector
-          value={state.interfaceFlags || { human: true, api: false, smartContract: false }}
+          value={state.interfaceFlags || { human: false, api: false, smartContract: false }}
           onChange={(flags) => {
             updateField("interfaceFlags", flags);
             // Clear API type if API is unchecked
@@ -193,7 +206,10 @@ export default function Step1_Verification({
         
         {/* API Type Dropdown - Only show when API is checked */}
         {state.interfaceFlags?.api && (
-          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div 
+            ref={apiDropdownRef}
+            className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg"
+          >
             <Label htmlFor="api-type" className="text-sm font-medium mb-2 block">
               What type of API? <span className="text-red-500">*</span>
             </Label>

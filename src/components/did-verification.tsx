@@ -142,6 +142,7 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
                 <li>Name: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">_omatrust</code></li>
                 <li>Value: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">v=1;caip10={caip10}</code></li>
                 <li className="text-xs text-gray-600 dark:text-gray-400">Note: Use semicolon (;) as separator. Spaces also supported but not recommended.</li>
+                <li className="font-medium text-amber-700 dark:text-amber-400">⏱️ Wait at least 15 minutes after setup before clicking Verify (DNS propagation time)</li>
                 {!account && <li className="text-amber-600 dark:text-amber-400">⚠️ Connect your wallet to see your exact values</li>}
               </ul>
             </div>
@@ -166,29 +167,6 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
       {renderInstructions()}
 
       <div className="flex flex-col gap-3 pt-2">
-        <div className="p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
-          <div className="flex gap-2 items-start text-amber-700 dark:text-amber-400">
-            <AlertCircleIcon size={18} className="mt-0.5 flex-shrink-0" />
-            <div className="text-sm">
-              <p className="font-medium">⏱️ Important: DNS/Setup Propagation</p>
-              <p className="mt-1">
-                After setting up your DID document or DNS TXT record, <strong>wait at least 15 minutes</strong> before
-                clicking the verification button. This allows DNS changes to propagate globally and ensures the
-                verification server can see your settings.
-              </p>
-              <p className="mt-2">
-                <strong>Before verifying:</strong>
-              </p>
-              <ul className="list-disc ml-4 mt-1 space-y-1">
-                <li>Complete all setup steps above</li>
-                <li>Double-check your wallet address matches exactly</li>
-                <li>Wait 15+ minutes after making changes</li>
-                <li>The verification will request a wallet signature to prove ownership</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
         <Button
           type="button"
           onClick={handleVerify}

@@ -23,12 +23,12 @@ export function getThirdwebRpcUrl(chainId: number, clientId: string): string {
   if (!Number.isInteger(chainId) || chainId <= 0) {
     throw new Error(`Invalid chainId: ${chainId}. Must be a positive integer.`);
   }
-  
+
   // Validate clientId
   if (!clientId || clientId.trim() === '') {
     throw new Error('Thirdweb Client ID is required. Set NEXT_PUBLIC_THIRDWEB_CLIENT_ID environment variable.');
   }
-  
+
   return `https://${chainId}.rpc.thirdweb.com/${clientId}`;
 }
 
@@ -46,25 +46,25 @@ export async function withRetry<T>(
   initialDelay: number = 500
 ): Promise<T> {
   let lastError: Error | undefined;
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error as Error;
-      
+
       // Don't retry on last attempt
       if (attempt === maxAttempts) {
         break;
       }
-      
+
       // Exponential backoff: 500ms, 1000ms, 2000ms, etc.
       const delay = initialDelay * Math.pow(2, attempt - 1);
       console.log(`[rpc] Attempt ${attempt} failed, retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
+
   throw new Error(`Operation failed after ${maxAttempts} attempts: ${lastError?.message}`);
 }
 
@@ -86,15 +86,26 @@ export function getRpcUrl(
   omaChainId?: number,
   omaRpcUrl?: string
 ): string {
-  // Priority 1: OMA chain (custom chain)
+  // Priority 1: Hardcoded OMA testnet
+  if (chainId === 66238) {
+    console.log(`[rpc] Using hardcoded OMAChain Testnet RPC for chainId ${chainId}`);
+    return 'https://rpc.testnet.chain.oma3.org/';
+  }
+
+  if (chainId === 6623) {
+    console.log(`[rpc] Using hardcoded OMAChain Mainnet RPC for chainId ${chainId}`);
+    return 'https://rpc.chain.oma3.org/';
+  }
+
+  // Priority 2: OMA chain (custom chain from config)
   if (omaChainId !== undefined && chainId === omaChainId && omaRpcUrl) {
     console.log(`[rpc] Using OMA chain RPC for chainId ${chainId}`);
     return omaRpcUrl;
   }
-  
-  // Priority 2: Thirdweb RPC Edge (all EVM chains)
+
+  // Priority 3: Thirdweb RPC Edge (all EVM chains)
   const thirdwebClientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
-  
+
   if (thirdwebClientId) {
     try {
       const url = getThirdwebRpcUrl(chainId, thirdwebClientId);
@@ -104,16 +115,16 @@ export function getRpcUrl(
       console.warn(`[rpc] Failed to get Thirdweb RPC URL: ${(error as Error).message}`);
     }
   }
-  
-  // Priority 3: QuickNode (future support for non-EVM chains)
+
+  // Priority 4: QuickNode (future support for non-EVM chains)
   // TODO: Add QuickNode support for Solana, Sui, Aptos when needed
-  
+
   // Fallback: localhost for development
   if (chainId === 31337 || chainId === 1337) {
     console.log(`[rpc] Using localhost RPC for chainId ${chainId}`);
     return 'http://localhost:8545';
   }
-  
+
   throw new Error(
     `No RPC provider configured for chainId ${chainId}. ` +
     `Set NEXT_PUBLIC_THIRDWEB_CLIENT_ID environment variable to use Thirdweb RPC Edge.`

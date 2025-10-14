@@ -106,12 +106,36 @@ export function Caip10Input({
     }
   }, [inputValue]);
 
+  // Debounced onChange - trigger after 2 seconds of no typing
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
+    
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Set new timer to trigger onChange after 2 seconds
+    debounceTimerRef.current = setTimeout(() => {
+      if (validationResult?.valid && validationResult.normalized) {
+        onChange(validationResult.normalized);
+      } else if (!validationResult?.valid && newValue.trim()) {
+        onChange(null);
+      } else if (!newValue.trim()) {
+        onChange(null);
+      }
+    }, 2000);
   };
 
   const handleInputBlur = () => {
+    // Clear debounce timer on blur
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
     if (validationResult?.valid && validationResult.normalized) {
       // Update to normalized form
       setInputValue(validationResult.normalized);
@@ -246,17 +270,32 @@ export function Caip10Input({
               </Select>
             </div>
 
-            {/* EVM Chain Search */}
+            {/* EVM Chain Search or Manual Entry */}
             {namespace === "eip155" && (
               <div className="grid gap-2">
-                <Label htmlFor="evm-chain">Chain</Label>
-                <ChainSearchInput
-                  value={evmChainId}
-                  onChange={(chainId) => setEvmChainId(chainId)}
-                  placeholder="Search mainnets by name or ID..."
-                />
+                <Label htmlFor="evm-chain">Chain ID</Label>
+                <div className="space-y-2">
+                  <ChainSearchInput
+                    value={evmChainId}
+                    onChange={(chainId) => setEvmChainId(chainId)}
+                    placeholder="Search mainnets by name or ID..."
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Or enter chain ID manually:
+                  </div>
+                  <Input
+                    type="number"
+                    value={evmChainId || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEvmChainId(val ? parseInt(val, 10) : null);
+                    }}
+                    placeholder="e.g., 66238 for OMAchain Testnet"
+                    className="font-mono"
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Search 19 mainnets, or paste complete CAIP-10 above for testnets/other chains
+                  Search finds 19 mainnets. For testnets, enter chain ID manually above.
                 </p>
               </div>
             )}
