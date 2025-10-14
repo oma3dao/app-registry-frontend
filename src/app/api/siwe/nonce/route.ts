@@ -15,6 +15,3 @@ export async function GET() {
     );
   }
 }
-
-// Re-export for backward compatibility
-export { verifyNonceToken } from '@/lib/server/siwe-nonce';
