@@ -197,7 +197,7 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
                 <p className="font-medium">Verification Failed</p>
                 <p className="mt-1">{verificationError}</p>
                 <p className="mt-2 text-xs opacity-75">
-                  💡 Open your browser's JavaScript console (F12) for detailed error information.
+                  💡 Open your browser&apos;s JavaScript console (F12) for detailed error information.
                 </p>
               </div>
             </div>

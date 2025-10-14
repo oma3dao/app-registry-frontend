@@ -174,11 +174,11 @@ export function DidPkhVerification({
               <ul className="text-sm list-disc list-inside ml-2 space-y-2">
                 <li>
                   <strong>Option 1 (Recommended):</strong> Send a small transfer from the controlling wallet to prove ownership.
-                  Safer - doesn&apos;t require connecting your admin wallet. Click "Discover Controlling Wallet" to start.
+                  Safer - doesn&apos;t require connecting your admin wallet. Click &quot;Discover Controlling Wallet&quot; to start.
                 </li>
                 <li>
                   <strong>Option 2:</strong> If your connected wallet is the contract owner/admin, 
-                  click "Verify Wallet Ownership" to verify automatically.
+                  click &quot;Verify Wallet Ownership&quot; to verify automatically.
                 </li>
               </ul>
             </div>
