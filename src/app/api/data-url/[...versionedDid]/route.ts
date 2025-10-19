@@ -44,6 +44,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid versionedDID format' }, { status: 400 });
     }
     
+    log(`[API data-url] Input versionedDID: ${versionedDID}`);
     log(`[API data-url] Extracted baseDid: ${baseDid}, full version: ${fullVersion}`);
     
     // Parse the version parts
@@ -58,11 +59,14 @@ export async function GET(
     log(`[API data-url] Fetching raw metadata JSON for base DID: ${baseDid}`);
     
     const contract = getAppMetadataContract();
+    log(`[API data-url] Using metadata contract address: ${contract.address}`);
     const metadataJSON = await readContract({
       contract,
       method: "function getMetadataJson(string) view returns (string)",
       params: [baseDid]
     }) as string;
+    
+    log(`[API data-url] Raw contract response for ${baseDid}:`, metadataJSON);
     
     // If no metadata found, return 404
     if (!metadataJSON || metadataJSON.trim() === "") {

@@ -18,20 +18,20 @@ export default function Step5_HumanDistribution(ctx: StepRenderContext) {
   const req = (path: string) => isFieldRequired(path, state.interfaceFlags);
   const platformsErr = errors?.["metadata.platforms"]; 
 
-  const getPlatform = (key: PlatformKey) => state.metadata?.platforms?.[key] || {};
+  const getPlatform = (key: PlatformKey) => state.platforms?.[key] || {};
   const setPlatform = (key: PlatformKey, field: string, value: any) => {
-    const current = state.metadata?.platforms || {};
+    const current = state.platforms || {};
     const next = { ...current, [key]: { ...(current[key] || {}), [field]: value } };
-    updateField("metadata.platforms", next);
+    updateField("platforms", next);
   };
   
   // Get/set artifact metadata (stored separately from platforms)
-  const getArtifact = (artifactDid: string) => state.metadata?.artifacts?.[artifactDid] || {};
+  const getArtifact = (artifactDid: string) => state.artifacts?.[artifactDid] || {};
   const setArtifact = (artifactDid: string, field: string, value: any) => {
     if (!artifactDid) return;
-    const current = state.metadata?.artifacts || {};
+    const current = state.artifacts || {};
     const next = { ...current, [artifactDid]: { ...(current[artifactDid] || {}), [field]: value } };
-    updateField("metadata.artifacts", next);
+    updateField("artifacts", next);
   };
   
   // Debounced artifact creation
@@ -57,8 +57,8 @@ export default function Step5_HumanDistribution(ctx: StepRenderContext) {
   
   // Cleanup orphaned artifacts (not referenced by any platform)
   useEffect(() => {
-    const platforms = state.metadata?.platforms || {};
-    const artifacts = state.metadata?.artifacts || {};
+    const platforms = state.platforms || {};
+    const artifacts = state.artifacts || {};
     
     // Collect all artifact DIDs referenced by platforms
     const referencedDids = new Set<string>();
@@ -75,14 +75,15 @@ export default function Step5_HumanDistribution(ctx: StepRenderContext) {
     if (orphaned.length > 0) {
       const cleaned = { ...artifacts };
       orphaned.forEach(did => delete cleaned[did]);
-      updateField("metadata.artifacts", Object.keys(cleaned).length > 0 ? cleaned : undefined);
+      updateField("artifacts", Object.keys(cleaned).length > 0 ? cleaned : undefined);
     }
-  }, [state.metadata?.platforms]); // Run when platforms change
+  }, [state.platforms, state.artifacts, updateField]); // Run when platforms change
   
   // Cleanup timers on unmount
   useEffect(() => {
+    const timers = artifactTimers.current;
     return () => {
-      Object.values(artifactTimers.current).forEach(timer => clearTimeout(timer));
+      Object.values(timers).forEach(timer => clearTimeout(timer));
     };
   }, []);
   
@@ -181,8 +182,8 @@ export default function Step5_HumanDistribution(ctx: StepRenderContext) {
                           setPlatform(p, "artifactDid", newDid);
                           
                           // If DID changed and old one exists, remove old artifact
-                          if (oldDid && oldDid !== newDid && state.metadata?.artifacts?.[oldDid]) {
-                            const artifacts = { ...(state.metadata.artifacts || {}) };
+                          if (oldDid && oldDid !== newDid && state.artifacts?.[oldDid]) {
+                            const artifacts = { ...(state.artifacts || {}) };
                             delete artifacts[oldDid];
                             updateField("metadata.artifacts", Object.keys(artifacts).length > 0 ? artifacts : undefined);
                           }

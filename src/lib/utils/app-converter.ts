@@ -1,9 +1,14 @@
 /**
  * Utility functions for converting between AppSummary (contract) and NFT (frontend) types
+ * 
+ * TODO: Consider merging with offchain-json.ts into a single bidirectional converter
+ * - app-converter.ts: Contract → NFT (reading from blockchain)
+ * - offchain-json.ts: NFT → JSON metadata (writing to blockchain)
+ * - Could share field mapping logic and reduce duplication
  */
 
 import type { AppSummary } from '@/lib/contracts/types';
-import type { NFT } from '@/types/nft';
+import type { NFT } from '@/schema/data-model';
 import { statusToNumber } from './status';
 
 /**
@@ -33,24 +38,44 @@ export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT 
   // Convert Status type to number
   const statusNum = statusToNumber(app.status);
   
+  // Note: traits come from metadata JSON, not from contract trait hashes
+  // The contract stores hashes for verification, but the actual trait strings
+  // are in the metadata JSON at the dataUrl
+  
   return {
     did: app.did,
     name: '', // Name comes from metadata at dataUrl, will be fetched separately
     version,
-    
+
     // Interface support
     interfaces: app.interfaces,
     dataUrl: app.dataUrl || '',
-    
-    // This will be populated when metadata is fetched from dataUrl
-    iwpsPortalUrl: '',
-    
+
     // On-chain identifiers
     contractId: app.contractId || undefined,
     fungibleTokenId: app.fungibleTokenId || undefined,
-    
+
     status: statusNum,
     minter: app.minter || fallbackAddress || '',
+
+    // Flattened metadata fields (will be populated by metadata fetching)
+    description: '',
+    publisher: '',
+    image: '',
+    external_url: '',
+    summary: '',
+    legalUrl: '',
+    supportUrl: '',
+    screenshotUrls: [],
+    videoUrls: [],
+    threeDAssetUrls: [],
+    iwpsPortalUrl: '',
+    platforms: {},
+    artifacts: {},
+    endpoint: undefined,
+    interfaceVersions: [],
+    mcp: undefined,
+    traits: [], // Will be populated from metadata JSON
   };
 }
 

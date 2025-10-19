@@ -143,6 +143,9 @@ export interface UpdateAppInput {
   // Version increments (required if making changes)
   newMinor: number;               // Must be >= current
   newPatch: number;               // Must be >= current
+  
+  // Optional on-chain metadata
+  metadataJson?: string;          // On-chain JSON for metadata contract (empty string to skip)
 }
 
 /**

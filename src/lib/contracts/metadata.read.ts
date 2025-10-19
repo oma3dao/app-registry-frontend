@@ -4,7 +4,7 @@
 
 import { readContract } from 'thirdweb';
 import { getAppMetadataContract } from './client';
-import type { MetadataContractData } from '@/types/metadata-contract';
+// Removed MetadataContractData import - using generic Record for frontend
 import { buildMetadataStructure } from './metadata.utils';
 import { normalizeEvmError } from './errors';
 
@@ -13,7 +13,7 @@ import { normalizeEvmError } from './errors';
  * @param versionedDid The versioned DID (e.g., "did:web:example.com:v:1.0")
  * @returns Structured metadata or null if not found
  */
-export async function getMetadata(versionedDid: string): Promise<MetadataContractData | null> {
+export async function getMetadata(versionedDid: string): Promise<Record<string, any> | null> {
   try {
     const contract = getAppMetadataContract();
     

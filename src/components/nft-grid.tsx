@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import NFTCard from "@/components/nft-card"
-import type { NFT } from "@/types/nft"
+import type { NFT } from "@/schema/data-model"
 import { PlusIcon } from "lucide-react"
 import { log } from "@/lib/log"
 

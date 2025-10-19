@@ -18,9 +18,9 @@ export const localhost = {
   testnet: true,
   contracts: {
     // Update these addresses after running: npx hardhat deploy-system --network localhost and copy the addresses from the deployment output to the below fields:
-    registry: "0x9AFBaA695D801b0C5d1F2c5F153ce7518cD04861",
-    metadata: "0x84724AB9899455ca6EC292C285978c535b7982aC",
-    resolver: "0x77E058106762AeA4A567f2919Ef896bb6A82f914"
+    registry: "",
+    metadata: "",
+    resolver: ""
   }
 };
 
@@ -49,8 +49,8 @@ export const omachainTestnet = {
   ],
   testnet: true,
   contracts: {
-    registry: "0x9AFBaA695D801b0C5d1F2c5F153ce7518cD04861",
-    metadata: "0x84724AB9899455ca6EC292C285978c535b7982aC",
+    registry: "0x63A7C12f54B4f42Cae7234f7e20c7A08f725B9F9",
+    metadata: "0xFdd87eA429D963eCB671D409128dC94BFf5f0694",
     resolver: "0x77E058106762AeA4A567f2919Ef896bb6A82f914"
   }
 };

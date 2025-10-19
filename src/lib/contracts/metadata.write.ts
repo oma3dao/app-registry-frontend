@@ -4,7 +4,7 @@
 
 import { prepareContractCall } from 'thirdweb';
 import { getAppMetadataContract } from './client';
-import type { NFT } from "@/types/nft";
+import type { NFT } from "@/schema/data-model";
 import { buildMetadataJSON, validateMetadataJSON } from './metadata.utils';
 import { normalizeEvmError } from './errors';
 

@@ -25,18 +25,22 @@ export default function Step6_Review({ state }: StepRenderContext) {
 
   const { metadataPreview, jcsJsonForHash } = useMemo(() => {
     try {
+      // Pass flattened state directly - all fields at top level (no nested metadata)
       const out = buildOffchainMetadataObject({
-        name: state.name,
-        metadata: state.metadata,
-        extra: {
-          iwpsPortalUrl: state.iwpsPortalUrl,
-          traits: Array.isArray(state.traits) ? state.traits : undefined,
-        }
+        ...state, // Spread all flattened fields (name, description, endpoint, mcp, platforms, traits, etc.)
       });
+
+      // Debug: Log what we're getting
+      console.log('[Step6 Review] state.mcp:', state.mcp);
+      console.log('[Step6 Review] state.endpoint:', state.endpoint);
+      console.log('[Step6 Review] state.platforms:', state.platforms);
+      console.log('[Step6 Review] buildOffchainMetadataObject output:', out);
+
       const pretty = JSON.stringify(out, null, 2);
       const { jcsJson } = canonicalizeForHash(out);
       return { metadataPreview: pretty, jcsJsonForHash: jcsJson };
-    } catch (_) {
+    } catch (err) {
+      console.error('[Step6 Review] Error building metadata:', err);
       return { metadataPreview: "{}", jcsJsonForHash: "{}" };
     }
   }, [state]);
@@ -46,12 +50,13 @@ export default function Step6_Review({ state }: StepRenderContext) {
     const algo = 0;
     try {
       // Hash only when meaningful metadata exists; otherwise zero hash
-      const hasMeta = !!state.metadata && (
-        state.metadata.description || state.metadata.image || state.metadata.external_url ||
-        state.metadata.summary || state.metadata.publisher ||
-        state.metadata.legalUrl || state.metadata.supportUrl ||
-        (state.metadata.screenshotUrls && state.metadata.screenshotUrls.length > 0) ||
-        (state.metadata.platforms && Object.keys(state.metadata.platforms).length > 0)
+      const hasMeta = !!(
+        state.description || state.image || state.external_url ||
+        state.summary || state.publisher ||
+        state.legalUrl || state.supportUrl ||
+        (state.screenshotUrls && state.screenshotUrls.length > 0) ||
+        (state.platforms && Object.keys(state.platforms).length > 0) ||
+        state.endpoint || state.mcp || state.traits
       );
       if (!hasMeta) {
         return { dataHashHex: "0x" + "0".repeat(64), dataHashAlgorithm: algo };
@@ -61,7 +66,7 @@ export default function Step6_Review({ state }: StepRenderContext) {
     } catch (_) {
       return { dataHashHex: "0x" + "0".repeat(64), dataHashAlgorithm: algo };
     }
-  }, [metadataPreview, state.metadata]);
+  }, [metadataPreview]);
 
   const flags = state.interfaceFlags || { human: false, api: false, smartContract: false };
 
@@ -108,18 +113,18 @@ export default function Step6_Review({ state }: StepRenderContext) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Common (Off‑Chain)</div>
-          <div className="text-sm">Description: {dashIfEmpty(state.metadata?.description)}</div>
-          <div className="text-sm break-all">Marketing URL: {dashIfEmpty(state.metadata?.external_url)}</div>
-          <div className="text-sm break-all">Icon URL: {dashIfEmpty(state.metadata?.image)}</div>
-          <div className="text-sm">Summary: {dashIfEmpty(state.metadata?.summary)}</div>
-          <div className="text-sm">Publisher: {dashIfEmpty(state.metadata?.publisher)}</div>
-          <div className="text-sm break-all">Legal URL: {dashIfEmpty(state.metadata?.legalUrl)}</div>
-          <div className="text-sm break-all">Support URL: {dashIfEmpty(state.metadata?.supportUrl)}</div>
+          <div className="text-sm">Description: {dashIfEmpty(state.description)}</div>
+          <div className="text-sm break-all">Marketing URL: {dashIfEmpty(state.external_url)}</div>
+          <div className="text-sm break-all">Icon URL: {dashIfEmpty(state.image)}</div>
+          <div className="text-sm">Summary: {dashIfEmpty(state.summary)}</div>
+          <div className="text-sm">Publisher: {dashIfEmpty(state.publisher)}</div>
+          <div className="text-sm break-all">Legal URL: {dashIfEmpty(state.legalUrl)}</div>
+          <div className="text-sm break-all">Support URL: {dashIfEmpty(state.supportUrl)}</div>
         </div>
         <div className="space-y-1">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Media</div>
           <div className="text-sm break-words">
-            Screenshots: {state.metadata?.screenshotUrls && state.metadata.screenshotUrls.length > 0 ? state.metadata.screenshotUrls.join(", ") : "—"}
+            Screenshots: {state.screenshotUrls && state.screenshotUrls.length > 0 ? state.screenshotUrls.join(", ") : "—"}
           </div>
         </div>
       </div>
@@ -131,8 +136,8 @@ export default function Step6_Review({ state }: StepRenderContext) {
         <div className="text-sm">
           Platforms:
           <div className="mt-1 pl-3 border-l">
-            {state.metadata?.platforms && Object.keys(state.metadata.platforms).length > 0 ? (
-              Object.entries(state.metadata.platforms).map(([platform, details]) => {
+            {state.platforms && Object.keys(state.platforms).length > 0 ? (
+              Object.entries(state.platforms).map(([platform, details]) => {
                 const platformDetails = details as import('@/types/metadata-contract').PlatformDetails | undefined;
                 return (
                   <div key={platform} className="text-sm mb-1">
@@ -164,7 +169,7 @@ export default function Step6_Review({ state }: StepRenderContext) {
       <div className="space-y-2">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">Off‑chain JSON (copy/paste)</div>
         <pre className="text-xs bg-muted/30 rounded-md p-3 overflow-auto max-h-64">
-{metadataPreview}
+          {metadataPreview}
         </pre>
       </div>
     </div>

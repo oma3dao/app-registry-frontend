@@ -256,6 +256,68 @@ export function useUpdateStatus() {
 }
 
 /**
+ * Hook to update an existing app
+ * @returns Update function, pending state, and error
+ */
+export function useUpdateApp() {
+  const account = useActiveAccount();
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
+
+  const updateApp = async (input: any): Promise<string> => {
+    if (!account) {
+      throw new Error('No active account. Please connect your wallet.');
+    }
+
+    console.log('[useUpdateApp] Update input:', input);
+
+    setIsPending(true);
+    setError(null);
+    setTxHash(null);
+
+    const sendOnce = async () => {
+      await ensureWalletOnEnvChain(account);
+      const { prepareUpdateApp } = await import('./registry.write');
+      console.log('[useUpdateApp] Preparing transaction with input:', input);
+      const transaction = prepareUpdateApp(input);
+      console.log('[useUpdateApp] Transaction prepared:', transaction);
+      const result = await sendTransaction({ account, transaction });
+      console.log('[useUpdateApp] Transaction sent, hash:', result.transactionHash);
+      setTxHash(result.transactionHash);
+      return result.transactionHash;
+    };
+
+    try {
+      return await sendOnce();
+    } catch (e) {
+      console.error('[useUpdateApp] Error during update:', e);
+      const normalized = normalizeEvmError(e);
+      console.error('[useUpdateApp] Normalized error:', normalized);
+      if (normalized.code === 'NETWORK_ERROR') {
+        await new Promise((r) => setTimeout(r, 300));
+        try {
+          return await sendOnce();
+        } catch (e2) {
+          const n2 = normalizeEvmError(e2);
+          console.error('[useUpdateApp] Retry failed:', n2);
+          const err2 = new Error(n2.message);
+          setError(err2);
+          throw err2;
+        }
+      }
+      const errorObj = new Error(normalized.message);
+      setError(errorObj);
+      throw errorObj;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { updateApp, isPending, error, txHash };
+}
+
+/**
  * Hook to search apps by DID
  * @param query Search query (DID)
  * @returns Search results, loading state, and error

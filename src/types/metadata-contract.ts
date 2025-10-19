@@ -14,6 +14,10 @@ export interface PlatformDetails {
    * Optional list of supported devices or architectures (e.g., ["iPhone", "iPad"], ["x64", "arm64"]).
    */
   supported?: string[];
+  /**
+   * DID reference to artifact for verification (per OMATrust spec)
+   */
+  artifactDid?: string;
 }
 
 /**
@@ -80,101 +84,93 @@ export interface McpConfig {
  */
 export interface MetadataContractData {
   /**
-   * URL to app description
+   * App name (required per OMATrust spec)
    */
-  descriptionUrl?: string;
-  
+  name: string;
+
   /**
-   * Full text description content (cached from descriptionUrl)
+   * Long description of the application (required per OMATrust spec)
    */
-  description?: string;
-  
+  description: string;
+
   /**
-   * URL to marketing materials
+   * Publisher name (required per OMATrust spec)
+   */
+  publisher: string;
+
+  /**
+   * URL to app icon (required for human interface per OMATrust spec)
+   */
+  image: string;
+
+  /**
+   * URL to marketing materials (optional per OMATrust spec)
    */
   external_url?: string;
-  
+
   /**
-   * Token contract address (optional)
-   */
-  token?: string;
-  
-  /**
-   * URL to app icon (1024x1024)
-   */
-  image?: string;
-  
-  /**
-   * URLs to app screenshots (max 5)
-   * First screenshot is required, others are optional
-   * Maximum resolution: 2048x2048
-   */
-  screenshotUrls?: string[];
-  
-  /**
-   * Nested object containing details for each supported platform.
-   * Matches the "platforms" key used in the final JSON.
-   */
-  platforms?: Platforms;
-  
-  /**
-   * Brief summary of the app
+   * Short description (optional per OMATrust spec)
    */
   summary?: string;
-  
+
   /**
-   * Publisher/developer name
-   */
-  publisher?: string;
-  
-  /**
-   * URL to legal documents (privacy policy, TOS, etc.)
+   * URL to legal agreements (optional per OMATrust spec)
    */
   legalUrl?: string;
-  
+
   /**
-   * URL to support/help resources
+   * URL to get support (optional per OMATrust spec)
    */
   supportUrl?: string;
-  
-  // === API/Contract Interface Fields ===
-  
+
   /**
-   * Array of interface versions supported (API/Contract)
+   * URLs to app screenshots (required for human interface per OMATrust spec)
    */
-  interfaceVersions?: string[];
-  
+  screenshotUrls: string[];
+
   /**
-   * API/Contract endpoint configuration
-   */
-  endpoint?: EndpointConfig;
-  
-  /**
-   * Model Context Protocol configuration (API for AI agents)
-   */
-  mcp?: McpConfig;
-  
-  /**
-   * Payment mechanisms (x402, manual, etc.)
-   */
-  payments?: Array<{
-    type: 'x402' | 'manual';
-    url?: string;
-    chains?: string[];
-  }>;
-  
-  /**
-   * Artifact verification (for downloadable binaries)
-   */
-  artifacts?: Record<string, any>;
-  
-  /**
-   * Video URLs (human interface)
+   * URLs to demo videos (optional per OMATrust spec)
    */
   videoUrls?: string[];
-  
+
   /**
-   * 3D asset URLs (human interface)
+   * URLs to 3D assets (optional per OMATrust spec)
+   * Note: Stored as "3dAssetUrls" in JSON but using camelCase here for TypeScript compatibility
    */
   threeDAssetUrls?: string[];
+
+  /**
+   * IWPS Portal URL (optional per OMATrust spec)
+   */
+  iwpsPortalUrl?: string;
+
+  /**
+   * Platform availability information (required for human interface per OMATrust spec)
+   */
+  platforms: Platforms;
+
+  /**
+   * Traits for categorization (optional, max 20 per OMATrust spec)
+   */
+  traits?: string[];
+
+  /**
+   * Interface versions supported (optional per OMATrust spec)
+   */
+  interfaceVersions?: string[];
+
+  /**
+   * Artifacts for distribution (optional per OMATrust spec)
+   */
+  artifacts?: Record<string, any>;
+
+  /**
+   * API endpoint configuration (required for API interface per OMATrust spec)
+   */
+  endpoint?: EndpointConfig;
+
+  /**
+   * MCP configuration (optional for API interface per OMATrust spec)
+   */
+  mcp?: McpConfig;
 } 

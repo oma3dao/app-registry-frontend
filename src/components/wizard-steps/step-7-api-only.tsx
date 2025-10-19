@@ -42,7 +42,7 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
     );
   }
 
-  const endpoint = state.metadata?.endpoint || { url: '', schemaUrl: '' };
+  const endpoint = state.endpoint || { url: '', schemaUrl: '' };
   
   // Get endpoint labels based on interface type
   const getEndpointLabels = () => {
@@ -206,7 +206,7 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
               id="interface-versions"
               type="text"
               placeholder="v1, v2, v3 or 1.0.0, 2.0.0"
-              value={state.metadata?.interfaceVersions?.join(", ") || ""}
+              value={state.interfaceVersions?.join(", ") || ""}
               onChange={(e) => {
                 const versions = e.target.value
                   .split(",")
@@ -235,12 +235,12 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
           </p>
           
           <McpConfigEditor
-            value={state.metadata?.mcp}
-            onChange={(mcpConfig) => updateField("metadata.mcp", mcpConfig)}
+            value={state.mcp}
+            onChange={(mcpConfig) => updateField("mcp", mcpConfig)}
           />
           
-          {errors?.["metadata.mcp"] && (
-            <p className="text-sm text-red-500">{errors["metadata.mcp"]}</p>
+          {errors?.mcp && (
+            <p className="text-sm text-red-500">{errors.mcp}</p>
           )}
         </div>
       )}

@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { log } from '@/lib/log'
-import { MetadataContractData, Platforms } from '@/types/metadata-contract';
+
 
 /**
  * Utility function for conditionally joining class names
@@ -129,53 +129,18 @@ export async function fetchMetadataImage(dataUrl: string): Promise<string | null
  * @param metadata Raw metadata object which might be missing fields
  * @returns Normalized metadata with all required fields (using defaults where needed)
  */
-export const normalizeMetadata = (metadata: Record<string, any> | null | undefined): Partial<MetadataContractData> => {
+export const normalizeMetadata = (metadata: Record<string, any> | null | undefined): Record<string, any> => {
   if (!metadata) return {};
   
   return {
-    descriptionUrl: metadata.descriptionUrl || "",
+    name: metadata.name || "",
+    description: metadata.description || "",
+    publisher: metadata.publisher || "",
     external_url: metadata.external_url || "",
-    token: metadata.token || "",
     image: metadata.image || "",
-    screenshotUrls: Array.isArray(metadata.screenshotUrls) ? metadata.screenshotUrls : ["", "", "", "", ""],
+    screenshotUrls: Array.isArray(metadata.screenshotUrls) ? metadata.screenshotUrls : [],
     platforms: metadata.platforms || {}
   };
 };
 
-/**
- * Fetches description content from a URL using the API route
- * @param descriptionUrl The URL where the description is hosted
- * @returns The content as a string or null if it couldn't be fetched
- */
-export async function fetchDescriptionContent(descriptionUrl: string): Promise<string | null> {
-  if (!descriptionUrl) return null;
-  
-  try {
-    log("[fetchDescriptionContent] Fetching for URL:", descriptionUrl);
-    // Use the fetch-description API route
-    const apiUrl = `/api/fetch-description?url=${encodeURIComponent(descriptionUrl)}`;
-    const response = await fetch(apiUrl);
-    
-    if (!response.ok) {
-      log("[fetchDescriptionContent] API response not OK:", response.status, response.statusText);
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    if (data.error) {
-      log("[fetchDescriptionContent] Error in API response:", data.error);
-      return null;
-    }
-    
-    if (typeof data.content === 'string') {
-      return data.content;
-    } else {
-      log("[fetchDescriptionContent] Content missing or not a string");
-      return null;
-    }
-  } catch (error) {
-    log("[fetchDescriptionContent] Error calling API route:", error);
-    return null;
-  }
-}
+// Removed fetchDescriptionContent - descriptionUrl doesn't exist in OMATrust spec

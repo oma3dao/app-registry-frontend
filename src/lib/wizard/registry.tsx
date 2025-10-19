@@ -49,9 +49,9 @@ export const Step1_Verification: StepDef = {
   id: "verification",
   title: "Verification",
   description: "Verify DID ownership and configure app interfaces",
-  
+
   fields: ["did", "version", "name", "interfaceFlags", "apiType"],
-  
+
   schema: z.object({
     did: DidSchema,
     version: SemverSchema,
@@ -62,6 +62,10 @@ export const Step1_Verification: StepDef = {
       smartContract: z.boolean(),
     }),
     apiType: z.enum(['openapi', 'graphql', 'jsonrpc', 'mcp', 'a2a']).nullable().optional(),
+    ui: z.object({
+      isEditing: z.boolean().optional(),
+      currentVersion: z.string().optional(),
+    }).optional(),
   }).superRefine((data, ctx) => {
     // Require API type if API interface is selected
     if (data.interfaceFlags.api && !data.apiType) {
@@ -71,13 +75,61 @@ export const Step1_Verification: StepDef = {
         message: "Please select an API type when API interface is enabled",
       });
     }
+
+    // Enforce version increment in edit mode
+    if (data.ui?.isEditing && data.ui?.currentVersion) {
+      const currentVersion = data.ui.currentVersion;
+      const newVersion = data.version;
+
+      // Simple version comparison - new version must be different and higher
+      if (newVersion === currentVersion) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["version"],
+          message: `Version must be incremented from ${currentVersion} when editing`,
+        });
+      }
+
+      // Basic semantic version comparison
+      const parseVersion = (v: string) => {
+        const parts = v.split('.').map(Number);
+        return { major: parts[0] || 0, minor: parts[1] || 0, patch: parts[2] || 0 };
+      };
+
+      try {
+        const current = parseVersion(currentVersion);
+        const next = parseVersion(newVersion);
+
+        const isHigher =
+          next.major > current.major ||
+          (next.major === current.major && next.minor > current.minor) ||
+          (next.major === current.major && next.minor === current.minor && next.patch > current.patch);
+
+        if (!isHigher) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["version"],
+            message: `Version ${newVersion} must be higher than current version ${currentVersion}`,
+          });
+        }
+      } catch (error) {
+        // If version parsing fails, just require it to be different
+        if (newVersion === currentVersion) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["version"],
+            message: `Version must be incremented from ${currentVersion} when editing`,
+          });
+        }
+      }
+    }
   }),
 
   guard: (state) => {
     const did = (state.did || "").trim();
-    
-    // Check if verification status is ready (set by verification component)
-    const verificationReady = state._verificationStatus === "ready";
+
+    // Check if verification status is success (set by verification component)
+    const verificationReady = state.ui?.verificationStatus === "success";
 
     // Enforce verification for both did:web and did:pkh
     if ((did.startsWith("did:web:") || did.startsWith("did:pkh:")) && !verificationReady) {
@@ -98,9 +150,9 @@ export const Step2_Onchain: StepDef = {
   id: "onchain",
   title: "Onchain Data",
   description: "Configure on-chain identifiers and data references",
-  
+
   fields: ["dataUrl", "contractId", "fungibleTokenId", "traits"],
-  
+
   schema: z.object({
     dataUrl: UrlSchema,
     contractId: z.string().optional(),
@@ -119,17 +171,17 @@ export const Step3_Common: StepDef = {
   id: "common",
   title: "Common Info",
   description: "Basic app information for all interfaces",
-  
+
   fields: [
-    "metadata.description",
-    "metadata.external_url",
-    "metadata.image",
-    "metadata.summary",
-    "metadata.publisher",
-    "metadata.legalUrl",
-    "metadata.supportUrl",
+    "description",
+    "external_url",
+    "image",
+    "summary",
+    "publisher",
+    "legalUrl",
+    "supportUrl",
   ],
-  
+
   // Dynamic schema: requiredness of some fields depends on interface flags
   schema: z.any().superRefine((state, ctx) => {
     const md = state?.metadata || {};
@@ -160,20 +212,20 @@ export const Step3_Common: StepDef = {
     };
 
     // Requiredness per FIELD_REQUIREMENTS (updated by user changes)
-    ensureText(md.description, "metadata.description", "Description");
-    ensureText(md.publisher, "metadata.publisher", "Publisher");
-    ensureUrl(md.external_url, "metadata.external_url", "Marketing URL");
-    ensureUrl(md.image, "metadata.image", "Icon URL");
+    ensureText(md.description, "description", "Description");
+    ensureText(md.publisher, "publisher", "Publisher");
+    ensureUrl(md.external_url, "external_url", "Marketing URL");
+    ensureUrl(md.image, "image", "Icon URL");
 
     // Optionals unless required in future rules
     if (typeof md.summary !== "undefined" && typeof md.summary !== "string") {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", "summary"], message: "Summary must be a string" });
     }
     if (typeof md.publisher !== "undefined" && typeof md.publisher !== "string") {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", "publisher"], message: "Publisher must be a string" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publisher"], message: "Publisher must be a string" });
     }
-    ensureUrl(md.legalUrl, "metadata.legalUrl", "Legal URL");
-    ensureUrl(md.supportUrl, "metadata.supportUrl", "Support URL");
+    ensureUrl(md.legalUrl, "legalUrl", "Legal URL");
+    ensureUrl(md.supportUrl, "supportUrl", "Support URL");
   }),
 
   render: (ctx) => <Step3CommonComponent {...ctx} />,
@@ -187,24 +239,24 @@ export const Step4_HumanMedia: StepDef = {
   id: "human-media",
   title: "Media & Assets",
   description: "Screenshots and visual assets for human users",
-  
+
   appliesTo: (flags: InterfaceFlags) => flags.human,
-  
-  fields: ["metadata.screenshotUrls"],
-  
+
+  fields: ["screenshotUrls"],
+
   schema: z.any().superRefine((state, ctx) => {
     const flags = state?.interfaceFlags;
-    const mustScreens = isFieldRequired("metadata.screenshotUrls", flags);
-    const urls: any[] = state?.metadata?.screenshotUrls || [];
+    const mustScreens = isFieldRequired("screenshotUrls", flags);
+    const urls: any[] = state?.screenshotUrls || [];
     const nonEmpty = urls.filter((u) => typeof u === "string" && u.length > 0);
     if (mustScreens && nonEmpty.length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata","screenshotUrls"], message: "At least one screenshot is required" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["screenshotUrls"], message: "At least one screenshot is required" });
     }
     // Validate format for any provided URLs
     for (let i = 0; i < urls.length; i++) {
       const u = urls[i];
       if (typeof u === "string" && u.length > 0) {
-        try { new URL(u); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata","screenshotUrls", i], message: "Must be a valid URL" }); }
+        try { new URL(u); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["screenshotUrls", i], message: "Must be a valid URL" }); }
       }
     }
   }),
@@ -221,11 +273,11 @@ export const Step5_HumanDistribution: StepDef = {
   id: "human-distribution",
   title: "Distribution",
   description: "Platform availability and distribution settings",
-  
+
   appliesTo: (flags: InterfaceFlags) => flags.human,
-  
-  fields: ["iwpsPortalUrl", "metadata.platforms"],
-  
+
+  fields: ["iwpsPortalUrl", "platforms"],
+
   schema: z.any().superRefine((state, ctx) => {
     const iwps = state?.iwpsPortalUrl;
     if (typeof iwps === "string" && iwps.length > 0) {
@@ -234,13 +286,13 @@ export const Step5_HumanDistribution: StepDef = {
 
     // platforms: at least one URL (download or launch) somewhere if human
     const flags = state?.interfaceFlags;
-    const platforms = state?.metadata?.platforms || {};
+    const platforms = state?.platforms || {};
     const hasAnyUrl = Object.values(platforms).some((det: any) => {
       const d = det?.downloadUrl; const l = det?.launchUrl;
       return (typeof d === "string" && d.length > 0) || (typeof l === "string" && l.length > 0);
     });
     if (flags?.human && !hasAnyUrl) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata","platforms"], message: "Provide at least one Download or Launch URL for a platform" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["platforms"], message: "Provide at least one Download or Launch URL for a platform" });
     }
 
     // Validate any provided URLs
@@ -249,10 +301,10 @@ export const Step5_HumanDistribution: StepDef = {
       const d = platformDetails?.downloadUrl;
       const l = platformDetails?.launchUrl;
       if (typeof d === "string" && d.length > 0) {
-        try { new URL(d); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata","platforms", platformKey, "downloadUrl"], message: "Must be a valid URL" }); }
+        try { new URL(d); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", "platforms", platformKey, "downloadUrl"], message: "Must be a valid URL" }); }
       }
       if (typeof l === "string" && l.length > 0) {
-        try { new URL(l); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata","platforms", platformKey, "launchUrl"], message: "Must be a valid URL" }); }
+        try { new URL(l); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", "platforms", platformKey, "launchUrl"], message: "Must be a valid URL" }); }
       }
     }
   }),
@@ -269,10 +321,10 @@ export const Step7_ApiOnly: StepDef = {
   id: "endpoint-config",
   title: "Endpoint",
   description: "Configure endpoint and interface-specific settings",
-  
+
   appliesTo: (flags) => flags.api || flags.smartContract,
-  fields: ["metadata.endpoint", "metadata.interfaceVersions", "metadata.mcp"],
-  
+  fields: ["endpoint", "interfaceVersions", "mcp"],
+
   schema: z.object({
     metadata: z.object({
       endpoint: z.object({
@@ -299,9 +351,9 @@ export const Step6_Review: StepDef = {
   id: "review",
   title: "Review",
   description: "Review all information before minting",
-  
+
   fields: [], // No fields, read-only review
-  
+
   // Note: Review step validates the ENTIRE form using composeSchemas()
   // No per-step schema needed
 

@@ -2,15 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardFooter 
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter
 } from "@/components/ui/card"
-import type { NFT } from "@/types/nft"
-import { getStatusLabel, getStatusClasses } from "@/types/nft"
+import type { NFT } from "@/schema/data-model"
+import { getStatusLabel, getStatusClasses } from "@/schema/data-model"
 import { log } from "@/lib/log"
 import { useNFTMetadata } from "@/lib/nft-metadata-context"
 import {
@@ -59,7 +59,7 @@ function getInterfaceBadges(interfaces: number) {
 export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTCardProps) {
   // Use the metadata context to get complete metadata
   const { getNFTMetadata } = useNFTMetadata();
-  
+
   // Local state to store the metadata for this card
   const [nftMetadata, setNftMetadata] = useState<ReturnType<typeof getNFTMetadata> | null>(null);
 
@@ -73,37 +73,43 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
   // Debug log key generation
   const key = `${nft.did || 'unknown'}-${nft.version || 'unknown'}`;
   log(`NFTCard rendering with key: ${key}`, nft);
-  
+
   // Get data from metadata context (fetched from dataUrl), with fallbacks
   const name = nftMetadata?.displayData.name || nft.name || "Unnamed App";
   const version = nft.version || "Unknown Version";
   const did = nft.did || "Unknown DID";
   const interfaces = nft.interfaces || 0;
-  
-  // Get image/icon from metadata context first, then fall back to NFT metadata
-  const image = nftMetadata?.displayData.image || nft.metadata?.image || "";
+
+  // Get image/icon from metadata context first, then fall back to NFT image
+  const image = nftMetadata?.displayData.image || nft.image || "";
   const isLoading = nftMetadata?.isLoading || false;
-  
+
+  // Debug logging
+  if (nft.did) {
+    log(`[NFTCard] ${nft.did} - nftMetadata:`, nftMetadata?.displayData);
+    log(`[NFTCard] ${nft.did} - image sources: fetched="${nftMetadata?.displayData.image}", nft="${nft.image}", final="${image}"`);
+  }
+
   // Determine if we have a valid image to display
   const hasImage = !isLoading && image && image.trim() !== '';
-  
-  // Get marketing/external URL from metadata context first, then fall back to NFT metadata
-  const external_url = nftMetadata?.displayData.external_url || nft.metadata?.external_url || "";
+
+  // Get marketing/external URL from metadata context first, then fall back to NFT external_url
+  const external_url = nftMetadata?.displayData.external_url || nft.external_url || "";
   const status = typeof nft.status === 'number' ? nft.status : 0;
 
-  // Determine available platforms from metadata context first, then fall back to NFT metadata
-  const availablePlatformsFromContext = nftMetadata 
+  // Determine available platforms from metadata context first, then fall back to NFT platforms
+  const availablePlatformsFromContext = nftMetadata
     ? Object.keys(nftMetadata.displayData.platforms)
     : [];
-  
-  // Fall back to NFT metadata platforms if context doesn't have any
+
+  // Fall back to NFT platforms if context doesn't have any
   const availablePlatforms = availablePlatformsFromContext.length > 0
     ? availablePlatformsFromContext
-    : (!nft.hasError && nft.metadata?.platforms 
-        ? Object.keys(platformIcons).filter(platformKey => 
-            nft.metadata!.platforms!.hasOwnProperty(platformKey)
-          )
-        : []);
+    : (!nft.hasError && nft.platforms
+      ? Object.keys(platformIcons).filter(platformKey =>
+        nft.platforms!.hasOwnProperty(platformKey)
+      )
+      : []);
 
   const handleCardClick = () => {
     if (!nft.hasError) {
@@ -112,7 +118,7 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
   };
 
   return (
-    <Card 
+    <Card
       className={`overflow-hidden transition-all duration-200 border flex flex-col group min-h-[220px] ${nft.hasError ? 'border-red-500 bg-red-50 dark:bg-red-950 opacity-70 cursor-not-allowed' : 'hover:shadow-lg cursor-pointer hover:scale-[1.02] hover:border-blue-500'}`}
       onClick={handleCardClick}
       role="button"
@@ -160,10 +166,10 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
             <div className="flex justify-between items-center text-sm text-slate-600 dark:text-slate-400 mt-1">
               <span>Version: {version}</span>
               {external_url && (
-                <a 
-                  href={external_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                <a
+                  href={external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
                   className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 ml-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
                   aria-label={`Visit ${name} website (opens in new tab)`}
@@ -200,10 +206,10 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
           <div className="flex justify-between items-center text-sm text-slate-600 dark:text-slate-400 mt-1">
             <span>Version: {version}</span>
             {external_url && (
-              <a 
-                href={external_url} 
-                target="_blank" 
-                rel="noopener noreferrer" 
+              <a
+                href={external_url}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 ml-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
                 aria-label={`Visit ${name} website (opens in new tab)`}
@@ -228,45 +234,45 @@ export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTC
       )}
 
       <CardContent className="p-4 pt-2 space-y-2 flex-grow">
-         {/* Error Message Display */}
-         {nft.hasError && (
-            <div className="border-t border-red-300 dark:border-red-700 pt-3 mt-3">
-                <p className="text-sm font-medium text-red-700 dark:text-red-400">Error:</p>
-                <p className="text-xs text-red-600 dark:text-red-500">{nft.errorMessage || 'Unknown error.'}</p>
-            </div>
-         )}
-         
-         {/* Platform Icons (only if no error) */}
-         {!nft.hasError && availablePlatforms.length > 0 && (
-           <div className="flex flex-wrap gap-2 items-center border-t pt-3 mt-3">
-             <span className="text-xs font-medium text-slate-700 dark:text-slate-300 mr-1">Platforms:</span>
-             {availablePlatforms.map(platformKey => (
-               <span key={platformKey} title={platformKey.charAt(0).toUpperCase() + platformKey.slice(1)} className="text-slate-500 dark:text-slate-400">
-                 {platformIcons[platformKey]}
-               </span>
-             ))}
-           </div>
-         )}
-         {!nft.hasError && availablePlatforms.length === 0 && (
-           <div className="border-t pt-3 mt-3">
-             <p className="text-xs text-slate-500 italic">No platform information provided.</p>
-           </div>
-         )}
+        {/* Error Message Display */}
+        {nft.hasError && (
+          <div className="border-t border-red-300 dark:border-red-700 pt-3 mt-3">
+            <p className="text-sm font-medium text-red-700 dark:text-red-400">Error:</p>
+            <p className="text-xs text-red-600 dark:text-red-500">{nft.errorMessage || 'Unknown error.'}</p>
+          </div>
+        )}
+
+        {/* Platform Icons (only if no error) */}
+        {!nft.hasError && availablePlatforms.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center border-t pt-3 mt-3">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300 mr-1">Platforms:</span>
+            {availablePlatforms.map(platformKey => (
+              <span key={platformKey} title={platformKey.charAt(0).toUpperCase() + platformKey.slice(1)} className="text-slate-500 dark:text-slate-400">
+                {platformIcons[platformKey]}
+              </span>
+            ))}
+          </div>
+        )}
+        {!nft.hasError && availablePlatforms.length === 0 && (
+          <div className="border-t pt-3 mt-3">
+            <p className="text-xs text-slate-500 italic">No platform information provided.</p>
+          </div>
+        )}
 
         {/* DID and Contract (only if no error) */}
         {!nft.hasError && (
-            <>
-                <div className="text-sm pt-2">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">DID: </span>
-                  <span className="text-slate-600 dark:text-slate-400 break-all" title={did}>{did}</span>
-                </div>
-                {nft.contractId && (
-                  <div className="text-sm">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">Contract: </span>
-                    <span className="text-slate-600 dark:text-slate-400 break-all" title={nft.contractId}>{nft.contractId}</span>
-                  </div>
-                )}
-            </>
+          <>
+            <div className="text-sm pt-2">
+              <span className="font-medium text-slate-700 dark:text-slate-300">DID: </span>
+              <span className="text-slate-600 dark:text-slate-400 break-all" title={did}>{did}</span>
+            </div>
+            {nft.contractId && (
+              <div className="text-sm">
+                <span className="font-medium text-slate-700 dark:text-slate-300">Contract: </span>
+                <span className="text-slate-600 dark:text-slate-400 break-all" title={nft.contractId}>{nft.contractId}</span>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

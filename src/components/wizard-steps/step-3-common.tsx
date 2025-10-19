@@ -36,8 +36,8 @@ export default function Step3_Common(ctx: StepRenderContext) {
           id="description"
           name="metadata.description"
           placeholder="Describe your app..."
-          value={state.metadata?.description || ""}
-          onChange={(e) => updateField("metadata.description", e.target.value)}
+          value={state.description || ""}
+          onChange={(e) => updateField("description", e.target.value)}
           className={descErr ? "border-red-500" : ""}
           rows={5}
         />
@@ -57,12 +57,12 @@ export default function Step3_Common(ctx: StepRenderContext) {
           name="metadata.external_url"
           type="url"
           placeholder="https://example.com"
-          value={state.metadata?.external_url || ""}
-          onChange={(e) => updateField("metadata.external_url", e.target.value)}
+          value={state.external_url || ""}
+          onChange={(e) => updateField("external_url", e.target.value)}
           className={extErr ? "border-red-500" : ""}
         />
         {extErr && <p className="text-sm text-red-500">{extErr}</p>}
-        <UrlValidator url={state.metadata?.external_url || ""} />
+        <UrlValidator url={state.external_url || ""} />
       </div>
 
       {/* Icon/Image URL */}
@@ -78,12 +78,12 @@ export default function Step3_Common(ctx: StepRenderContext) {
           name="metadata.image"
           type="url"
           placeholder="https://example.com/icon.png"
-          value={state.metadata?.image || ""}
-          onChange={(e) => updateField("metadata.image", e.target.value)}
+          value={state.image || ""}
+          onChange={(e) => updateField("image", e.target.value)}
           className={imgErr ? "border-red-500" : ""}
         />
         {imgErr && <p className="text-sm text-red-500">{imgErr}</p>}
-        <UrlValidator url={state.metadata?.image || ""} />
+        <UrlValidator url={state.image || ""} />
       </div>
 
       {/* Optional fields (may be required by some interface rules later) */}
@@ -96,8 +96,8 @@ export default function Step3_Common(ctx: StepRenderContext) {
           name="metadata.summary"
           type="text"
           placeholder="Short app summary"
-          value={state.metadata?.summary || ""}
-          onChange={(e) => updateField("metadata.summary", e.target.value)}
+          value={state.summary || ""}
+          onChange={(e) => updateField("summary", e.target.value)}
           className={sumErr ? "border-red-500" : ""}
         />
         {sumErr && <p className="text-sm text-red-500">{sumErr}</p>}
@@ -112,8 +112,8 @@ export default function Step3_Common(ctx: StepRenderContext) {
           name="metadata.publisher"
           type="text"
           placeholder="Your organization"
-          value={state.metadata?.publisher || ""}
-          onChange={(e) => updateField("metadata.publisher", e.target.value)}
+          value={state.publisher || ""}
+          onChange={(e) => updateField("publisher", e.target.value)}
           className={pubErr ? "border-red-500" : ""}
         />
         {pubErr && <p className="text-sm text-red-500">{pubErr}</p>}
@@ -128,8 +128,8 @@ export default function Step3_Common(ctx: StepRenderContext) {
           name="metadata.legalUrl"
           type="url"
           placeholder="https://example.com/legal"
-          value={state.metadata?.legalUrl || ""}
-          onChange={(e) => updateField("metadata.legalUrl", e.target.value)}
+          value={state.legalUrl || ""}
+          onChange={(e) => updateField("legalUrl", e.target.value)}
           className={legalErr ? "border-red-500" : ""}
         />
         {legalErr && <p className="text-sm text-red-500">{legalErr}</p>}
@@ -144,8 +144,8 @@ export default function Step3_Common(ctx: StepRenderContext) {
           name="metadata.supportUrl"
           type="url"
           placeholder="https://example.com/support"
-          value={state.metadata?.supportUrl || ""}
-          onChange={(e) => updateField("metadata.supportUrl", e.target.value)}
+          value={state.supportUrl || ""}
+          onChange={(e) => updateField("supportUrl", e.target.value)}
           className={supportErr ? "border-red-500" : ""}
         />
         {supportErr && <p className="text-sm text-red-500">{supportErr}</p>}

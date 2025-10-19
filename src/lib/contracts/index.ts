@@ -17,6 +17,7 @@ export {
   useAppsList,
   useTotalApps,
   useMintApp,
+  useUpdateApp,
   useUpdateStatus,
   useSearchByDid,
 } from './registry.hooks';

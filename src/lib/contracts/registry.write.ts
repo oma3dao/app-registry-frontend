@@ -52,7 +52,7 @@ export function prepareMintApp(input: MintAppInput) {
   try {
     const contract = getAppRegistryContract();
     const normalizedDid = normalizeDidWeb(input.did);
-    
+
     return prepareContractCall({
       contract,
       method: 'function mint(string, uint16, string, bytes32, uint8, string, string, uint8, uint8, uint8, bytes32[], string) returns (uint256)',
@@ -88,7 +88,7 @@ export function prepareUpdateStatus(input: UpdateStatusInput) {
     const contract = getAppRegistryContract();
     const normalizedDid = normalizeDidWeb(input.did);
     const statusNum = statusToNumber(input.status);
-    
+
     return prepareContractCall({
       contract,
       method: 'function updateStatus(string, uint8, uint8) external',
@@ -113,7 +113,8 @@ export function prepareUpdateStatus(input: UpdateStatusInput) {
  *   uint16 newInterfaces,
  *   bytes32[] newTraitHashes,
  *   uint8 newMinor,
- *   uint8 newPatch
+ *   uint8 newPatch,
+ *   string metadataJson
  * )
  * 
  * @param input Update data
@@ -123,20 +124,21 @@ export function prepareUpdateApp(input: UpdateAppInput) {
   try {
     const contract = getAppRegistryContract();
     const normalizedDid = normalizeDidWeb(input.did);
-    
+
     return prepareContractCall({
       contract,
-      method: 'function updateAppControlled(string, uint8, string, bytes32, uint8, uint16, bytes32[], uint8, uint8) external',
+      method: 'function updateAppControlled(string, uint8, string, bytes32, uint8, uint16, bytes32[], uint8, uint8, string) external',
       params: [
-        normalizedDid,                                         // didString
-        input.major,                                          // major
-        input.newDataUrl || '',                               // newDataUrl (empty = no change)
-        (input.newDataHash as `0x${string}`) || '0x0000000000000000000000000000000000000000000000000000000000000000', // newDataHash (bytes32(0) = no change)
-        input.newDataHashAlgorithm || 0,                      // newDataHashAlgorithm (0 = no change)
-        input.newInterfaces || 0,                             // newInterfaces (0 = no change)
-        (input.newTraitHashes || []).map(h => h as `0x${string}`), // newTraitHashes (empty = no change)
-        input.newMinor,                                       // newMinor
-        input.newPatch,                                       // newPatch
+        normalizedDid,                                         // 1. didString
+        input.major,                                          // 2. major
+        input.newDataUrl || '',                               // 3. newDataUrl (empty = no change)
+        (input.newDataHash as `0x${string}`) || '0x0000000000000000000000000000000000000000000000000000000000000000', // 4. newDataHash (bytes32(0) = no change)
+        input.newDataHashAlgorithm || 0,                      // 5. newDataHashAlgorithm (0 = no change)
+        input.newInterfaces || 0,                             // 6. newInterfaces (0 = no change)
+        (input.newTraitHashes || []).map(h => h as `0x${string}`), // 7. newTraitHashes (empty = no change)
+        input.newMinor,                                       // 8. newMinor
+        input.newPatch,                                       // 9. newPatch
+        input.metadataJson || '',                             // 10. metadataJson (empty to skip)
       ],
     });
   } catch (e) {

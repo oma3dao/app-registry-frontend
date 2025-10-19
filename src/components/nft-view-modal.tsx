@@ -20,8 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import type { NFT } from "@/types/nft"
-import { APP_STATUSES, getStatusLabel, getStatusClasses } from "@/types/nft"
+import type { NFT } from "@/schema/data-model"
+import { APP_STATUSES, getStatusLabel, getStatusClasses } from "@/schema/data-model"
 import { useActiveAccount } from "thirdweb/react"
 import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile, buildVersionedDID } from "@/lib/utils"
@@ -132,10 +132,9 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   }, [isOpen, nft?.did]);
   
   // Extract metadata values with fallbacks
-  const image = nftMetadata?.displayData.image || nft?.metadata?.image || "";
-  const external_url = nftMetadata?.displayData.external_url || nft?.metadata?.external_url || "";
-  const descriptionUrl = nftMetadata?.displayData.descriptionUrl || "";
-  const description = nftMetadata?.displayData.description || "";
+  const image = nftMetadata?.displayData.image || nft?.image || "";
+  const external_url = nftMetadata?.displayData.external_url || nft?.external_url || "";
+  const description = nftMetadata?.displayData.description || nft?.description || "";
   const screenshotUrls = nftMetadata?.displayData.screenshotUrls || [];
   const platforms = nftMetadata?.displayData.platforms || {};
   const isLoading = nftMetadata?.isLoading || false;
@@ -191,23 +190,11 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     }
   }, [nft, isOpen]); // Rerun when modal opens or NFT changes
 
-  // Fetch description when modal opens
+  // Description is now directly available in the metadata
   useEffect(() => {
-    const loadDescription = async () => {
-      if (isOpen && nft && nftMetadata && !nftMetadata.displayData.description && nftMetadata.displayData.descriptionUrl) {
-        setIsLoadingDescription(true);
-        try {
-          await fetchNFTDescription(nft);
-        } catch (error) {
-          log("[NFTViewModal] Error fetching description:", error);
-        } finally {
-          setIsLoadingDescription(false);
-        }
-      }
-    };
-
-    loadDescription();
-  }, [isOpen, nft, nftMetadata, fetchNFTDescription]);
+    // No need to fetch description separately since it's part of the main metadata
+    setIsLoadingDescription(false);
+  }, [isOpen, nft, nftMetadata]);
 
   const handleStatusChange = async () => {
     if (!nft || !isOwner || !statusChanged) return
@@ -373,7 +360,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
                 <div className="flex-grow">
                   <DialogTitle className="text-2xl mb-1">{nftMetadata?.displayData.name || nft.name || 'Unnamed App'}</DialogTitle>
-                  <DialogDescription className="text-md flex flex-col gap-2">
+                  <div className="text-md flex flex-col gap-2 text-muted-foreground">
                     <span>Version: {nft.version}</span>
                     {/* Interfaces */}
                     <div className="flex items-center gap-2 text-sm">
@@ -387,7 +374,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                         {getStatusLabel(nft.status)}
                       </span>
                     )}
-                  </DialogDescription>
+                  </div>
                 </div>
               </div>
               <Button 

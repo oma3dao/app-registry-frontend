@@ -40,6 +40,15 @@ const activeChain = CHAIN_PRESETS[parsed.NEXT_PUBLIC_ACTIVE_CHAIN];
  * For custom domains: Modify the chain configuration in chains.ts
  */
 function getAppBaseUrl(): string {
+  console.log(`[ENV] NODE_ENV: "${process.env.NODE_ENV}", activeChain.id: ${activeChain.id}`);
+  
+  // DEVELOPMENT OVERRIDE: Always use localhost during development
+  // This allows testing with any chain (localhost, testnet, mainnet) while developing locally
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[ENV] Development mode detected - using localhost for API routes');
+    return 'http://localhost:3000';
+  }
+
   // Chain-aware: Only use localhost for actual localhost chain
   if (activeChain.id === 31337) {
     // Local Hardhat chain - use localhost for development

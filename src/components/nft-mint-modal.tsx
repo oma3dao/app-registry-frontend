@@ -11,8 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from "lucide-react";
-import { NFT } from "@/types/nft";
-import type { WizardFormData } from "@/types/form";
+import { NFT, defaultUIState, defaultFormState, type TFormState } from "@/schema/data-model";
 import {
   ALL_STEPS,
   visibleSteps,
@@ -27,26 +26,28 @@ import { DEFAULT_INTERFACE_FLAGS } from "@/lib/utils/interfaces";
 const draftKey = (did?: string, version?: string) =>
   did ? `wizard:${did}${version ? `:v:${version}` : ""}` : "";
 
-function saveDraft(state: WizardFormData) {
+function saveDraft(state: TFormState) {
   try {
     const key = draftKey(state.did, state.version);
     if (!key) return;
-    // Strip ephemeral/internal fields (keys starting with "_")
-    const { _verificationStatus, ...rest } = state;
+    // Strip UI state and ephemeral fields
+    const { ui, ...rest } = state;
     localStorage.setItem(key, JSON.stringify(rest));
-  } catch {}
+  } catch { }
 }
 
-function loadDraft(did?: string, version?: string): Partial<WizardFormData> | null {
+function loadDraft(did?: string, version?: string): Partial<TFormState> | null {
   try {
     const key = draftKey(did, version);
     if (!key) return null;
     const raw = localStorage.getItem(key);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<WizardFormData>;
-    // Ensure ephemeral/internal fields are reset
-    if (parsed && parsed._verificationStatus) delete parsed._verificationStatus;
-    return parsed;
+    const parsed = JSON.parse(raw) as Partial<TFormState>;
+    // Ensure UI state is reset to defaults
+    return {
+      ...parsed,
+      ui: defaultUIState,
+    };
   } catch {
     return null;
   }
@@ -69,17 +70,7 @@ export default function NFTMintModal({
 }: NFTMintModalProps) {
   // Form state
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [formData, setFormData] = useState<WizardFormData>({
-    name: "",
-    version: "",
-    did: "",
-    dataUrl: "",
-    interfaces: 1, // Default: human only
-    status: 0, // Default: Active
-    minter: "", // Will be set by contract
-    interfaceFlags: DEFAULT_INTERFACE_FLAGS,
-    metadata: undefined,
-  });
+  const [formData, setFormData] = useState<TFormState>(defaultFormState);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Step status store (for async operations like verification)
@@ -99,11 +90,11 @@ export default function NFTMintModal({
         }
         current[parts[parts.length - 1]] = value;
         // If DID changed via nested path (unlikely), also reset verification
-        return updated as WizardFormData;
+        return updated as TFormState;
       }
-      const next = { ...prev, [path]: value } as WizardFormData;
+      const next = { ...prev, [path]: value } as TFormState;
       if (path === "did") {
-        next._verificationStatus = "idle";
+        next.ui.verificationStatus = "idle";
       }
       return next;
     });
@@ -121,7 +112,19 @@ export default function NFTMintModal({
   // Initialize form data when modal opens
   useEffect(() => {
     if (isOpen && initialData) {
-      setFormData((prev) => ({ ...prev, ...initialData }));
+      const isEditMode = !!initialData.did && !!initialData.version;
+      setFormData((prev) => ({
+        ...prev,
+        ...initialData,
+        ui: {
+          ...prev.ui,
+          mode: isEditMode ? "edit" : "create",
+          isEditing: isEditMode,
+          currentVersion: isEditMode ? initialData.version : undefined,
+          // Always require verification, even in edit mode (security: ownership could have changed)
+          verificationStatus: "idle",
+        },
+      }));
     }
   }, [isOpen, initialData]);
 
@@ -131,7 +134,7 @@ export default function NFTMintModal({
     if (!formData.did || !formData.version) return;
     const draft = loadDraft(formData.did, formData.version);
     if (draft) {
-      setFormData((prev) => ({ ...prev, ...draft }));
+      setFormData((prev) => ({ ...prev, ...draft, ui: prev.ui }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, formData.did, formData.version]);
@@ -140,17 +143,7 @@ export default function NFTMintModal({
   useEffect(() => {
     if (!isOpen) {
       setCurrentStepIndex(0);
-      setFormData({
-        name: "",
-        version: "",
-        did: "",
-        dataUrl: "",
-        interfaces: 1,
-        status: 0,
-        minter: "",
-        interfaceFlags: { human: true, api: false, smartContract: false },
-        metadata: undefined,
-      });
+      setFormData(defaultFormState);
       setErrors({});
       resetStatus();
     }
@@ -228,24 +221,17 @@ export default function NFTMintModal({
 
   // Handle form submission
   const handleSubmit = async () => {
-    // Convert interfaceFlags to bitmap
-    const flags = formData.interfaceFlags || { human: true, api: false, smartContract: false };
-    const interfaces = (flags.human ? 1 : 0) + (flags.api ? 2 : 0) + (flags.smartContract ? 4 : 0);
-
     // Convert formData to NFT format (Dashboard handles actual on-chain mint via useMintApp)
     const nft: NFT = {
-      name: formData.name || "",
-      version: formData.version || "",
-      did: formData.did || "",
-      dataUrl: formData.dataUrl || "",
-      contractId: formData.contractId || "",
-      fungibleTokenId: formData.fungibleTokenId,
-      traits: formData.traits,
-      iwpsPortalUrl: formData.iwpsPortalUrl,
-      interfaces,
-      status: formData.status,
-      minter: formData.minter,
-      metadata: formData.metadata,
+      ...formData,
+      // Override with computed interface bitmap
+      interfaces: (formData.interfaceFlags.human ? 1 : 0) +
+        (formData.interfaceFlags.api ? 2 : 0) +
+        (formData.interfaceFlags.smartContract ? 4 : 0),
+      // Add required fields - preserve from initialData in edit mode, use defaults for new apps
+      minter: initialData?.minter || '', // Preserve existing minter in edit mode, empty for new apps
+      status: initialData?.status ?? 0,  // Preserve existing status in edit mode, default to Active for new apps
+      dataUrl: formData.dataUrl || '', // Ensure dataUrl is not undefined
     };
 
     try {
@@ -299,13 +285,12 @@ export default function NFTMintModal({
               <React.Fragment key={step.id}>
                 <div className="flex flex-col items-center gap-1 flex-shrink-0 min-w-0">
                   <div
-                    className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${
-                      isActive
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : isCompleted
+                    className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${isActive
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : isCompleted
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-muted-foreground/30 bg-background"
-                    }`}
+                      }`}
                     title={step.title}
                   >
                     {isCompleted ? (
@@ -315,11 +300,10 @@ export default function NFTMintModal({
                     )}
                   </div>
                   <div
-                    className={`text-xs leading-tight text-center font-medium max-w-[70px] ${
-                      isActive
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    }`}
+                    className={`text-xs leading-tight text-center font-medium max-w-[70px] ${isActive
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                      }`}
                   >
                     {step.title}
                   </div>

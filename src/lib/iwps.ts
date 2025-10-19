@@ -1,5 +1,5 @@
 import * as AppConfig from '@/config/app-config';
-import type { NFT } from "@/types/nft";
+import type { NFT } from "@/schema/data-model";
 
 // Define the structure for Group 1 parameters
 // Using IWPS constants for potential keys, but values are detected

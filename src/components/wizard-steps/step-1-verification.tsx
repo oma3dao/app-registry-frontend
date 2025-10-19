@@ -69,7 +69,7 @@ export default function Step1_Verification({
   const handleDidTypeChange = (newType: string) => {
     setDidType(newType as "did:web" | "did:pkh" | "");
     updateField("did", ""); // Clear DID when switching types
-    updateField("_verificationStatus", "idle"); // Reset verification
+    updateField("ui.verificationStatus", "idle"); // Reset verification
   };
 
   return (
@@ -104,6 +104,16 @@ export default function Step1_Verification({
         {errors?.version && (
           <p className="text-red-500 text-sm mt-1">{errors.version}</p>
         )}
+        
+        {/* Edit mode version increment warning */}
+        {state.ui?.isEditing && state.ui?.currentVersion && (
+          <div className="p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-md">
+            <p className="text-sm text-yellow-900 dark:text-yellow-100">
+              <strong>Editing existing app:</strong> You must increment the version from <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">{state.ui.currentVersion}</code> to publish changes.
+            </p>
+          </div>
+        )}
+        
         <p className="text-xs text-muted-foreground">
           Semantic version (e.g., 1.0 or 1.0.0)
         </p>
@@ -159,7 +169,7 @@ export default function Step1_Verification({
           onChange={(caip10) => {
             const newDid = caip10 ? `did:pkh:${caip10}` : "";
             updateField("did", newDid);
-            updateField("_verificationStatus", "idle"); // Reset verification when DID changes
+            updateField("ui.verificationStatus", "idle"); // Reset verification when DID changes
           }}
           error={errors?.did}
         />
@@ -171,10 +181,17 @@ export default function Step1_Verification({
           <DidVerification
             did={state.did || ""}
             onVerificationComplete={(verified) => {
-              updateField("_verificationStatus", verified ? "ready" : "idle");
+              updateField("ui.verificationStatus", verified ? "success" : "error");
             }}
-            isVerified={state._verificationStatus === "ready"}
+            isVerified={state.ui?.verificationStatus === "success"}
           />
+          {state.ui?.isEditing && (
+            <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>Security:</strong> Verification is required even when editing to ensure you still control this DID.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -184,10 +201,17 @@ export default function Step1_Verification({
           <DidPkhVerification
             did={state.did}
             onVerificationComplete={(verified) => {
-              updateField("_verificationStatus", verified ? "ready" : "idle");
+              updateField("ui.verificationStatus", verified ? "success" : "error");
             }}
-            isVerified={state._verificationStatus === "ready"}
+            isVerified={state.ui?.verificationStatus === "success"}
           />
+          {state.ui?.isEditing && (
+            <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>Security:</strong> Verification is required even when editing to ensure you still control this DID.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

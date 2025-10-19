@@ -116,7 +116,7 @@ export async function POST(
     console.log(`[API portal-url] Fetching metadata for: ${versionedDid}`);
     let appMetadata: MetadataContractData | null = null;
     try {
-      appMetadata = await getMetadata(versionedDid);
+      appMetadata = await getMetadata(versionedDid) as MetadataContractData | null;
     } catch (metadataError) {
        console.log(`[API portal-url] Error fetching metadata for ${versionedDid}:`, metadataError);
        return NextResponse.json({ approval: false, error: 'Failed to retrieve application metadata' }, { status: 500 });

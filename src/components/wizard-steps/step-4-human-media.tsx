@@ -11,30 +11,30 @@ export default function Step4_HumanMedia(ctx: StepRenderContext) {
   const { state, updateField, errors } = ctx;
   const req = (path: string) => isFieldRequired(path, state.interfaceFlags);
 
-  const screenshotErr = errors?.["metadata.screenshotUrls"];
+  const screenshotErr = errors?.screenshotUrls;
 
-  const getScreenshot = (idx: number) => state.metadata?.screenshotUrls?.[idx] || "";
+  const getScreenshot = (idx: number) => state.screenshotUrls?.[idx] || "";
   const setScreenshot = (idx: number, value: string) => {
-    const current = state.metadata?.screenshotUrls || [];
+    const current = state.screenshotUrls || [];
     const next = [...current];
     next[idx] = value;
-    updateField("metadata.screenshotUrls", next);
+    updateField("screenshotUrls", next);
   };
   
-  const getVideo = (idx: number) => state.metadata?.videoUrls?.[idx] || "";
+  const getVideo = (idx: number) => state.videoUrls?.[idx] || "";
   const setVideo = (idx: number, value: string) => {
-    const current = state.metadata?.videoUrls || [];
+    const current = state.videoUrls || [];
     const next = [...current];
     next[idx] = value;
-    updateField("metadata.videoUrls", next);
+    updateField("videoUrls", next);
   };
   
-  const get3dAsset = (idx: number) => state.metadata?.threeDAssetUrls?.[idx] || "";
+  const get3dAsset = (idx: number) => state.threeDAssetUrls?.[idx] || "";
   const set3dAsset = (idx: number, value: string) => {
-    const current = state.metadata?.threeDAssetUrls || [];
+    const current = state.threeDAssetUrls || [];
     const next = [...current];
     next[idx] = value;
-    updateField("metadata.threeDAssetUrls", next);
+    updateField("threeDAssetUrls", next);
   };
 
   return (

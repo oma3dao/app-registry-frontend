@@ -66,7 +66,7 @@ export const CONTRACT_PLACEHOLDER = `CAIP-2 compliant contract address`;
  */
 // Top-level keys
 export const METADATA_JSON_NAME_KEY = "name";
-export const METADATA_JSON_DESCRIPTION_URL_KEY = "descriptionUrl";
+// Removed METADATA_JSON_DESCRIPTION_URL_KEY - not in OMATrust spec
 export const METADATA_JSON_MARKETING_URL_KEY = "external_url";
 export const METADATA_JSON_TOKEN_CONTRACT_KEY = "token";
 export const METADATA_JSON_ICON_URL_KEY = "image";
@@ -123,8 +123,7 @@ export const MINTER_KEY = "minter";
 export const MINTER_LABEL = "Minter";
 
 // Metadata field keys and labels
-export const DESCRIPTION_URL_KEY = "descriptionUrl";
-export const DESCRIPTION_URL_LABEL = "Description URL";
+// Removed DESCRIPTION_URL constants - not in OMATrust spec
 
 export const MARKETING_URL_KEY = "external_url";
 export const MARKETING_URL_LABEL = "Marketing URL";

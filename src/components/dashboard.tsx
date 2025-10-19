@@ -6,8 +6,8 @@ import { PlusIcon } from "lucide-react"
 import NFTGrid from "@/components/nft-grid"
 import NFTMintModal from "@/components/nft-mint-modal"
 import NFTViewModal from "@/components/nft-view-modal"
-import type { NFT } from "@/types/nft"
-import { useAppsByOwner, useMintApp, useUpdateStatus, type Status } from "@/lib/contracts"
+import type { NFT } from "@/schema/data-model"
+import { useAppsByOwner, useMintApp, useUpdateApp, useUpdateStatus, type Status } from "@/lib/contracts"
 import { useActiveAccount } from "thirdweb/react"
 import { useSetMetadata } from "@/lib/contracts"
 import { log } from "@/lib/log"
@@ -19,11 +19,14 @@ import { buildOffchainMetadataObject } from "@/lib/utils/offchain-json";
 import { toast } from "sonner"
 import { env } from "@/config/env"
 import { ExternalLinkIcon, InfoIcon } from "lucide-react"
+import { toMintAppInput, toUpdateAppInput } from "@/schema/mapping"
+import { useNFTMetadata } from "@/lib/nft-metadata-context"
 
 export default function Dashboard() {
   log("Component rendering");
   const account = useActiveAccount();
   const connectedAddress = account?.address as `0x${string}` | undefined;
+  const { clearCache } = useNFTMetadata();
   
   
   const [nfts, setNfts] = useState<NFT[]>([])
@@ -36,6 +39,7 @@ export default function Dashboard() {
   // Use new hooks
   const { data: appsData, isLoading: isLoadingApps, error: appsError } = useAppsByOwner(connectedAddress);
   const { mint, isPending: isMinting } = useMintApp();
+  const { updateApp, isPending: isUpdatingApp } = useUpdateApp();
   const { updateStatus: updateStatusFn, isPending: isUpdatingStatus } = useUpdateStatus();
   const { setMetadata, isPending: isSettingMetadata } = useSetMetadata();
   
@@ -98,13 +102,8 @@ export default function Dashboard() {
   const handleOpenMintModalFromView = (metadata: Record<string, any>, nft: NFT) => {
     log("Opening mint modal for editing metadata", { metadata, nft });
     
-    // Populate name from metadata if nft.name is empty
-    const nftWithName = {
-      ...nft,
-      name: nft.name || metadata.name || "Unnamed App"
-    };
-    
-    setCurrentNft(nftWithName);
+    // Use the NFT as-is since it now has all flattened metadata fields
+    setCurrentNft(nft);
     setEditMetadata(metadata);
     
     setIsViewModalOpen(false); // Close the view modal
@@ -145,60 +144,116 @@ export default function Dashboard() {
         delete nftWithExtras.isCustomUrls;
       }
 
-      // Submit (handled at Step 6 inside modal)
-      log("Registering new app:", nft);
+      // Check if this is an edit operation
+      const isEditMode = currentNft && currentNft.did === nft.did;
+      
+      if (isEditMode) {
+        log("Updating existing app:", nft);
+        log("Current NFT version:", currentNft.version);
+        log("Current NFT minter (owner):", currentNft.minter);
+        log("Connected wallet address:", account?.address);
         
-        // Parse version string (e.g., "1.0.0" -> {major: 1, minor: 0, patch: 0})
-        const versionParts = nft.version.split('.').map(Number);
-        const [major = 1, minor = 0, patch = 0] = versionParts;
+        // Check if connected wallet is the owner
+        if (currentNft.minter && account?.address && 
+            currentNft.minter.toLowerCase() !== account.address.toLowerCase()) {
+          const errorMsg = `You are not the owner of this app. Owner: ${currentNft.minter}, Connected: ${account.address}`;
+          log(errorMsg);
+          toast.error(errorMsg);
+          return Promise.reject(new Error(errorMsg));
+        }
         
-        // Build the same off-chain object used in Step 6 and compute JCS hash
-        const offchainObj = buildOffchainMetadataObject({
-          name: nft.name,
-          metadata: nft.metadata,
-          extra: {
-            iwpsPortalUrl: nft.iwpsPortalUrl,
-            traits: Array.isArray(nft.traits) ? nft.traits : undefined,
-          }
+        // Import mapping function
+        const { toUpdateAppInput } = await import('@/schema/mapping');
+        
+        // Convert to update input
+        const updateInput = toUpdateAppInput(nft, currentNft.version);
+        
+        log("Update input prepared:", updateInput);
+        log("Update input keys:", Object.keys(updateInput));
+        log("Update input did:", updateInput.did);
+        log("Update input major:", updateInput.major);
+        log("Update input newMinor:", updateInput.newMinor);
+        log("Update input newPatch:", updateInput.newPatch);
+        log("Update input newDataUrl:", updateInput.newDataUrl);
+        log("Update input newDataHash:", updateInput.newDataHash);
+        log("Update input newInterfaces:", updateInput.newInterfaces);
+        log("Update input newTraitHashes:", updateInput.newTraitHashes);
+        log("Update input metadataJson length:", updateInput.metadataJson?.length || 0);
+        
+        // The contract will fetch newDataUrl and verify its hash matches newDataHash
+        // So the dataUrl MUST be publicly accessible and return the correct content
+        log("WARNING: Contract will fetch newDataUrl and verify hash");
+        log("Make sure the dataUrl is publicly accessible!");
+        
+        // Verify the hash matches what we computed
+        if (updateInput.metadataJson) {
+          const { keccak256 } = await import('ethers');
+          const computedHash = keccak256(Buffer.from(updateInput.metadataJson));
+          log("Computed hash from metadataJson:", computedHash);
+          log("Provided newDataHash:", updateInput.newDataHash);
+          log("Hashes match?", computedHash === updateInput.newDataHash);
+        }
+        
+        // Fetch current on-chain data to compare
+        log("Fetching current on-chain data for comparison...");
+        const { getAppByDid } = await import('@/lib/contracts/registry.read');
+        const currentOnChainApp = await getAppByDid(nft.did);
+        if (currentOnChainApp) {
+          log("Current on-chain dataUrl:", currentOnChainApp.dataUrl);
+          log("Current on-chain dataHash:", currentOnChainApp.dataHash);
+          log("Current on-chain interfaces:", currentOnChainApp.interfaces);
+          log("Current on-chain traits count:", currentOnChainApp.traitHashes?.length || 0);
+          log("New dataUrl same as current?", updateInput.newDataUrl === currentOnChainApp.dataUrl);
+          log("New dataHash same as current?", updateInput.newDataHash === currentOnChainApp.dataHash);
+          log("New interfaces same as current?", updateInput.newInterfaces === currentOnChainApp.interfaces);
+        }
+        
+        // Notify user to check wallet for transaction approval
+        toast.info("Please check your wallet to approve the update transaction", {
+          duration: 8000,
         });
-        const jcs = canonicalizeForHash(offchainObj);
-        const dataHash = jcs ? jcs.hash : ('0x' + '0'.repeat(64)) as `0x${string}`;
-        log("[dashboard.tsx:handleRegisterApp] Computed dataHash (JCS keccak256):", dataHash);
-        log(`[dashboard.tsx:handleRegisterApp] Canonical (JCS) JSON length: ${jcs.jcsJson.length}`);
         
-        // Hash traits if provided
-        const traitHashes = nft.traits ? hashTraits(nft.traits) : [];
+        // Use the update hook
+        await updateApp(updateInput);
+        
+        // Clear metadata cache so it refetches with new data
+        clearCache();
+        
+        // Update local state
+        setNfts(prev => prev.map(item => 
+          item.did === nft.did ? { ...item, ...nft } : item
+        ));
+        
+        toast.success("App updated successfully!");
+      } else {
+        log("Registering new app:", nft);
+        
+        // Import mapping function
+        const { toMintAppInput } = await import('@/schema/mapping');
+        
+        // Convert to mint input
+        const mintInput = toMintAppInput(nft);
         
         // Notify user to check wallet for transaction approval
         toast.info("Please check your wallet to approve the transaction", {
           duration: 8000,
         });
         
-        // Use the new mint hook with proper structure
-        await mint({
-          did: nft.did,
-          interfaces: 1, // Default to human interface (bitmap: 1=human)
-          dataUrl: nft.dataUrl || '',
-          dataHash,
-          dataHashAlgorithm: 0, // keccak256
-          fungibleTokenId: nft.fungibleTokenId || '',
-          contractId: nft.contractId || '',
-          initialVersionMajor: major,
-          initialVersionMinor: minor,
-          initialVersionPatch: patch,
-          traitHashes,
-          metadataJson: jcs.jcsJson,
-        });
+        // Use the mint hook
+        await mint(mintInput);
 
         // Add to local state (it will be refetched automatically but this provides immediate feedback)
         setNfts([...nfts, nft]);
         toast.success("App registered successfully!");
+      }
+      
       handleCloseMintModal(); // Close modal after successful registration
 
       return Promise.resolve();
     } catch (error) {
       console.error("Error in handleRegisterApp:", error);
-      toast.error(`Failed to register app: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const action = currentNft && currentNft.did === nft.did ? 'update' : 'register';
+      toast.error(`Failed to ${action} app: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return Promise.reject(error);
     }
   };

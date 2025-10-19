@@ -7,8 +7,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { sendTransaction } from 'thirdweb';
 import { useActiveAccount } from 'thirdweb/react';
-import type { NFT } from "@/types/nft";
-import type { MetadataContractData } from '@/types/metadata-contract';
+import type { NFT } from "@/schema/data-model";
+// Removed MetadataContractData import - using generic Record for frontend
 import { getMetadata } from './metadata.read';
 import { prepareSetMetadata } from './metadata.write';
 import { formatErrorMessage } from './errors';
@@ -20,7 +20,7 @@ import { ensureWalletOnEnvChain } from './chain-guard';
  * @returns Metadata, loading state, error, and refetch function
  */
 export function useMetadata(versionedDid?: string) {
-  const [data, setData] = useState<MetadataContractData | null>(null);
+  const [data, setData] = useState<Record<string, any> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
