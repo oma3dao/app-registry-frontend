@@ -693,6 +693,7 @@ export interface NFT {
   image: string;
   external_url?: string;
   summary?: string;
+  owner?: string; // Owner wallet address (stored in metadata JSON, not on-chain)
   legalUrl?: string;
   supportUrl?: string;
   screenshotUrls: string[];
@@ -705,6 +706,14 @@ export interface NFT {
   interfaceVersions?: string[];
   mcp?: any;
   traits: string[];
+
+  // Verification fields
+  ownerVerification?: {
+    metadataOwner?: string; // Owner address from metadata JSON
+    contractOwner?: string; // Owner address from contract (minter)
+    isValid: boolean; // Does metadata owner match contract owner?
+    error?: string; // Error message if verification failed
+  };
 
   // Frontend flags
   hasError?: boolean;

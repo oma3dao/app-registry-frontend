@@ -149,6 +149,9 @@ export default function Dashboard() {
         delete nftWithExtras.isCustomUrls;
       }
 
+      // Set owner to connected wallet address (will be included in metadata JSON)
+      nft.owner = account.address;
+
       // Check if this is an edit operation
       const isEditMode = currentNft && currentNft.did === nft.did;
       

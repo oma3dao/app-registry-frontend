@@ -553,7 +553,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                     </a>
                   </div>
                 
-                  {/* Data Hash Verification Status (from metadata context) */}
+                  {/* Data Hash Verification Status */}
                   {nftMetadata?.dataHashVerification && (
                     <div className={`flex items-center gap-2 p-1.5 rounded text-xs ${
                       nftMetadata.dataHashVerification.isValid 
@@ -563,7 +563,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                       {nftMetadata.dataHashVerification.isValid ? (
                         <>
                           <CheckCircle2 size={14} />
-                          <span>Data verified</span>
+                          <span>Data hash verified</span>
                           {attestationStatus.hasAttestation && (
                             <span title={attestationStatus.message}>
                               <Shield size={12} className="ml-1" />
@@ -573,7 +573,28 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                       ) : (
                         <>
                           <XCircle size={14} />
-                          <span>Hash mismatch</span>
+                          <span>Data hash mismatch</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Owner Verification Status */}
+                  {nft.ownerVerification && nft.ownerVerification.metadataOwner && (
+                    <div className={`flex items-center gap-2 p-1.5 rounded text-xs ${
+                      nft.ownerVerification.isValid 
+                        ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' 
+                        : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300'
+                    }`}>
+                      {nft.ownerVerification.isValid ? (
+                        <>
+                          <CheckCircle2 size={14} />
+                          <span>Owner verified</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={14} />
+                          <span>Owner mismatch</span>
                         </>
                       )}
                     </div>

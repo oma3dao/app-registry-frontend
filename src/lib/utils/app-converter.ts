@@ -64,6 +64,7 @@ export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT 
     image: '',
     external_url: '',
     summary: '',
+    owner: '', // Will be populated from metadata JSON
     legalUrl: '',
     supportUrl: '',
     screenshotUrls: [],
@@ -82,6 +83,7 @@ export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT 
 /**
  * Fetch metadata from dataUrl and merge into NFT object
  * This makes the NFT object the single source of truth with all data
+ * Also performs owner verification to ensure metadata provider controls the NFT
  */
 export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
   if (!nft.dataUrl) {
@@ -102,6 +104,30 @@ export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
 
     const metadata = await response.json();
 
+    // Get contract owner (currently same as minter, will be updated when contract supports ownerOf)
+    const contractOwner = nft.owner || nft.minter;
+    
+    // Get metadata owner (from JSON)
+    const metadataOwner = metadata.owner as string | undefined;
+    
+    // Perform owner verification
+    let ownerVerification: NFT['ownerVerification'];
+    if (metadataOwner) {
+      const isValid = metadataOwner.toLowerCase() === contractOwner.toLowerCase();
+      ownerVerification = {
+        metadataOwner,
+        contractOwner,
+        isValid,
+        error: isValid ? undefined : 'Metadata owner does not match NFT owner',
+      };
+    } else {
+      // No owner in metadata - this is acceptable, just note it
+      ownerVerification = {
+        contractOwner,
+        isValid: true, // Not an error if owner field is missing
+      };
+    }
+
     // Merge all metadata fields into the NFT object
     return {
       ...nft,
@@ -111,6 +137,7 @@ export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
       image: metadata.image || nft.image,
       external_url: metadata.external_url || nft.external_url,
       summary: metadata.summary || nft.summary,
+      owner: metadata.owner || nft.owner, // Owner from metadata JSON
       legalUrl: metadata.legalUrl || nft.legalUrl,
       supportUrl: metadata.supportUrl || nft.supportUrl,
       iwpsPortalUrl: metadata.iwpsPortalUrl || nft.iwpsPortalUrl,
@@ -123,6 +150,7 @@ export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
       interfaceVersions: metadata.interfaceVersions || nft.interfaceVersions,
       mcp: metadata.mcp || nft.mcp,
       traits: metadata.traits || nft.traits,
+      ownerVerification,
     };
   } catch (error) {
     console.error(`[hydrateNFTWithMetadata] Error fetching metadata for ${nft.did}:`, error);
