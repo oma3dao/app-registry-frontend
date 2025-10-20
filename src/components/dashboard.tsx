@@ -12,7 +12,7 @@ import { useActiveAccount } from "thirdweb/react"
 import { useSetMetadata } from "@/lib/contracts"
 import { log } from "@/lib/log"
 import { fetchMetadataImage } from "@/lib/utils"
-import { appSummariesToNFTs } from "@/lib/utils/app-converter"
+import { appSummariesToNFTsWithMetadata } from "@/lib/utils/app-converter"
 import { hashTraits } from "@/lib/utils/traits";
 import { canonicalizeForHash } from "@/lib/utils/dataurl";
 import { buildOffchainMetadataObject } from "@/lib/utils/offchain-json";
@@ -30,6 +30,7 @@ export default function Dashboard() {
   
   
   const [nfts, setNfts] = useState<NFT[]>([])
+  const [isHydratingMetadata, setIsHydratingMetadata] = useState(false)
   const [isMintModalOpen, setIsMintModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
@@ -44,7 +45,7 @@ export default function Dashboard() {
   const { setMetadata, isPending: isSettingMetadata } = useSetMetadata();
   
   
-  const isLoadingNFTs = isLoadingApps;
+  const isLoadingNFTs = isLoadingApps || isHydratingMetadata;
 
   // Convert AppSummary to NFT and augment with metadata when apps data changes
   useEffect(() => {
@@ -52,22 +53,26 @@ export default function Dashboard() {
       if (!appsData || appsData.length === 0) {
         log("No apps to augment");
         setNfts([]);
+        setIsHydratingMetadata(false);
         return;
       }
       
       try {
         log(`Augmenting ${appsData.length} apps`);
+        setIsHydratingMetadata(true);
         
-        // Convert AppSummary[] to NFT[] using utility function
-        const nftApps = appSummariesToNFTs(appsData, connectedAddress);
+        // Convert AppSummary[] to NFT[] and hydrate with metadata
+        const nftApps = await appSummariesToNFTsWithMetadata(appsData, connectedAddress);
         
-        log(`[dashboard] Converted ${nftApps.length} apps from contract`);
+        log(`[dashboard] Converted and hydrated ${nftApps.length} apps from contract`);
         
         setNfts(nftApps);
-        log(`Set ${nftApps.length} apps in state`);
+        log(`Set ${nftApps.length} fully hydrated apps in state`);
       } catch (error) {
         console.error("Error augmenting apps:", error);
         setNfts([]);
+      } finally {
+        setIsHydratingMetadata(false);
       }
     };
     

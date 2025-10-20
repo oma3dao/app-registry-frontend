@@ -209,12 +209,3 @@ export const IWPS_ERROR_KEY = "error";
 export const IWPS_DEFAULT_ACK_URL = "";
 export const IWPS_DEFAULT_NACK_URL = "";
 
-/**
- * Base URLs for metadata editing eligibility
- * Dynamically includes the current deployment URL
- */
-export const METADATA_EDIT_ELIGIBLE_BASE_URLS = [
-  new URL(env.appBaseUrl).hostname,    // Current deployment (localhost, registry.omatrust.org)
-  "registry.omatrust.org",             // Production (always allowed)
-  "appregistry.oma3.org",              // Legacy domain (for backwards compatibility)
-];

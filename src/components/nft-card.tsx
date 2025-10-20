@@ -12,7 +12,6 @@ import {
 import type { NFT } from "@/schema/data-model"
 import { getStatusLabel, getStatusClasses } from "@/schema/data-model"
 import { log } from "@/lib/log"
-import { useNFTMetadata } from "@/lib/nft-metadata-context"
 import {
   Globe,
   Apple,
@@ -57,49 +56,31 @@ function getInterfaceBadges(interfaces: number) {
 }
 
 export default function NFTCard({ nft, onNFTCardClick, showStatus = true }: NFTCardProps) {
-  // Use the metadata context to get complete metadata
-  const { getNFTMetadata } = useNFTMetadata();
-
-  // Local state to store the metadata for this card
-  const [nftMetadata, setNftMetadata] = useState<ReturnType<typeof getNFTMetadata> | null>(null);
-
-  // Effect to fetch/update metadata when NFT changes
-  useEffect(() => {
-    const metadata = getNFTMetadata(nft); // Call inside useEffect
-    setNftMetadata(metadata); // Update local state
-    // Note: getNFTMetadata handles the actual fetching and caching logic internally
-  }, [nft, getNFTMetadata]); // Rerun effect if nft prop or context function changes
-
-  // Debug log key generation
+  // NFT is now fully hydrated with all metadata - use it directly!
   const key = `${nft.did || 'unknown'}-${nft.version || 'unknown'}`;
   log(`NFTCard rendering with key: ${key}`, nft);
 
-  // Get data from metadata context (fetched from dataUrl), with fallbacks
-  const name = nftMetadata?.displayData.name || nft.name || "Unnamed App";
+  // Get data directly from the hydrated NFT object
+  const name = nft.name || "Unnamed App";
   const version = nft.version || "Unknown Version";
   const did = nft.did || "Unknown DID";
   const interfaces = nft.interfaces || 0;
-
-  // Get image/icon from metadata context first, then fall back to NFT image
-  const image = nftMetadata?.displayData.image || nft.image || "";
-  const isLoading = nftMetadata?.isLoading || false;
+  const image = nft.image || "";
+  const external_url = nft.external_url || "";
+  const status = typeof nft.status === 'number' ? nft.status : 0;
 
   // Debug logging
   if (nft.did) {
-    log(`[NFTCard] ${nft.did} - nftMetadata:`, nftMetadata?.displayData);
-    log(`[NFTCard] ${nft.did} - image sources: fetched="${nftMetadata?.displayData.image}", nft="${nft.image}", final="${image}"`);
+    log(`[NFTCard] ${nft.did} - Using hydrated NFT data directly`);
+    log(`[NFTCard] ${nft.did} - name="${name}", image="${image}"`);
   }
 
   // Determine if we have a valid image to display
-  const hasImage = !isLoading && image && image.trim() !== '';
+  const hasImage = image && image.trim() !== '';
 
-  // Get marketing/external URL from metadata context first, then fall back to NFT external_url
-  const external_url = nftMetadata?.displayData.external_url || nft.external_url || "";
-  const status = typeof nft.status === 'number' ? nft.status : 0;
-
-  // Determine available platforms from metadata context first, then fall back to NFT platforms
-  const availablePlatformsFromContext = nftMetadata
-    ? Object.keys(nftMetadata.displayData.platforms)
+  // Determine available platforms from the hydrated NFT
+  const availablePlatformsFromContext = nft.platforms
+    ? Object.keys(nft.platforms)
     : [];
 
   // Fall back to NFT platforms if context doesn't have any

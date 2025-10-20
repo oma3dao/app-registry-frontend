@@ -80,10 +80,74 @@ export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT 
 }
 
 /**
+ * Fetch metadata from dataUrl and merge into NFT object
+ * This makes the NFT object the single source of truth with all data
+ */
+export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
+  if (!nft.dataUrl) {
+    console.warn(`[hydrateNFTWithMetadata] No dataUrl for ${nft.did}`);
+    return nft;
+  }
+
+  try {
+    // In development, rewrite production URLs to localhost for testing
+    const { env } = await import('@/config/env');
+    const fetchUrl = env.getMetadataFetchUrl(nft.dataUrl);
+    
+    const response = await fetch(fetchUrl);
+    if (!response.ok) {
+      console.warn(`[hydrateNFTWithMetadata] Failed to fetch metadata for ${nft.did}: ${response.status}`);
+      return nft;
+    }
+
+    const metadata = await response.json();
+
+    // Merge all metadata fields into the NFT object
+    return {
+      ...nft,
+      name: metadata.name || nft.name,
+      description: metadata.description || nft.description,
+      publisher: metadata.publisher || nft.publisher,
+      image: metadata.image || nft.image,
+      external_url: metadata.external_url || nft.external_url,
+      summary: metadata.summary || nft.summary,
+      legalUrl: metadata.legalUrl || nft.legalUrl,
+      supportUrl: metadata.supportUrl || nft.supportUrl,
+      iwpsPortalUrl: metadata.iwpsPortalUrl || nft.iwpsPortalUrl,
+      screenshotUrls: metadata.screenshotUrls || nft.screenshotUrls,
+      videoUrls: metadata.videoUrls || nft.videoUrls,
+      threeDAssetUrls: metadata['3dAssetUrls'] || metadata.threeDAssetUrls || nft.threeDAssetUrls,
+      platforms: metadata.platforms || nft.platforms,
+      artifacts: metadata.artifacts || nft.artifacts,
+      endpoint: metadata.endpoint || nft.endpoint,
+      interfaceVersions: metadata.interfaceVersions || nft.interfaceVersions,
+      mcp: metadata.mcp || nft.mcp,
+      traits: metadata.traits || nft.traits,
+    };
+  } catch (error) {
+    console.error(`[hydrateNFTWithMetadata] Error fetching metadata for ${nft.did}:`, error);
+    return nft; // Return original NFT on error
+  }
+}
+
+/**
  * Convert array of AppSummary to array of NFT
  */
 export function appSummariesToNFTs(apps: AppSummary[], fallbackAddress?: string): NFT[] {
   return apps.map(app => appSummaryToNFT(app, fallbackAddress));
+}
+
+/**
+ * Convert array of AppSummary to array of fully hydrated NFTs with metadata
+ * This is the recommended way to load apps - returns NFTs with all metadata merged in
+ */
+export async function appSummariesToNFTsWithMetadata(
+  apps: AppSummary[],
+  fallbackAddress?: string
+): Promise<NFT[]> {
+  const nfts = appSummariesToNFTs(apps, fallbackAddress);
+  // Fetch metadata for all NFTs in parallel
+  return Promise.all(nfts.map(nft => hydrateNFTWithMetadata(nft)));
 }
 
 /**

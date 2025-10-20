@@ -151,13 +151,8 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   // Determine if status has been changed from original
   const statusChanged = nft && selectedStatus !== nft.status;
 
-  // Check if the dataUrl base URL matches the eligible ones for editing metadata
-  // AND if the user is the owner of the NFT
-  const canEditMetadata = nft && isOwner && AppConfig.METADATA_EDIT_ELIGIBLE_BASE_URLS.some(baseUrl => {
-    const isMatch = nft.dataUrl.includes(baseUrl);
-    log(`[NFTViewModal] Checking dataUrl: ${nft.dataUrl}, Base URL: ${baseUrl}, Match: ${isMatch}`);
-    return isMatch;
-  });
+  // Owner can edit metadata
+  const canEditMetadata = nft && isOwner;
 
   // Reset state when modal opens with new NFT
   const handleOpenChange = (open: boolean) => {
@@ -254,12 +249,15 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
 
   const handleEditMetadata = () => {
     log('handleEditMetadata called');
-    // Use the metadata from the hook
-    const metadataObject = (typeof contractMetadata === 'object' && contractMetadata !== null) ? contractMetadata : {};
-
-    // Call the parent component's onEditMetadata function if provided
+    
+    // Use the NFT object directly - it now has all metadata hydrated
+    // No need to fetch from contractMetadata or metadata context
     if (onEditMetadata && nft) {
-      onEditMetadata(metadataObject, nft);
+      console.log('[nft-view-modal] Passing NFT to edit:', nft);
+      console.log('[nft-view-modal] NFT.traits:', nft.traits);
+      console.log('[nft-view-modal] NFT.summary:', nft.summary);
+      // Pass the NFT as both metadata and nft (for backwards compatibility)
+      onEditMetadata(nft, nft);
     } else {
       log('onEditMetadata prop not provided or nft is null');
       handleCloseViewModal();

@@ -113,27 +113,50 @@ export default function NFTMintModal({
   useEffect(() => {
     if (isOpen && initialData) {
       const isEditMode = !!initialData.did && !!initialData.version;
-      setFormData((prev) => ({
-        ...prev,
-        ...initialData,
-        ui: {
-          ...prev.ui,
-          mode: isEditMode ? "edit" : "create",
-          isEditing: isEditMode,
-          currentVersion: isEditMode ? initialData.version : undefined,
-          // Always require verification, even in edit mode (security: ownership could have changed)
-          verificationStatus: "idle",
-        },
-      }));
+      
+      console.log('[nft-mint-modal] Initializing form with initialData:', initialData);
+      console.log('[nft-mint-modal] initialData.traits:', initialData.traits);
+      console.log('[nft-mint-modal] initialData.summary:', initialData.summary);
+      console.log('[nft-mint-modal] initialData.publisher:', initialData.publisher);
+      
+      setFormData((prev) => {
+        const newFormData: TFormState = {
+          ...prev,
+          ...initialData,
+          ui: {
+            ...prev.ui,
+            mode: (isEditMode ? "edit" : "create") as "create" | "edit",
+            isEditing: isEditMode,
+            currentVersion: isEditMode ? initialData.version : undefined,
+            // Always require verification, even in edit mode (security: ownership could have changed)
+            verificationStatus: "idle" as const,
+          },
+        };
+        
+        console.log('[nft-mint-modal] New formData.traits:', newFormData.traits);
+        console.log('[nft-mint-modal] New formData.summary:', newFormData.summary);
+        console.log('[nft-mint-modal] New formData.publisher:', newFormData.publisher);
+        
+        return newFormData;
+      });
     }
   }, [isOpen, initialData]);
 
   // Load draft if DID+Version set and draft exists
+  // BUT: Don't load drafts in edit mode - use the current on-chain data instead
   useEffect(() => {
     if (!isOpen) return;
     if (!formData.did || !formData.version) return;
+    
+    // Skip draft loading in edit mode - we want to use the current on-chain data
+    if (formData.ui?.isEditing) {
+      console.log('[nft-mint-modal] Skipping draft load in edit mode');
+      return;
+    }
+    
     const draft = loadDraft(formData.did, formData.version);
     if (draft) {
+      console.log('[nft-mint-modal] Loading draft:', draft);
       setFormData((prev) => ({ ...prev, ...draft, ui: prev.ui }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -33,7 +33,9 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
   // Sync traitsInput with formData.traits when navigating back to this step
   useEffect(() => {
     const currentTraits = formData.traits || [];
+    console.log('[step-2] formData.traits:', currentTraits);
     const currentInput = currentTraits.join(", ");
+    console.log('[step-2] traitsInput will be set to:', currentInput);
     // Only update if different to avoid cursor jumping
     if (currentInput !== traitsInput) {
       setTraitsInput(currentInput);

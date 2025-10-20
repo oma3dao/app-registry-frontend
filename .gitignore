@@ -46,3 +46,7 @@ next-env.d.ts
 
 # instructions
 /instructions
+
+# temporary files
+/temp
+temp/

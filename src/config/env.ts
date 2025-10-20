@@ -26,11 +26,11 @@ const parsed = Env.parse({
 const activeChain = CHAIN_PRESETS[parsed.NEXT_PUBLIC_ACTIVE_CHAIN];
 
 /**
- * Get the base URL for the application
+ * Get the base URL for the application (for storing on-chain)
  * 
  * The URL is DETERMINISTICALLY derived from the active chain:
  * - Localhost chain (31337) → http://localhost:3000
- * - Testnet/Mainnet → https://registry.omatrust.org (or VERCEL_URL in deployments)
+ * - Testnet/Mainnet → https://registry.omatrust.org (ALWAYS, even in dev mode)
  * 
  * CRITICAL: The dataUrl is stored IMMUTABLY on-chain. This function ensures:
  * 1. Local chain apps use localhost (safe, won't leak to production)
@@ -42,28 +42,57 @@ const activeChain = CHAIN_PRESETS[parsed.NEXT_PUBLIC_ACTIVE_CHAIN];
 function getAppBaseUrl(): string {
   console.log(`[ENV] NODE_ENV: "${process.env.NODE_ENV}", activeChain.id: ${activeChain.id}`);
   
-  // DEVELOPMENT OVERRIDE: Always use localhost during development
-  // This allows testing with any chain (localhost, testnet, mainnet) while developing locally
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[ENV] Development mode detected - using localhost for API routes');
-    return 'http://localhost:3000';
-  }
-
   // Chain-aware: Only use localhost for actual localhost chain
   if (activeChain.id === 31337) {
     // Local Hardhat chain - use localhost for development
+    console.log('[ENV] Localhost chain - using localhost for dataUrl');
     return 'http://localhost:3000';
   }
 
-  // Testnet/Mainnet: Use Vercel URL if available (automatic in deployments)
-  // Otherwise use canonical production domain
+  // Testnet/Mainnet: ALWAYS use production URL (even in development)
+  // This ensures dataUrls stored on-chain are accessible from anywhere
+  // Local dev will rewrite these URLs when fetching (see getMetadataFetchUrl)
   if (process.env.NEXT_PUBLIC_VERCEL_URL) {
     return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
   }
 
   // Canonical production domain for testnet/mainnet
-  // This ensures on-chain dataUrls are accessible from anywhere
+  console.log('[ENV] Testnet/Mainnet - using production URL for dataUrl');
   return 'https://registry.omatrust.org';
+}
+
+/**
+ * Get the URL to use when fetching metadata
+ * 
+ * Handles URL rewriting for different environments:
+ * - Local development (NODE_ENV=development): Rewrites production URLs to localhost for testing
+ * - Deployed environments (production/test): Rewrites localhost URLs to production (fixes accidental localhost URLs on-chain)
+ */
+function getMetadataFetchUrl(dataUrl: string): string {
+  const isLocalDev = process.env.NODE_ENV === 'development';
+  const isLocalhostChain = activeChain.id === 31337;
+  
+  // Local development (not localhost chain): Rewrite production URLs to localhost for testing
+  if (isLocalDev && !isLocalhostChain) {
+    if (dataUrl.includes('registry.omatrust.org') || dataUrl.includes(process.env.NEXT_PUBLIC_VERCEL_URL || '')) {
+      const rewritten = dataUrl.replace(/https:\/\/[^/]+/, 'http://localhost:3000');
+      console.log(`[ENV] Local dev - rewriting production URL to localhost: ${dataUrl} → ${rewritten}`);
+      return rewritten;
+    }
+  }
+  
+  // Deployed environments (production/test): Rewrite localhost URLs to production
+  // This fixes accidental localhost URLs that were stored on-chain during development
+  if (!isLocalDev && dataUrl.includes('localhost')) {
+    const productionUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : 'https://registry.omatrust.org';
+    const rewritten = dataUrl.replace(/http:\/\/localhost:\d+/, productionUrl);
+    console.warn(`[ENV] Deployed environment - rewriting localhost URL to production: ${dataUrl} → ${rewritten}`);
+    return rewritten;
+  }
+  
+  return dataUrl;
 }
 
 /**
@@ -84,8 +113,11 @@ export const env = {
   metadataAddress: parsed.NEXT_PUBLIC_METADATA_ADDRESS || activeChain.contracts.metadata,
   resolverAddress: parsed.NEXT_PUBLIC_RESOLVER_ADDRESS || activeChain.contracts.resolver || "0x0000000000000000000000000000000000000000",
 
-  // Application base URL (for API routes)
+  // Application base URL (for API routes and storing on-chain)
   appBaseUrl: getAppBaseUrl(),
+  
+  // Metadata fetch URL rewriter (for local development)
+  getMetadataFetchUrl,
 
   // Flags
   debugAdapter: parsed.NEXT_PUBLIC_DEBUG_ADAPTER === 'true',

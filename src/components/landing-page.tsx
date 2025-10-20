@@ -10,7 +10,7 @@ import { LANDING_PAGE_NUM_APPS } from "@/config/app-config"
 import NFTViewModal from "@/components/nft-view-modal"
 import { log } from "@/lib/log"
 import { useActiveAccount } from "thirdweb/react"
-import { appSummariesToNFTs } from "@/lib/utils/app-converter"
+import { appSummariesToNFTsWithMetadata } from "@/lib/utils/app-converter"
 
 export default function LandingPage() {
   const [latestApps, setLatestApps] = useState<NFT[]>([])
@@ -85,8 +85,8 @@ export default function LandingPage() {
         setIsLoadingImages(true)
         log(`Processing ${appsData.items.length} apps`)
         
-        // Convert AppSummary to NFT type using utility function
-        const nftApps = appSummariesToNFTs(appsData.items)
+        // Convert AppSummary to NFT type and hydrate with metadata
+        const nftApps = await appSummariesToNFTsWithMetadata(appsData.items)
 
         const augmentedAppsResults = nftApps.map(app => ({ status: 'fulfilled' as const, value: app }))
         
