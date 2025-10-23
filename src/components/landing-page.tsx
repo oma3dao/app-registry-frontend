@@ -66,14 +66,6 @@ export default function LandingPage() {
       });
   }, [shouldLoadNFTs, totalAppsCount]);
   
-  
-  // Redirect to dashboard if wallet is connected
-  useEffect(() => {
-    if (account) {
-      window.location.href = "/dashboard";
-    }
-  }, [account])
-  
   // Process and augment apps when data changes
   useEffect(() => {
     if (!shouldLoadNFTs || !appsData?.items || appsData.items.length === 0) {

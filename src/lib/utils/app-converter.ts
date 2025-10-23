@@ -105,20 +105,49 @@ export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
     const metadata = await response.json();
 
     // Get contract owner (currently same as minter, will be updated when contract supports ownerOf)
-    const contractOwner = nft.owner || nft.minter;
+    const contractOwner = nft.minter;
     
-    // Get metadata owner (from JSON)
+    // Get metadata owner (from JSON) - should be in CAIP-10 format
     const metadataOwner = metadata.owner as string | undefined;
     
     // Perform owner verification
     let ownerVerification: NFT['ownerVerification'];
     if (metadataOwner) {
-      const isValid = metadataOwner.toLowerCase() === contractOwner.toLowerCase();
+      // Import CAIP-10 utilities for proper comparison
+      const { parseCaip10, normalizeCaip10 } = await import('@/lib/utils/caip10');
+      const { env } = await import('@/config/env');
+      
+      // Parse metadata owner (should be CAIP-10 format)
+      const parsed = parseCaip10(metadataOwner);
+      let isValid = false;
+      let error: string | undefined;
+      
+      if (parsed instanceof Error) {
+        // Invalid CAIP-10 format
+        error = `Invalid owner format: ${parsed.message}`;
+      } else {
+        // Extract address from CAIP-10 and compare with contract owner
+        const metadataAddress = parsed.address.toLowerCase();
+        const contractAddress = contractOwner.toLowerCase();
+        
+        // Verify the address matches
+        if (metadataAddress === contractAddress) {
+          // Also verify the chain ID matches
+          if (parsed.namespace === 'eip155' && parsed.reference === env.chainId.toString()) {
+            isValid = true;
+          } else {
+            error = `Chain mismatch: expected eip155:${env.chainId}, got ${parsed.namespace}:${parsed.reference}`;
+          }
+        } else {
+          error = 'Metadata owner address does not match NFT owner';
+        }
+      }
+      
       ownerVerification = {
         metadataOwner,
         contractOwner,
         isValid,
-        error: isValid ? undefined : 'Metadata owner does not match NFT owner',
+        error,
       };
     } else {
       // No owner in metadata - this is acceptable, just note it

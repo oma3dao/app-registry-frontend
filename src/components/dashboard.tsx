@@ -149,8 +149,10 @@ export default function Dashboard() {
         delete nftWithExtras.isCustomUrls;
       }
 
-      // Set owner to connected wallet address (will be included in metadata JSON)
-      nft.owner = account.address;
+      // Set owner to connected wallet address in CAIP-10 format (will be included in metadata JSON)
+      // Use buildCaip10 utility to ensure proper format: eip155:chainId:address
+      const { buildCaip10 } = await import('@/lib/utils/caip10');
+      nft.owner = buildCaip10('eip155', env.chainId.toString(), account.address);
 
       // Check if this is an edit operation
       const isEditMode = currentNft && currentNft.did === nft.did;
