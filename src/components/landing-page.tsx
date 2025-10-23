@@ -146,8 +146,33 @@ export default function LandingPage() {
           OMATrust is the open internet&apos;s decentralized trust layer. It brings the security and comfort of curated stores to the whole internet. Get started and register your services today.
         </p>
 
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
-          <Button size="lg" isConnectButton />
+        <div className="flex flex-col sm:flex-row justify-center gap-4" id="hero-connect">
+          <Button 
+            size="lg" 
+            isConnectButton 
+            className="min-w-[165px] px-8 py-6 text-lg font-semibold rounded-md"
+            connectButtonProps={{ label: "Get Started" }}
+          />
+          <style>{`
+            #hero-connect .tw-connect-wallet {
+              min-width: 165px !important;
+              height: auto !important;
+              font-size: 1.125rem !important;
+              padding: 1.5rem 2rem !important;
+              background-color: rgb(37 99 235) !important;
+              color: white !important;
+              border-radius: 0.375rem !important;
+              font-weight: 600 !important;
+              line-height: 1.75rem !important;
+            }
+            #hero-connect .tw-connect-wallet:hover {
+              background-color: rgb(29 78 216) !important;
+            }
+            #hero-connect .tw-connect-wallet:focus {
+              outline: none !important;
+              box-shadow: 0 0 0 2px rgb(59 130 246 / 0.5), 0 0 0 4px white !important;
+            }
+          `}</style>
         </div>
 
         {/* Row 1: Core Actions */}

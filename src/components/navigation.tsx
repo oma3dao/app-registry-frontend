@@ -5,6 +5,7 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { OMA3_DOCS_URL, OMA3_WEBSITE_URL } from "@/config/app-config"
+import { Button } from "@/components/ui/button"
 
 export function Navigation() {
   const pathname = usePathname()
@@ -55,6 +56,12 @@ export function Navigation() {
               {link.name}
             </Link>
           ))}
+          <Button 
+            isConnectButton 
+            size="sm" 
+            className="h-9 px-3 bg-black text-white hover:bg-black/80 rounded-md"
+            connectButtonProps={{ label: "Connect" }}
+          />
         </div>
       </div>
     </nav>

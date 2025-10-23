@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ThirdwebProvider } from "thirdweb/react";
 import { PreAlphaBanner } from "@/components/pre-alpha-banner";
 import { Navigation } from "@/components/navigation";
 import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
-import { NFTMetadataProvider } from "@/lib/nft-metadata-context";
+import { Providers } from "./providers";
+import { supportedWalletChains } from "@/config/chains";
+import { defineChain } from "thirdweb/chains";
+import { client } from "./client";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,6 +25,17 @@ export const metadata: Metadata = {
   },
 };
 
+// Map configured wallet chains to thirdweb chain definitions
+const supportedChains = supportedWalletChains.map((chain) =>
+  defineChain({
+    id: chain.id,
+    rpc: chain.rpc,
+    name: chain.name,
+    nativeCurrency: chain.nativeCurrency,
+    blockExplorers: chain.blockExplorers,
+  })
+);
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,12 +51,10 @@ export default function RootLayout({
       </head>
      <body className={inter.className}>
         <PreAlphaBanner />
-        <ThirdwebProvider>
+        <Providers>
           <Navigation />
-          <NFTMetadataProvider>
-            {children}
-          </NFTMetadataProvider>
-        </ThirdwebProvider>
+          {children}
+        </Providers>
         <Toaster position="top-center" richColors />
       </body>
     </html>

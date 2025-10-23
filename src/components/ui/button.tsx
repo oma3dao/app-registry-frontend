@@ -3,6 +3,7 @@ import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { useActiveAccount } from "thirdweb/react"
 import { client } from "@/app/client"
+import { ConnectButton as ThirdwebConnectButton } from "thirdweb/react"
 import { 
   createWallet,
   inAppWallet,
@@ -12,12 +13,6 @@ import { defineChain } from "thirdweb/chains"
 import { supportedWalletChains } from "@/config/chains"
 
 import { cn } from "@/lib/utils"
-
-// Lazy load the ThirdwebConnectButton to prevent early wallet access
-const ThirdwebConnectButton = React.lazy(() => 
-  import("thirdweb/react").then(mod => ({ default: mod.ConnectButton }))
-)
-
 // Convert our chain configurations to thirdweb chain definitions
 const supportedChains = supportedWalletChains.map(chain => 
   defineChain({
@@ -63,6 +58,9 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
   isConnectButton?: boolean
+  connectButtonProps?: {
+    label?: string
+  }
 }
 
 // Extend the ThirdwebConnectButton props to include className
@@ -70,39 +68,10 @@ type ThirdwebConnectButtonProps = React.ComponentProps<typeof ThirdwebConnectBut
   className?: string
 }
 
-// Add global CSS for the connect button styling
-if (typeof document !== "undefined") {
-  const style = document.createElement("style");
-  style.innerHTML = `
-    .tw-connect-wallet {
-      min-width: 165px !important;
-      height: auto !important;
-      font-size: 1.125rem !important; /* text-lg */
-      padding: 1.5rem 2rem !important;
-      background-color: rgb(37 99 235) !important; /* bg-blue-600 */
-      color: white !important;
-      border-radius: 0.375rem !important; /* rounded-md */
-      font-weight: 600 !important; /* font-medium rendered more boldly */
-      line-height: 1.75rem !important; /* text-lg line-height */
-      text-rendering: optimizeLegibility !important;
-      -webkit-font-smoothing: antialiased !important;
-      -moz-osx-font-smoothing: grayscale !important;
-      font-synthesis-weight: none !important;
-      letter-spacing: -0.01em !important;
-    }
-    .tw-connect-wallet:hover {
-      background-color: rgb(29 78 216) !important;
-    }
-    .tw-connect-wallet:focus {
-      outline: none !important;
-      box-shadow: 0 0 0 2px rgb(59 130 246 / 0.5), 0 0 0 4px white !important;
-    }
-  `;
-  document.head.appendChild(style);
-}
+// Removed global connect button CSS to allow per-instance styling via className
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, isConnectButton = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, isConnectButton = false, connectButtonProps, ...props }, ref) => {
     const account = useActiveAccount()
 
     if (isConnectButton) {
@@ -126,38 +95,28 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         walletConnect()
       ];
       
-      // Use React.Suspense to handle the lazy loading
       return (
-        <React.Suspense fallback={
-          <button className={cn(buttonVariants({ variant, size, className }))}>
-            Get Started
-          </button>
-        }>
-          <ThirdwebConnectButton
-            client={client}
-            appMetadata={{
-              name: "OMATrust App Registry",
-              url: "https://oma3.org",
-            }}
-            className={className}
-            // Auto-connect to previously connected wallets but don't show modal
-            autoConnect={{
-              timeout: 15000,
-            }}
-            // Prioritize in-app wallets and social logins over external wallets
-            wallets={wallets}
-            // Configure supported chains for the connect modal
-            chains={supportedChains}
-            connectModal={{
-              size: "wide",
-              showThirdwebBranding: false,
-            }}
-            connectButton={{
-              label: "Get Started",
-            }}
-            {...restProps}
-          />
-        </React.Suspense>
+        <ThirdwebConnectButton
+          appMetadata={{
+            name: "OMATrust App Registry",
+            url: "https://oma3.org",
+          }}
+          className={className}
+          autoConnect={{ timeout: 15000 }}
+          // Prioritize in-app wallets and social logins over external wallets
+          wallets={wallets}
+          // Configure supported chains for the connect modal
+          chains={supportedChains}
+          connectModal={{
+            size: "wide",
+            showThirdwebBranding: false,
+          }}
+          connectButton={{
+            label: connectButtonProps?.label ?? "Get Started",
+          }}
+          client={client}
+          {...restProps}
+        />
       )
     }
 

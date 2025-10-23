@@ -322,7 +322,6 @@ export default function Dashboard() {
             <PlusIcon size={20} />
             Register New App
           </Button>
-          <Button size="lg" isConnectButton className="h-[52px]" />
         </div>
       </div>
 
