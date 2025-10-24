@@ -142,17 +142,11 @@ export default function Dashboard() {
         return Promise.reject(new Error("No wallet connected"));
       }
 
-      // Extract and remove the isCustomUrls flag (temporary flag added by wizard)
-      const nftWithExtras = nft as NFT & { isCustomUrls?: boolean };
-      const isCustomUrls = 'isCustomUrls' in nftWithExtras && nftWithExtras.isCustomUrls;
-      if ('isCustomUrls' in nftWithExtras) {
-        delete nftWithExtras.isCustomUrls;
-      }
-
       // Set owner to connected wallet address in CAIP-10 format (will be included in metadata JSON)
       // Use buildCaip10 utility to ensure proper format: eip155:chainId:address
       const { buildCaip10 } = await import('@/lib/utils/caip10');
-      nft.owner = buildCaip10('eip155', env.chainId.toString(), account.address);
+      const ownerCaip10 = buildCaip10('eip155', env.chainId.toString(), account.address);
+      nft.owner = ownerCaip10;
 
       // Check if this is an edit operation
       const isEditMode = currentNft && currentNft.did === nft.did;
@@ -252,7 +246,7 @@ export default function Dashboard() {
         // Use the mint hook
         await mint(mintInput);
 
-        // Add to local state (it will be refetched automatically but this provides immediate feedback)
+        // Add to local state
         setNfts([...nfts, nft]);
         toast.success("App registered successfully!");
       }

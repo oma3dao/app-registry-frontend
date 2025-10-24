@@ -16,7 +16,7 @@ const PLATFORMS: PlatformKey[] = ["web","ios","android","windows","macos","meta"
 export default function Step5_HumanDistribution(ctx: StepRenderContext) {
   const { state, updateField, errors } = ctx;
   const req = (path: string) => isFieldRequired(path, state.interfaceFlags);
-  const platformsErr = errors?.["metadata.platforms"]; 
+  const platformsErr = errors?.["platforms"]; 
 
   const getPlatform = (key: PlatformKey) => state.platforms?.[key] || {};
   const setPlatform = (key: PlatformKey, field: string, value: any) => {
@@ -185,7 +185,7 @@ export default function Step5_HumanDistribution(ctx: StepRenderContext) {
                           if (oldDid && oldDid !== newDid && state.artifacts?.[oldDid]) {
                             const artifacts = { ...(state.artifacts || {}) };
                             delete artifacts[oldDid];
-                            updateField("metadata.artifacts", Object.keys(artifacts).length > 0 ? artifacts : undefined);
+                            updateField("artifacts", Object.keys(artifacts).length > 0 ? artifacts : undefined);
                           }
                           
                           // Debounce artifact creation for new DID

@@ -14,20 +14,20 @@ export default function Step3_Common(ctx: StepRenderContext) {
   const flags = state.interfaceFlags;
   const req = (path: string) => isFieldRequired(path, flags);
 
-  const descErr = errors?.["metadata.description"]; 
-  const extErr = errors?.["metadata.external_url"]; 
-  const imgErr = errors?.["metadata.image"]; 
-  const sumErr = errors?.["metadata.summary"]; 
-  const pubErr = errors?.["metadata.publisher"]; 
-  const legalErr = errors?.["metadata.legalUrl"]; 
-  const supportErr = errors?.["metadata.supportUrl"]; 
+  const descErr = errors?.["description"]; 
+  const extErr = errors?.["external_url"]; 
+  const imgErr = errors?.["image"]; 
+  const sumErr = errors?.["summary"]; 
+  const pubErr = errors?.["publisher"]; 
+  const legalErr = errors?.["legalUrl"]; 
+  const supportErr = errors?.["supportUrl"]; 
 
   return (
     <div className="space-y-6">
       {/* Description (text) */}
       <div className="space-y-2">
         <Label htmlFor="description" className="text-base font-semibold">
-          Description {req("metadata.description") ? "*" : ""}
+          Description {req("description") ? "*" : ""}
         </Label>
         <p className="text-sm text-muted-foreground">
           A concise description of your app. Markdown supported.
@@ -47,7 +47,7 @@ export default function Step3_Common(ctx: StepRenderContext) {
       {/* Marketing/External URL */}
       <div className="space-y-2">
         <Label htmlFor="externalUrl" className="text-base font-semibold">
-          Marketing URL {req("metadata.external_url") ? "*" : ""}
+          Marketing URL {req("external_url") ? "*" : ""}
         </Label>
         <p className="text-sm text-muted-foreground">
           Public landing page or marketing site for your app.
@@ -68,7 +68,7 @@ export default function Step3_Common(ctx: StepRenderContext) {
       {/* Icon/Image URL */}
       <div className="space-y-2">
         <Label htmlFor="imageUrl" className="text-base font-semibold">
-          Icon URL {req("metadata.image") ? "*" : ""}
+          Icon URL {req("image") ? "*" : ""}
         </Label>
         <p className="text-sm text-muted-foreground">
           App icon (recommended 1024×1024, square).
@@ -89,7 +89,7 @@ export default function Step3_Common(ctx: StepRenderContext) {
       {/* Optional fields (may be required by some interface rules later) */}
       <div className="space-y-2">
         <Label htmlFor="summary" className="text-base font-semibold">
-          Summary {req("metadata.summary") ? "*" : ""}
+          Summary {req("summary") ? "*" : ""}
         </Label>
         <Input
           id="summary"
@@ -105,7 +105,7 @@ export default function Step3_Common(ctx: StepRenderContext) {
 
       <div className="space-y-2">
         <Label htmlFor="publisher" className="text-base font-semibold">
-          Publisher {req("metadata.publisher") ? "*" : ""}
+          Publisher {req("publisher") ? "*" : ""}
         </Label>
         <Input
           id="publisher"
@@ -121,7 +121,7 @@ export default function Step3_Common(ctx: StepRenderContext) {
 
       <div className="space-y-2">
         <Label htmlFor="legalUrl" className="text-base font-semibold">
-          Legal URL {req("metadata.legalUrl") ? "*" : ""}
+          Legal URL {req("legalUrl") ? "*" : ""}
         </Label>
         <Input
           id="legalUrl"
@@ -137,7 +137,7 @@ export default function Step3_Common(ctx: StepRenderContext) {
 
       <div className="space-y-2">
         <Label htmlFor="supportUrl" className="text-base font-semibold">
-          Support URL {req("metadata.supportUrl") ? "*" : ""}
+          Support URL {req("supportUrl") ? "*" : ""}
         </Label>
         <Input
           id="supportUrl"

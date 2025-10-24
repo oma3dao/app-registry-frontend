@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import type { NFT } from "@/schema/data-model"
-import { APP_STATUSES, getStatusLabel, getStatusClasses } from "@/schema/data-model"
+import { APP_STATUSES, getStatusLabel, getStatusClasses, isMetadataOwnerVerified } from "@/schema/data-model"
 import { useActiveAccount } from "thirdweb/react"
 import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile, buildVersionedDID } from "@/lib/utils"
@@ -580,13 +580,13 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                   )}
                   
                   {/* Owner Verification Status */}
-                  {nft.ownerVerification && nft.ownerVerification.metadataOwner && (
+                  {nft.owner && (
                     <div className={`flex items-center gap-2 p-1.5 rounded text-xs ${
-                      nft.ownerVerification.isValid 
+                      isMetadataOwnerVerified(nft)
                         ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' 
                         : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300'
                     }`}>
-                      {nft.ownerVerification.isValid ? (
+                      {isMetadataOwnerVerified(nft) ? (
                         <>
                           <CheckCircle2 size={14} />
                           <span>Owner verified</span>

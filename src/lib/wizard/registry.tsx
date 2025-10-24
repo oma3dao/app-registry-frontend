@@ -184,48 +184,47 @@ export const Step3_Common: StepDef = {
 
   // Dynamic schema: requiredness of some fields depends on interface flags
   schema: z.any().superRefine((state, ctx) => {
-    const md = state?.metadata || {};
     const flags = state?.interfaceFlags;
 
     const must = (path: string) => isFieldRequired(path, flags);
     const ensureText = (value: any, path: string, label: string) => {
       if (must(path)) {
         if (typeof value !== "string" || value.trim().length === 0) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", path.split(".")[1]], message: `${label} is required` });
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message: `${label} is required` });
         }
       }
     };
     const ensureUrl = (value: any, path: string, label: string) => {
       if (must(path)) {
         if (typeof value !== "string" || value.length === 0) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", path.split(".")[1]], message: `${label} is required` });
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message: `${label} is required` });
           return;
         }
         try {
           new URL(value);
         } catch {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", path.split(".")[1]], message: `${label} must be a valid URL` });
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message: `${label} must be a valid URL` });
         }
       } else if (typeof value === "string" && value.length > 0) {
-        try { new URL(value); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", path.split(".")[1]], message: `${label} must be a valid URL` }); }
+        try { new URL(value); } catch { ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message: `${label} must be a valid URL` }); }
       }
     };
 
     // Requiredness per FIELD_REQUIREMENTS (updated by user changes)
-    ensureText(md.description, "description", "Description");
-    ensureText(md.publisher, "publisher", "Publisher");
-    ensureUrl(md.external_url, "external_url", "Marketing URL");
-    ensureUrl(md.image, "image", "Icon URL");
+    ensureText(state.description, "description", "Description");
+    ensureText(state.publisher, "publisher", "Publisher");
+    ensureUrl(state.external_url, "external_url", "Marketing URL");
+    ensureUrl(state.image, "image", "Icon URL");
 
     // Optionals unless required in future rules
-    if (typeof md.summary !== "undefined" && typeof md.summary !== "string") {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["metadata", "summary"], message: "Summary must be a string" });
+    if (typeof state.summary !== "undefined" && typeof state.summary !== "string") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["summary"], message: "Summary must be a string" });
     }
-    if (typeof md.publisher !== "undefined" && typeof md.publisher !== "string") {
+    if (typeof state.publisher !== "undefined" && typeof state.publisher !== "string") {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publisher"], message: "Publisher must be a string" });
     }
-    ensureUrl(md.legalUrl, "legalUrl", "Legal URL");
-    ensureUrl(md.supportUrl, "supportUrl", "Support URL");
+    ensureUrl(state.legalUrl, "legalUrl", "Legal URL");
+    ensureUrl(state.supportUrl, "supportUrl", "Support URL");
   }),
 
   render: (ctx) => <Step3CommonComponent {...ctx} />,
@@ -326,14 +325,12 @@ export const Step7_ApiOnly: StepDef = {
   fields: ["endpoint", "interfaceVersions", "mcp"],
 
   schema: z.object({
-    metadata: z.object({
-      endpoint: z.object({
-        url: z.union([z.string().url(), z.literal("")]).optional(), // Required for API, optional for contract
-        schemaUrl: z.union([z.string().url(), z.literal("")]).optional(),
-      }).optional(),
-      interfaceVersions: z.array(z.string()).optional(),
-      mcp: z.any().optional(), // Complex MCP object for MCP type only
+    endpoint: z.object({
+      url: z.union([z.string().url(), z.literal("")]).optional(), // Required for API, optional for contract
+      schemaUrl: z.union([z.string().url(), z.literal("")]).optional(),
     }).optional(),
+    interfaceVersions: z.array(z.string()).optional(),
+    mcp: z.any().optional(), // Complex MCP object for MCP type only
   }).superRefine((data, ctx) => {
     // Require endpoint.url for API interfaces (but not for contract-only)
     // We check this in superRefine since we need access to parent state (interfaceFlags)

@@ -9,6 +9,9 @@ import type { StepRenderContext } from "@/lib/wizard";
 import { computeInterfacesBitmap } from "@/lib/utils/interfaces";
 import { canonicalizeForHash } from "@/lib/utils/dataurl";
 import { buildOffchainMetadataObject } from "@/lib/utils/offchain-json";
+import { buildCaip10 } from "@/lib/utils/caip10";
+import { env } from "@/config/env";
+import { useActiveAccount } from "thirdweb/react";
 
 function dashIfEmpty(v: any): string {
   if (v === undefined || v === null) return "—";
@@ -18,6 +21,8 @@ function dashIfEmpty(v: any): string {
 }
 
 export default function Step6_Review({ state }: StepRenderContext) {
+  const account = useActiveAccount();
+
   const interfacesBitmap = useMemo(() => {
     const flags = state.interfaceFlags || { human: false, api: false, smartContract: false };
     return computeInterfacesBitmap(flags);
@@ -25,9 +30,15 @@ export default function Step6_Review({ state }: StepRenderContext) {
 
   const { metadataPreview, jcsJsonForHash } = useMemo(() => {
     try {
+      // Set owner to connected wallet address in CAIP-10 format
+      const owner = account?.address
+        ? buildCaip10('eip155', env.chainId.toString(), account.address)
+        : undefined;
+
       // Pass flattened state directly - all fields at top level (no nested metadata)
       const out = buildOffchainMetadataObject({
         ...state, // Spread all flattened fields (name, description, endpoint, mcp, platforms, traits, etc.)
+        owner, // Override with CAIP-10 formatted owner
       });
 
       // Debug: Log what we're getting
@@ -43,7 +54,7 @@ export default function Step6_Review({ state }: StepRenderContext) {
       console.error('[Step6 Review] Error building metadata:', err);
       return { metadataPreview: "{}", jcsJsonForHash: "{}" };
     }
-  }, [state]);
+  }, [state, account?.address]);
 
   const { dataHashHex, dataHashAlgorithm } = useMemo(() => {
     // Algorithm: 0 = keccak256 (default)

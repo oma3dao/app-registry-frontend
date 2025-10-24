@@ -27,7 +27,12 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
   }, [updateField]);
   
   // Local state for custom URL toggle and traits input
-  const [isCustomizingUrl, setIsCustomizingUrl] = useState(false);
+  // Initialize based on whether dataUrl is our hosted URL
+  const { isOurHostedUrl } = require('@/schema/mapping');
+  const [isCustomizingUrl, setIsCustomizingUrl] = useState(() => {
+    // If dataUrl exists and is NOT our hosted URL, then it's custom
+    return formData.dataUrl ? !isOurHostedUrl(formData.dataUrl) : false;
+  });
   const [traitsInput, setTraitsInput] = useState("");
   
   // Sync traitsInput with formData.traits when navigating back to this step

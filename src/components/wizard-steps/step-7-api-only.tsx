@@ -154,12 +154,15 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
             type="url"
             placeholder={labels.urlPlaceholder}
             value={endpoint.url || ""}
-            onChange={(e) => updateField("metadata.endpoint.url", e.target.value)}
-            className={errors?.["metadata.endpoint.url"] ? "border-red-500" : ""}
+            onChange={(e) => {
+              const newEndpoint = { ...endpoint, url: e.target.value };
+              updateField("endpoint", newEndpoint);
+            }}
+            className={errors?.["endpoint.url"] ? "border-red-500" : ""}
           />
           <UrlValidator url={endpoint.url || ""} />
-          {errors?.["metadata.endpoint.url"] && (
-            <p className="text-sm text-red-500">{errors["metadata.endpoint.url"]}</p>
+          {errors?.["endpoint.url"] && (
+            <p className="text-sm text-red-500">{errors["endpoint.url"]}</p>
           )}
         </div>
         
@@ -183,7 +186,10 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
               'https://api.example.com/schema.json'
             }
             value={endpoint.schemaUrl || ""}
-            onChange={(e) => updateField("metadata.endpoint.schemaUrl", e.target.value)}
+            onChange={(e) => {
+              const newEndpoint = { ...endpoint, schemaUrl: e.target.value };
+              updateField("endpoint", newEndpoint);
+            }}
           />
           <UrlValidator url={endpoint.schemaUrl || ""} />
           <p className="text-xs text-muted-foreground">
@@ -212,7 +218,7 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
                   .split(",")
                   .map(v => v.trim())
                   .filter(v => v.length > 0);
-                updateField("metadata.interfaceVersions", versions.length > 0 ? versions : undefined);
+                updateField("interfaceVersions", versions.length > 0 ? versions : undefined);
               }}
             />
             <p className="text-xs text-muted-foreground">

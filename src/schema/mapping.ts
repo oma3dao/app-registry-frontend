@@ -7,6 +7,28 @@ import type { MintAppInput, UpdateAppInput } from '@/lib/contracts/types';
 import { hashTraits } from '@/lib/utils/traits';
 import { canonicalizeForHash } from '@/lib/utils/dataurl';
 import { buildOffchainMetadataObject } from '@/lib/utils/offchain-json';
+import { env } from '@/config/env';
+
+/**
+ * Check if a dataUrl points to our hosted infrastructure
+ * Checks for our domains: omatrust.org, oma3.org, localhost, or Vercel previews
+ */
+export function isOurHostedUrl(dataUrl: string | undefined): boolean {
+  if (!dataUrl) return false;
+  
+  // Check against our base URL (handles current environment: prod, Vercel, localhost)
+  if (dataUrl.startsWith(env.appBaseUrl)) return true;
+  
+  // Check for our root domains (handles any subdomain)
+  const ourDomains = [
+    'omatrust.org',
+    'oma3.org',
+    'localhost',
+    'vercel.app', // Vercel preview deployments
+  ];
+  
+  return ourDomains.some(domain => dataUrl.includes(domain));
+}
 
 /**
  * Convert form data to mint app input for new registrations
@@ -45,7 +67,8 @@ export function toMintAppInput(nft: NFT): MintAppInput & { metadataJson: string 
     initialVersionMinor: minor,
     initialVersionPatch: patch,
     traitHashes,
-    metadataJson: jcs.jcsJson,
+    // Pass metadataJson only if dataUrl points to our hosted infrastructure
+    metadataJson: isOurHostedUrl(nft.dataUrl) ? jcs.jcsJson : "",
   };
 }
 
@@ -90,6 +113,7 @@ export function toUpdateAppInput(
     newTraitHashes: traitHashes,
     newMinor,
     newPatch,
-    metadataJson: jcs.jcsJson,
+    // Pass metadataJson only if dataUrl points to our hosted infrastructure
+    metadataJson: isOurHostedUrl(nft.dataUrl) ? jcs.jcsJson : "",
   };
 }

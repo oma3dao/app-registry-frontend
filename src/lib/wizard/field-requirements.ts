@@ -18,29 +18,29 @@ export const FIELD_REQUIREMENTS: Record<string, { human: boolean; api: boolean; 
   "traits":                 { human: false, api: false, smartContract: false },
 
   // Step 3 - Common Offchain
-  "metadata.description":    { human: true,  api: true,  smartContract: true },
-  "metadata.external_url":   { human: false, api: false, smartContract: false },
-  "metadata.image":          { human: true,  api: false, smartContract: false },
-  "metadata.summary":        { human: false, api: false, smartContract: false }, // optional by default
-  "metadata.publisher":      { human: true,  api: true,  smartContract: true }, // optional by default
-  "metadata.legalUrl":       { human: false, api: false, smartContract: false }, // optional by default
-  "metadata.supportUrl":     { human: false, api: false, smartContract: false }, // optional by default
+  "description":    { human: true,  api: true,  smartContract: true },
+  "external_url":   { human: false, api: false, smartContract: false },
+  "image":          { human: true,  api: false, smartContract: false },
+  "summary":        { human: false, api: false, smartContract: false }, // optional by default
+  "publisher":      { human: true,  api: true,  smartContract: true }, // optional by default
+  "legalUrl":       { human: false, api: false, smartContract: false }, // optional by default
+  "supportUrl":     { human: false, api: false, smartContract: false }, // optional by default
 
   // Step 4 - Human Media
-  "metadata.screenshotUrls": { human: true,  api: false, smartContract: false },
-  "metadata.videoUrls":      { human: false, api: false, smartContract: false }, // Optional
-  "metadata.threeDAssetUrls":{ human: false, api: false, smartContract: false }, // Optional
+  "screenshotUrls": { human: true,  api: false, smartContract: false },
+  "videoUrls":      { human: false, api: false, smartContract: false }, // Optional
+  "threeDAssetUrls":{ human: false, api: false, smartContract: false }, // Optional
 
   // Step 5 - Human Distribution
   "iwpsPortalUrl":           { human: false, api: false, smartContract: false },
   // Note: platforms requirement is composite; enforced in schema that at least one URL exists
   
   // Step 7 - Endpoint Configuration (API & Smart Contract)
-  "metadata.endpoint":       { human: false, api: true,  smartContract: false }, // Endpoint required for API, optional for contract
-  "metadata.endpoint.url":   { human: false, api: true,  smartContract: false }, // Endpoint URL required for API
-  "metadata.endpoint.schemaUrl":{ human: false, api: false, smartContract: false }, // Schema URL optional
-  "metadata.interfaceVersions":{ human: false, api: false, smartContract: false }, // Optional for APIs only
-  "metadata.mcp":            { human: false, api: false, smartContract: false }, // MCP optional (only for MCP type)
+  "endpoint":                { human: false, api: true,  smartContract: false }, // Endpoint required for API, optional for contract
+  "endpoint.url":            { human: false, api: true,  smartContract: false }, // Endpoint URL required for API
+  "endpoint.schemaUrl":      { human: false, api: false, smartContract: false }, // Schema URL optional
+  "interfaceVersions":       { human: false, api: false, smartContract: false }, // Optional for APIs only
+  "mcp":                     { human: false, api: false, smartContract: false }, // MCP optional (only for MCP type)
 };
 
 export function isFieldRequired(fieldPath: string, flags?: InterfaceFlags): boolean {

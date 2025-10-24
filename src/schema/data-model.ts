@@ -707,14 +707,6 @@ export interface NFT {
   mcp?: any;
   traits: string[];
 
-  // Verification fields
-  ownerVerification?: {
-    metadataOwner?: string; // Owner address from metadata JSON
-    contractOwner?: string; // Owner address from contract (minter)
-    isValid: boolean; // Does metadata owner match contract owner?
-    error?: string; // Error message if verification failed
-  };
-
   // Frontend flags
   hasError?: boolean;
   errorMessage?: string;
@@ -744,6 +736,33 @@ export const getStatusClasses = (status: number): string => {
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+/**
+ * Check if the metadata owner matches the contract owner (minter)
+ * @param nft The NFT to verify
+ * @returns true if owner is verified, false otherwise
+ */
+export function isMetadataOwnerVerified(nft: NFT): boolean {
+  const metadataOwner = nft.owner;
+  const contractOwner = nft.minter;
+
+  // If no metadata owner or contract owner, can't verify
+  if (!metadataOwner || !contractOwner) {
+    return false;
+  }
+
+  // Parse metadata owner (should be CAIP-10 format like eip155:66238:0x123...)
+  let metadataAddress: string;
+  if (metadataOwner.startsWith('eip155:')) {
+    const parts = metadataOwner.split(':');
+    metadataAddress = parts[2]; // Extract address from CAIP-10
+  } else {
+    metadataAddress = metadataOwner; // Assume it's already an address
+  }
+
+  // Compare addresses (case-insensitive)
+  return metadataAddress.toLowerCase() === contractOwner.toLowerCase();
+}
 
 /**
  * Get field definition by ID
