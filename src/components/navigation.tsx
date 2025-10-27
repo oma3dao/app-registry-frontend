@@ -22,6 +22,12 @@ export function Navigation() {
       href: OMA3_WEBSITE_URL,
       isActive: false,
       isExternal: true
+    },
+    {
+      name: "Attest",
+      href: "https://reputation.oma3.org",
+      isActive: false,
+      isExternal: true
     }
   ]
 
