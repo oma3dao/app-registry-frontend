@@ -14,6 +14,7 @@ import { Caip10Input } from "@/components/caip10-input";
 import { validateCaipAddress, validateCaip19Token } from "@/lib/validation";
 import { env } from "@/config/env";
 import { UrlValidator } from "@/components/url-validator";
+import { isOurHostedUrl } from "@/schema/mapping";
 
 export default function Step2_Onchain(ctx: StepRenderContext) {
   const { state, updateField, errors } = ctx;
@@ -28,7 +29,6 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
   
   // Local state for custom URL toggle and traits input
   // Initialize based on whether dataUrl is our hosted URL
-  const { isOurHostedUrl } = require('@/schema/mapping');
   const [isCustomizingUrl, setIsCustomizingUrl] = useState(() => {
     // If dataUrl exists and is NOT our hosted URL, then it's custom
     return formData.dataUrl ? !isOurHostedUrl(formData.dataUrl) : false;
