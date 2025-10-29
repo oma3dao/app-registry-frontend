@@ -49,9 +49,9 @@ export const omachainTestnet = {
   ],
   testnet: true,
   contracts: {
-    registry: "0x63A7C12f54B4f42Cae7234f7e20c7A08f725B9F9",
-    metadata: "0xFdd87eA429D963eCB671D409128dC94BFf5f0694",
-    resolver: "0x77E058106762AeA4A567f2919Ef896bb6A82f914"
+    registry: "0xe2548AAdFEfc7C086DbCf025D699C487A3993C5f",
+    metadata: "0xd512c8F14d3b0bfF5DE03BbD5f82B01591dA5CC6",
+    resolver: "0xE2d601F18166F6632f80d2Fa0Ab474B6d251D400"
   }
 };
 
@@ -62,8 +62,8 @@ export const omachainTestnet = {
  * Explorer: TBD
  */
 export const omachainMainnet = {
-  id: 999999, // Placeholder - update when mainnet launches
-  chainId: 999999,
+  id: 6623, // Placeholder - update when mainnet launches
+  chainId: 6623,
   rpc: "https://rpc.chain.oma3.org/", // Placeholder
   name: "OMAchain Mainnet",
   nativeCurrency: {
