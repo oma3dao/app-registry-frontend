@@ -20,6 +20,7 @@ This repository serves multiple purposes:
 - **App Registry**: The repository implements the front-end of the OMATrust registry on OMAChain.  It provides the easiest way for app developers to registry apps with OMATrust and allows clients to discover, trust, and utilize them.  For more details on OMATrust, see [the docs](https://github.com/oma3dao/omatrust-docs).
 - **Sample Code**: Developers can use the repository as sample code to implement their own clients such as discovery tools and app stores.
 - **IWPS Demo**: The repository also implements a basic implementation of the Inter World Portaling System (IWPS), an appliction launching standard that is now in [draft form](../iwps-specification/blob/main/IWPS%20Base%20Specification.md).
+- **ERC-8004 Compatible**: The registry supports both ERC-8004 compliant registration and gas-efficient native functions.
 
 ## Repository Overview
 
@@ -228,6 +229,65 @@ NEXT_PUBLIC_DEBUG_ADAPTER=true
 ## Frontend Architecture
 
 For more information on the source code for this frontend, visit [src/README.md](src/README.md).
+
+## ERC-8004 Registration
+
+The app registry supports two registration paths, giving developers flexibility between standards compliance and gas optimization:
+
+### Two Registration Functions
+
+**1. ERC-8004 Compliant `register()` Function**
+
+The standard-compliant path uses a metadata array structure:
+
+```solidity
+function register(
+  string memory _tokenURI,
+  MetadataEntry[] memory _metadata
+) returns (uint256 tokenId)
+```
+
+This approach provides:
+- Full ERC-8004 specification compliance
+- Future compatibility with ERC-8004 tooling
+- Standardized metadata key-value structure
+
+**2. Gas-Efficient Native `mint()` Function**
+
+The optimized path uses direct parameters:
+
+```solidity
+function mint(
+  string didString,
+  uint16 interfaces,
+  string dataUrl,
+  bytes32 dataHash,
+  // ... additional parameters
+) returns (uint256 tokenId)
+```
+
+This approach provides:
+- Lower gas costs through direct parameter passing
+- Optimized for high-volume registrations
+
+### Reading Metadata: `getMetadata()` Function
+
+Both registration paths store data identically on-chain. Retrieve specific metadata fields using:
+
+```solidity
+function getMetadata(uint256 agentId, string key) 
+  returns (bytes value)
+```
+
+This allows querying individual metadata fields (e.g., "did", "interfaces", "dataHash") regardless of which registration function was used, ensuring consistent data access across the ecosystem.
+
+### Choosing Your Path
+
+- Use `register()` for ERC-8004 compliance and ecosystem compatibility
+- Use `mint()` when gas efficiency is the priority
+- Both functions produce identical on-chain data and support the same `getMetadata()` interface
+
+The frontend automatically uses the appropriate function based on configuration. See `src/lib/contracts/registry.write.ts` for implementation details.
 
 ## Optional Onchain Metadata Architecture
 
