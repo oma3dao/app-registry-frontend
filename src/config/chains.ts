@@ -49,9 +49,9 @@ export const omachainTestnet = {
   ],
   testnet: true,
   contracts: {
-    registry: "0xe2548AAdFEfc7C086DbCf025D699C487A3993C5f",
-    metadata: "0xd512c8F14d3b0bfF5DE03BbD5f82B01591dA5CC6",
-    resolver: "0xE2d601F18166F6632f80d2Fa0Ab474B6d251D400"
+    registry: "0x630F747aa24b2469850488FA5bcB3AaB6e072D44",
+    metadata: "0x09BdAa14C874222D9A8159996D07f9e594b3cB2a",
+    resolver: "0x68CCb1B002bb7C22f4412bC63e1dC9dCd3A8ea5f"
   }
 };
 

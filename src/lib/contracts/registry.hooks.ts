@@ -15,9 +15,10 @@ import {
   getTotalApps,
   searchByDid,
 } from './registry.read';
-import { prepareMintApp, prepareUpdateStatus } from './registry.write';
+import { prepareMintApp, prepareRegisterApp8004, prepareUpdateStatus } from './registry.write';
 import { normalizeEvmError, formatErrorMessage } from './errors';
 import { ensureWalletOnEnvChain } from './chain-guard';
+import { env } from '@/config/env';
 import type { AppSummary, Status, MintAppInput, Paginated } from './types';
 
 /**
@@ -159,7 +160,17 @@ export function useMintApp() {
 
     const sendOnce = async () => {
       await ensureWalletOnEnvChain(account);
-      const transaction = prepareMintApp(input);
+      
+      // Use ERC-8004 register() or native mint() based on environment flag
+      if (env.useErc8004Register) {
+        console.log('🔵 [useMintApp] Using ERC-8004 compliant register() function');
+      } else {
+        console.log('⚡ [useMintApp] Using gas-efficient native mint() function');
+      }
+      
+      const transaction = env.useErc8004Register 
+        ? prepareRegisterApp8004(input)
+        : prepareMintApp(input);
       const result = await sendTransaction({ account, transaction });
       setTxHash(result.transactionHash);
       return result.transactionHash;

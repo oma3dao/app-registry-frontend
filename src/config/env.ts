@@ -12,6 +12,7 @@ const Env = z.object({
   NEXT_PUBLIC_METADATA_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   NEXT_PUBLIC_RESOLVER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   NEXT_PUBLIC_DEBUG_ADAPTER: z.enum(['true', 'false']).optional(),
+  NEXT_PUBLIC_USE_ERC8004_REGISTER: z.enum(['true', 'false']).default('true'),
 });
 
 const parsed = Env.parse({
@@ -20,6 +21,7 @@ const parsed = Env.parse({
   NEXT_PUBLIC_METADATA_ADDRESS: process.env.NEXT_PUBLIC_METADATA_ADDRESS,
   NEXT_PUBLIC_RESOLVER_ADDRESS: process.env.NEXT_PUBLIC_RESOLVER_ADDRESS,
   NEXT_PUBLIC_DEBUG_ADAPTER: process.env.NEXT_PUBLIC_DEBUG_ADAPTER,
+  NEXT_PUBLIC_USE_ERC8004_REGISTER: process.env.NEXT_PUBLIC_USE_ERC8004_REGISTER || 'true',
 });
 
 // Get the active chain configuration from the preset
@@ -121,4 +123,5 @@ export const env = {
 
   // Flags
   debugAdapter: parsed.NEXT_PUBLIC_DEBUG_ADAPTER === 'true',
+  useErc8004Register: parsed.NEXT_PUBLIC_USE_ERC8004_REGISTER === 'true',
 };
