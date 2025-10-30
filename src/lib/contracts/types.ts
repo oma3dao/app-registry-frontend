@@ -64,7 +64,8 @@ export interface AppSummary {
   
   // === OWNERSHIP ===
   minter: `0x${string}`;          // Original creator (immutable)
-  owner: `0x${string}`;           // Current NFT owner (from ERC721.ownerOf)
+  currentOwner: `0x${string}`;    // Current NFT holder (from contract's AppView.currentOwner)
+  owner: `0x${string}`;           // Owner from metadata JSON (for verification against currentOwner)
   
   // === INTERFACES ===
   interfaces: number;             // Bitmap: 1=human, 2=api, 4=contract

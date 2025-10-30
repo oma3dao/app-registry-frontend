@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import type { ComponentType } from "react";
+import { parseCaip10 } from "@/lib/utils/caip10";
 
 // ============================================================================
 // CORE DATA TYPES (what gets stored/transmitted)
@@ -671,7 +672,8 @@ export const FIELDS: FieldDef[] = [
 export interface NFT {
   // On-chain fields (from contract)
   did: string;
-  minter: string;
+  minter: string;                 // Original creator (immutable, from contract)
+  currentOwner: string;           // Current NFT holder (from contract's AppView.currentOwner)
   contractId?: string;
   fungibleTokenId?: string;
   version: string;
@@ -693,7 +695,7 @@ export interface NFT {
   image: string;
   external_url?: string;
   summary?: string;
-  owner?: string; // Owner wallet address (stored in metadata JSON, not on-chain)
+  owner?: string; // Owner from metadata JSON (CAIP-10 format, for verification against currentOwner)
   legalUrl?: string;
   supportUrl?: string;
   screenshotUrls: string[];
@@ -738,30 +740,38 @@ export const getStatusClasses = (status: number): string => {
 // ============================================================================
 
 /**
- * Check if the metadata owner matches the contract owner (minter)
+ * Check if the metadata owner matches the current NFT holder
  * @param nft The NFT to verify
  * @returns true if owner is verified, false otherwise
  */
 export function isMetadataOwnerVerified(nft: NFT): boolean {
-  const metadataOwner = nft.owner;
-  const contractOwner = nft.minter;
+  const metadataOwner = nft.owner;           // CAIP-10 format from metadata JSON
+  const contractOwner = nft.currentOwner;    // Plain Ethereum address from contract
 
-  // If no metadata owner or contract owner, can't verify
+  // If no metadata owner or current owner, can't verify
   if (!metadataOwner || !contractOwner) {
     return false;
   }
 
-  // Parse metadata owner (should be CAIP-10 format like eip155:66238:0x123...)
-  let metadataAddress: string;
-  if (metadataOwner.startsWith('eip155:')) {
-    const parts = metadataOwner.split(':');
-    metadataAddress = parts[2]; // Extract address from CAIP-10
-  } else {
-    metadataAddress = metadataOwner; // Assume it's already an address
+  // Use CAIP-10 library to extract address from metadata owner
+  try {
+    const parsed = parseCaip10(metadataOwner);
+    
+    // If parsing failed, return false
+    if (parsed instanceof Error) {
+      console.warn('[isMetadataOwnerVerified] Failed to parse CAIP-10 owner:', parsed.message);
+      return false;
+    }
+    
+    // Extract the address component from CAIP-10
+    const metadataAddress = parsed.address;
+    
+    // Compare addresses (case-insensitive)
+    return metadataAddress.toLowerCase() === contractOwner.toLowerCase();
+  } catch (error) {
+    console.error('[isMetadataOwnerVerified] Error parsing CAIP-10 owner:', error);
+    return false;
   }
-
-  // Compare addresses (case-insensitive)
-  return metadataAddress.toLowerCase() === contractOwner.toLowerCase();
 }
 
 /**

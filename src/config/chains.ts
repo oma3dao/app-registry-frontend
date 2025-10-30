@@ -49,7 +49,7 @@ export const omachainTestnet = {
   ],
   testnet: true,
   contracts: {
-    registry: "0x29387aE755214b5e9221D06BdDB6f21eE5A1a50a",
+    registry: "0xC9c4079bdE0164Be050Fad407F2863c5541E6e8d",
     metadata: "0x9a530e23370C7d820FbaB2E0a884c58be5E4e919",
     resolver: "0xDc120C00E62822329A4d8C7808f5a43C9CbfC1f8"
   }

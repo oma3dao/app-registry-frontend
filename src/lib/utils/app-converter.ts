@@ -57,6 +57,7 @@ export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT 
 
     status: statusNum,
     minter: app.minter || fallbackAddress || '',
+    currentOwner: app.currentOwner || '', // Current NFT holder from contract
 
     // Flattened metadata fields (will be populated by metadata fetching)
     description: '',
@@ -64,7 +65,7 @@ export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT 
     image: '',
     external_url: '',
     summary: '',
-    owner: '', // Will be populated from metadata JSON
+    owner: '', // Will be populated from metadata JSON (CAIP-10 format)
     legalUrl: '',
     supportUrl: '',
     screenshotUrls: [],

@@ -246,6 +246,9 @@ export default function Dashboard() {
         // Use the mint hook
         await mint(mintInput);
 
+        // Set currentOwner to minter for fresh mints (they're the same at mint time)
+        nft.currentOwner = account.address;
+
         // Add to local state
         setNfts([...nfts, nft]);
         toast.success("App registered successfully!");

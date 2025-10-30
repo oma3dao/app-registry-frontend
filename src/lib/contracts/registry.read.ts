@@ -54,7 +54,8 @@ function parseAppStruct(appData: any): AppSummary {
     currentVersion,
     versionHistory,
     minter: appData.minter as `0x${string}`,
-    owner: appData.minter as `0x${string}`, // Will be overridden if we fetch actual owner
+    currentOwner: appData.currentOwner as `0x${string}`, // Current NFT holder from contract
+    owner: '' as `0x${string}`, // Will be populated from metadata JSON at dataUrl
     interfaces: Number(appData.interfaces),
     dataUrl: appData.dataUrl as string,
     dataHash: appData.dataHash as string,

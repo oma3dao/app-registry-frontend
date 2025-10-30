@@ -253,6 +253,7 @@ export default function NFTMintModal({
         (formData.interfaceFlags.smartContract ? 4 : 0),
       // Add required fields - preserve from initialData in edit mode, use defaults for new apps
       minter: initialData?.minter || '', // Preserve existing minter in edit mode, empty for new apps
+      currentOwner: initialData?.currentOwner || '', // Preserve existing currentOwner in edit mode, empty for new apps
       status: initialData?.status ?? 0,  // Preserve existing status in edit mode, default to Active for new apps
       dataUrl: formData.dataUrl || '', // Ensure dataUrl is not undefined
     };
