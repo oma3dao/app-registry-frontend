@@ -375,12 +375,14 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                   </div>
                 </div>
               </div>
-              <Button 
-                onClick={handleLaunch} 
-                className={`${buttonStyle} flex-shrink-0`} 
-              >
-                <RocketIcon className="mr-2 h-5 w-5" /> Launch
-              </Button>
+              {nft.iwpsPortalUrl && (
+                <Button 
+                  onClick={handleLaunch} 
+                  className={`${buttonStyle} flex-shrink-0`} 
+                >
+                  <RocketIcon className="mr-2 h-5 w-5" /> Launch
+                </Button>
+              )}
             </div>
           </DialogHeader>
           
@@ -409,7 +411,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
           {/* Scrollable content area */}
           <div className="flex-grow overflow-y-auto pr-2 -mr-2">
             <div className="grid gap-4 py-3">
-              {/* Status section - only visible to the owner */}
+              {/* 1. Status section - only visible to the owner */}
               {isOwner && (
                 <div className="grid gap-2">
                   <div className="flex justify-between items-center">
@@ -462,32 +464,25 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               )}
               
-              {/* Publisher and Website - Compact 2-column */}
-              {!isLoading && (nftMetadata?.rawData?.publisher || external_url) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {nftMetadata?.rawData?.publisher && (
-                    <div className="grid gap-1">
-                      <Label className="text-sm font-medium">Publisher</Label>
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
-                        {nftMetadata.rawData.publisher}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {external_url && (
-                    <div className="grid gap-1">
-                      <Label className="text-sm font-medium">Website</Label>
-                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
-                        <a href={external_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
-                          {external_url}
-                        </a>
-                      </div>
-                    </div>
-                  )}
+              {/* 2. DID */}
+              <div className="grid gap-1">
+                <Label htmlFor="did-display" className="text-sm font-medium">DID</Label>
+                <div id="did-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs break-all">
+                  {nft.did}
+                </div>
+              </div>
+              
+              {/* 3. Publisher */}
+              {!isLoading && nftMetadata?.rawData?.publisher && (
+                <div className="grid gap-1">
+                  <Label className="text-sm font-medium">Publisher</Label>
+                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
+                    {nftMetadata.rawData.publisher}
+                  </div>
                 </div>
               )}
               
-              {/* Description - More Compact */}
+              {/* 4. Description */}
               {!isLoading && description && (
                 <div className="grid gap-1">
                   <Label className="text-sm font-medium">Description</Label>
@@ -497,64 +492,82 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               )}
               
-              {/* Traits and Platforms - Compact side-by-side */}
-              {!isLoading && ((nft.traits && nft.traits.length > 0) || Object.keys(platforms).length > 0) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Traits */}
-                  {nft.traits && nft.traits.length > 0 && (
-                    <div className="grid gap-1">
-                      <Label className="text-sm font-medium">Traits</Label>
-                      <div className="flex flex-wrap gap-1 p-2 bg-slate-50 dark:bg-slate-800 rounded">
-                        {nft.traits.map((trait, index) => (
-                          <span 
-                            key={index} 
-                            className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded text-xs"
-                          >
-                            {trait}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Platforms */}
-                  {Object.keys(platforms).length > 0 && (
-                    <div className="grid gap-1">
-                      <Label className="text-sm font-medium">Platforms</Label>
-                      <div className="flex flex-wrap gap-1 p-2 bg-slate-50 dark:bg-slate-800 rounded">
-                        {Object.keys(platforms).map((platform) => (
-                          <span 
-                            key={platform} 
-                            className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs capitalize"
-                          >
-                            {platform}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+              {/* Website */}
+              {!isLoading && external_url && (
+                <div className="grid gap-1">
+                  <Label className="text-sm font-medium">Website</Label>
+                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
+                    <a href={external_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
+                      {external_url}
+                    </a>
+                  </div>
                 </div>
               )}
               
-              {/* DID and Data URL - Compact */}
-              <div className="grid gap-3">
+              {/* Supported Platforms - with launch buttons */}
+              {!isLoading && Object.keys(platforms).length > 0 && (
                 <div className="grid gap-1">
-                  <Label htmlFor="did-display" className="text-sm font-medium">DID</Label>
-                  <div id="did-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs break-all">
-                    {nft.did}
+                  <Label className="text-sm font-medium">Supported Platforms</Label>
+                  <div className="flex flex-wrap gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                    {Object.entries(platforms).map(([platformName, platformData]: [string, any]) => {
+                      const launchUrl = platformData?.launchUrl;
+                      
+                      if (launchUrl) {
+                        return (
+                          <a
+                            key={platformName}
+                            href={launchUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs capitalize transition-colors"
+                          >
+                            {platformName}
+                          </a>
+                        );
+                      } else {
+                        return (
+                          <span 
+                            key={platformName} 
+                            className="px-3 py-1.5 bg-slate-300 dark:bg-slate-600 text-slate-600 dark:text-slate-400 rounded text-xs capitalize cursor-not-allowed"
+                            title="No launch URL available"
+                          >
+                            {platformName}
+                          </span>
+                        );
+                      }
+                    })}
                   </div>
                 </div>
-                
+              )}
+              
+              {/* Traits */}
+              {!isLoading && nft.traits && nft.traits.length > 0 && (
                 <div className="grid gap-1">
-                  <Label htmlFor="data-url-display" className="text-sm font-medium">Data URL</Label>
-                  <div id="data-url-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs break-all">
-                    <a href={nft.dataUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                      {nft.dataUrl}
-                    </a>
+                  <Label className="text-sm font-medium">Traits</Label>
+                  <div className="flex flex-wrap gap-1 p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                    {nft.traits.map((trait, index) => (
+                      <span 
+                        key={index} 
+                        className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded text-xs"
+                      >
+                        {trait}
+                      </span>
+                    ))}
                   </div>
+                </div>
+              )}
+              
+              {/* Data URL */}
+              <div className="grid gap-1">
+                <Label htmlFor="data-url-display" className="text-sm font-medium">Data URL</Label>
+                <div id="data-url-display" className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs break-all">
+                  <a href={nft.dataUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    {nft.dataUrl}
+                  </a>
+                </div>
                 
-                  {/* Data Hash Verification Status */}
-                  {nftMetadata?.dataHashVerification && (
+                {/* Data Hash Verification Status */}
+                {nftMetadata?.dataHashVerification && (
                     <div className={`flex items-center gap-2 p-1.5 rounded text-xs ${
                       nftMetadata.dataHashVerification.isValid 
                         ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' 
@@ -577,10 +590,10 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                         </>
                       )}
                     </div>
-                  )}
-                  
-                  {/* Owner Verification Status */}
-                  {nft.owner && (
+                )}
+                
+                {/* Owner Verification Status */}
+                {nft.owner && (
                     <div className={`flex items-center gap-2 p-1.5 rounded text-xs ${
                       isMetadataOwnerVerified(nft)
                         ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' 
@@ -598,32 +611,16 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                         </>
                       )}
                     </div>
-                  )}
-                  
-                  {/* Attestation checking indicator */}
-                  {attestationStatus.checking && (
-                    <div className="flex items-center gap-2 p-1.5 rounded text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                      <Loader2 size={14} className="animate-spin" />
-                      <span>Checking attestation...</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Description Section - Only show when loaded */}
-              {!isLoadingDescription && description && (
-                <div className="grid gap-2">
-                  <Label htmlFor="description-content-display" className="text-base font-medium">Description</Label>
-                  <div 
-                    id="description-content-display" 
-                    className="p-3 bg-slate-50 dark:bg-slate-800 rounded-md overflow-hidden"
-                  >
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                      {description}
-                    </div>
+                )}
+                
+                {/* Attestation checking indicator */}
+                {attestationStatus.checking && (
+                  <div className="flex items-center gap-2 p-1.5 rounded text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Checking attestation...</span>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
               
               {nft.iwpsPortalUrl && (
                 <div className="grid gap-2">
@@ -645,20 +642,27 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               </div>
               
-              {/* Screenshots Section - Compact grid at bottom */}
+              {/* Screenshots Section - Clickable images */}
               {!isLoading && screenshotUrls.length > 0 && (
                 <div className="grid gap-1">
                   <Label className="text-sm font-medium">Screenshots</Label>
                   <div className="grid grid-cols-3 gap-1.5">
                     {screenshotUrls.map((url, index) => (
-                      <div key={index} className="aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden">
+                      <a 
+                        key={index} 
+                        href={url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="aspect-video bg-slate-100 dark:bg-slate-800 rounded overflow-hidden hover:opacity-90 transition-opacity cursor-pointer"
+                        title="Click to view full size"
+                      >
                         <img 
                           src={url} 
                           alt={`Screenshot ${index + 1}`} 
                           className="w-full h-full object-cover" 
                           loading="lazy"
                         />
-                      </div>
+                      </a>
                     ))}
                   </div>
                 </div>
