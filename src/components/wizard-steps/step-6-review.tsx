@@ -77,7 +77,21 @@ export default function Step6_Review({ state }: StepRenderContext) {
     } catch (_) {
       return { dataHashHex: "0x" + "0".repeat(64), dataHashAlgorithm: algo };
     }
-  }, [metadataPreview]);
+  }, [
+    metadataPreview,
+    state.description,
+    state.image,
+    state.external_url,
+    state.summary,
+    state.publisher,
+    state.legalUrl,
+    state.supportUrl,
+    state.screenshotUrls,
+    state.platforms,
+    state.endpoint,
+    state.mcp,
+    state.traits,
+  ]);
 
   const flags = state.interfaceFlags || { human: false, api: false, smartContract: false };
 

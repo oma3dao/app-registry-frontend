@@ -240,18 +240,17 @@ export function prepareUpdateApp(input: UpdateAppInput) {
 
     return prepareContractCall({
       contract,
-      method: 'function updateAppControlled(string, uint8, string, bytes32, uint8, uint16, bytes32[], uint8, uint8, string) external',
+      method: 'function updateAppControlled(string, uint8, bytes32, uint8, uint16, bytes32[], uint8, uint8, string) external',
       params: [
         normalizedDid,                                         // 1. didString
         input.major,                                          // 2. major
-        input.newDataUrl || '',                               // 3. newDataUrl (empty = no change)
-        (input.newDataHash as `0x${string}`) || '0x0000000000000000000000000000000000000000000000000000000000000000', // 4. newDataHash (bytes32(0) = no change)
-        input.newDataHashAlgorithm || 0,                      // 5. newDataHashAlgorithm (0 = no change)
-        input.newInterfaces || 0,                             // 6. newInterfaces (0 = no change)
-        (input.newTraitHashes || []).map(h => h as `0x${string}`), // 7. newTraitHashes (empty = no change)
-        input.newMinor,                                       // 8. newMinor
-        input.newPatch,                                       // 9. newPatch
-        input.metadataJson || '',                             // 10. metadataJson (empty to skip)
+        (input.newDataHash as `0x${string}`) || '0x0000000000000000000000000000000000000000000000000000000000000000', // 3. newDataHash (bytes32(0) = no change)
+        input.newDataHashAlgorithm || 0,                      // 4. newDataHashAlgorithm (0 = no change)
+        input.newInterfaces || 0,                             // 5. newInterfaces (0 = no change)
+        (input.newTraitHashes || []).map(h => h as `0x${string}`), // 6. newTraitHashes (empty = no change)
+        input.newMinor,                                       // 7. newMinor
+        input.newPatch,                                       // 8. newPatch
+        input.metadataJson || '',                             // 9. metadataJson (empty to skip)
       ],
     });
   } catch (e) {

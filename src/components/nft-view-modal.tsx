@@ -139,14 +139,14 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   const platforms = nftMetadata?.displayData.platforms || {};
   const isLoading = nftMetadata?.isLoading || false;
   
-  // Get the connected wallet address to check if user is the minter
+  // Get the connected wallet address to check if user is the current owner
   const account = useActiveAccount();
   const connectedAddress = account?.address?.toLowerCase();
   
-  // Determine if the current user can edit the status (is the minter)
+  // Determine if the current user can edit (is the current NFT owner)
   // Default to false when no account or nft data is available
   const isOwner = Boolean(connectedAddress && nft && 
-    nft.minter.toLowerCase() === connectedAddress);
+    nft.currentOwner.toLowerCase() === connectedAddress);
     
   // Determine if status has been changed from original
   const statusChanged = nft && selectedStatus !== nft.status;

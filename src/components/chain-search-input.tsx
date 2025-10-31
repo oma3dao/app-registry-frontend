@@ -38,7 +38,7 @@ export function ChainSearchInput({
     } else {
       setSelectedChain(null);
     }
-  }, [value]);
+  }, [value, results]);
 
   // Handle click outside to close
   useEffect(() => {

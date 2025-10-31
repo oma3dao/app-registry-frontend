@@ -27,6 +27,9 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
     });
   }, [updateField]);
   
+  // Check if we're in edit mode
+  const isEditMode = formData.ui?.isEditing || false;
+  
   // Local state for custom URL toggle and traits input
   // Initialize based on whether dataUrl is our hosted URL
   const [isCustomizingUrl, setIsCustomizingUrl] = useState(() => {
@@ -45,6 +48,7 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
     if (currentInput !== traitsInput) {
       setTraitsInput(currentInput);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.traits]);
   
   // Auto-generate dataUrl when not customizing
@@ -143,6 +147,7 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
     if (JSON.stringify(cleanedTraits) !== JSON.stringify(currentTraits)) {
       updateFormData({ traits: cleanedTraits.length > 0 ? cleanedTraits : undefined });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.apiType, formData.interfaceFlags?.api]);
   
   const handleTraitsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,56 +175,82 @@ export default function Step2_Onchain(ctx: StepRenderContext) {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="customizeUrl"
-            checked={isCustomizingUrl}
-            onChange={handleCustomUrlToggle}
-            className="h-4 w-4 rounded border-gray-300"
-          />
-          <Label
-            htmlFor="customizeUrl"
-            className="text-sm font-normal cursor-pointer"
-          >
-            I want to host metadata at my own URL
-          </Label>
-        </div>
-
-        {isCustomizingUrl ? (
-          <div className="space-y-2">
-            <Input
-              id="dataUrl"
-              type="url"
-              placeholder="https://example.com/metadata.json"
-              value={formData.dataUrl || ""}
-              onChange={(e) => updateFormData({ dataUrl: e.target.value })}
-              className={errors?.dataUrl ? "border-red-500" : ""}
-            />
-            {errors?.dataUrl && (
-              <p className="text-sm text-red-500">{errors.dataUrl}</p>
-            )}
-            <UrlValidator url={formData.dataUrl || ""} />
-            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md">
-              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-blue-900 dark:text-blue-100">
-                <strong>Custom URL Mode:</strong> When you submit, we&apos;ll generate the off‑chain JSON preview for you to copy and host at your URL. The registry stores only the pointer.
-              </p>
-            </div>
-          </div>
-        ) : (
+        {isEditMode ? (
+          // Edit mode: dataUrl is immutable
           <div className="space-y-2">
             <Input
               id="dataUrl"
               type="url"
               value={formData.dataUrl || ""}
               readOnly
-              className="bg-muted"
+              disabled
+              className="bg-muted opacity-60 cursor-not-allowed"
             />
-            <p className="text-xs text-muted-foreground">
-              Auto-generated based on your DID and version. If you switch to a custom URL, we’ll still build the JSON for you in Review.
-            </p>
+            <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-md">
+              <Info className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-yellow-900 dark:text-yellow-100">
+                <p className="font-semibold mb-1">Data URL cannot be changed</p>
+                <p>
+                  The Data URL is immutable and set at mint time. To use a different Data URL, you must mint a new NFT with a higher major version.
+                </p>
+              </div>
+            </div>
           </div>
+        ) : (
+          // Create mode: allow customization
+          <>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="customizeUrl"
+                checked={isCustomizingUrl}
+                onChange={handleCustomUrlToggle}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label
+                htmlFor="customizeUrl"
+                className="text-sm font-normal cursor-pointer"
+              >
+                I want to host metadata at my own URL
+              </Label>
+            </div>
+
+            {isCustomizingUrl ? (
+              <div className="space-y-2">
+                <Input
+                  id="dataUrl"
+                  type="url"
+                  placeholder="https://example.com/metadata.json"
+                  value={formData.dataUrl || ""}
+                  onChange={(e) => updateFormData({ dataUrl: e.target.value })}
+                  className={errors?.dataUrl ? "border-red-500" : ""}
+                />
+                {errors?.dataUrl && (
+                  <p className="text-sm text-red-500">{errors.dataUrl}</p>
+                )}
+                <UrlValidator url={formData.dataUrl || ""} />
+                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                    <strong>Custom URL Mode:</strong> When you submit, we&apos;ll generate the off‑chain JSON preview for you to copy and host at your URL. The registry stores only the pointer.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Input
+                  id="dataUrl"
+                  type="url"
+                  value={formData.dataUrl || ""}
+                  readOnly
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Auto-generated based on your DID and version. If you switch to a custom URL, we&apos;ll still build the JSON for you in Review.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 

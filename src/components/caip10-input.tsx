@@ -61,6 +61,7 @@ export function Caip10Input({
     if (value !== inputValue) {
       setInputValue(value);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   // Auto-scroll when builder opens

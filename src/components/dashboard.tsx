@@ -178,16 +178,15 @@ export default function Dashboard() {
         log("Update input major:", updateInput.major);
         log("Update input newMinor:", updateInput.newMinor);
         log("Update input newPatch:", updateInput.newPatch);
-        log("Update input newDataUrl:", updateInput.newDataUrl);
         log("Update input newDataHash:", updateInput.newDataHash);
         log("Update input newInterfaces:", updateInput.newInterfaces);
         log("Update input newTraitHashes:", updateInput.newTraitHashes);
         log("Update input metadataJson length:", updateInput.metadataJson?.length || 0);
         
-        // The contract will fetch newDataUrl and verify its hash matches newDataHash
-        // So the dataUrl MUST be publicly accessible and return the correct content
-        log("WARNING: Contract will fetch newDataUrl and verify hash");
-        log("Make sure the dataUrl is publicly accessible!");
+        // The contract will verify the newDataHash matches the content at the immutable dataUrl
+        // Note: dataUrl cannot be changed - it was set at mint time
+        log("WARNING: Ensure metadata at dataUrl matches the newDataHash");
+        log("DataUrl is immutable and cannot be changed in updates");
         
         // Verify the hash matches what we computed
         if (updateInput.metadataJson) {
@@ -207,7 +206,6 @@ export default function Dashboard() {
           log("Current on-chain dataHash:", currentOnChainApp.dataHash);
           log("Current on-chain interfaces:", currentOnChainApp.interfaces);
           log("Current on-chain traits count:", currentOnChainApp.traitHashes?.length || 0);
-          log("New dataUrl same as current?", updateInput.newDataUrl === currentOnChainApp.dataUrl);
           log("New dataHash same as current?", updateInput.newDataHash === currentOnChainApp.dataHash);
           log("New interfaces same as current?", updateInput.newInterfaces === currentOnChainApp.interfaces);
         }
@@ -246,8 +244,9 @@ export default function Dashboard() {
         // Use the mint hook
         await mint(mintInput);
 
-        // Set currentOwner to minter for fresh mints (they're the same at mint time)
+        // Set currentOwner and minter for fresh mints (they're the same at mint time)
         nft.currentOwner = account.address;
+        nft.minter = account.address;
 
         // Add to local state
         setNfts([...nfts, nft]);
