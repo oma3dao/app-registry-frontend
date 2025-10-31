@@ -33,7 +33,9 @@ export interface OffchainBuildInput {
   threeDAssetUrls?: string[];
   traits?: string[];
   interfaceVersions?: string[];
-  endpoint?: Record<string, any> | { url?: string; schemaUrl?: string };
+  endpointName?: string;
+  endpointUrl?: string;
+  endpointSchemaUrl?: string;
   payments?: Record<string, any>[];
   artifacts?: Record<string, any>;
   platforms?: Record<string, any>;
@@ -45,7 +47,9 @@ export interface OffchainBuildInput {
     iwpsPortalUrl: string;
     traits: string[];
     interfaceVersions: string[];
-    endpoint: Record<string, any> | { url?: string; schemaUrl?: string };
+    endpointName: string;
+    endpointUrl: string;
+    endpointSchemaUrl: string;
     payments: Record<string, any>[];
     artifacts: Record<string, any>;
     platforms: Record<string, any>;
@@ -98,11 +102,33 @@ export function buildOffchainMetadataObject(input: OffchainBuildInput): Record<s
 
     // JSON objects
     platforms: cleanPlatforms(pick('platforms')),
-    endpoint: typeof pick('endpoint') === 'object' && pick('endpoint') !== null ? pick('endpoint') : undefined,
     artifacts: typeof pick('artifacts') === 'object' && pick('artifacts') !== null ? pick('artifacts') : undefined,
     mcp: typeof pick('mcp') === 'object' && pick('mcp') !== null ? pick('mcp') : undefined,
     payments: Array.isArray(pick('payments')) ? pick('payments') : undefined,
   } as Record<string, any>;
+
+  // Build endpoints array from flat fields (ERC-8004 compliance)
+  const endpointUrl = pick('endpointUrl');
+  const endpointName = pick('endpointName') || 'API';
+  const mcpConfig = pick('mcp');
+  
+  if (endpointUrl) {
+    const endpoint: Record<string, any> = {
+      name: endpointName,
+      endpoint: endpointUrl,
+      ...(pick('endpointSchemaUrl') && { schemaUrl: pick('endpointSchemaUrl') }),
+    };
+    
+    // If this is an MCP endpoint, embed MCP config fields directly
+    if (endpointName === 'MCP' && mcpConfig && typeof mcpConfig === 'object') {
+      Object.assign(endpoint, mcpConfig);
+    }
+    
+    out.endpoints = [endpoint];
+  }
+  
+  // Remove top-level mcp field (it's now embedded in the endpoint)
+  delete out.mcp;
 
   // Deep clean: recursively remove empty values
   return deepClean(out);

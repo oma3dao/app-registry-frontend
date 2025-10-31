@@ -12,6 +12,26 @@ import type { NFT } from '@/schema/data-model';
 import { statusToNumber } from './status';
 
 /**
+ * Extract MCP configuration from an endpoint object
+ * If the endpoint name is "MCP", extract MCP-specific fields
+ */
+function extractMcpFromEndpoint(endpoint: any): any {
+  if (!endpoint || endpoint.name !== 'MCP') {
+    return undefined;
+  }
+  
+  // Extract MCP fields from the endpoint object
+  const { name, endpoint: url, schemaUrl, ...mcpFields } = endpoint;
+  
+  // Only return if there are actual MCP fields
+  if (Object.keys(mcpFields).length === 0) {
+    return undefined;
+  }
+  
+  return mcpFields;
+}
+
+/**
  * Format version for display following semantic versioning standards
  * Always show major.minor, only add patch if non-zero
  * Examples: "2.0" if 2.0.0, "2.1" if 2.1.0, "2.1.3" if 2.1.3
@@ -74,7 +94,9 @@ export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT 
     iwpsPortalUrl: '',
     platforms: {},
     artifacts: {},
-    endpoint: undefined,
+    endpointName: undefined,
+    endpointUrl: undefined,
+    endpointSchemaUrl: undefined,
     interfaceVersions: [],
     mcp: undefined,
     traits: [], // Will be populated from metadata JSON
@@ -106,27 +128,32 @@ export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
     const metadata = await response.json();
 
     // Merge all metadata fields into the NFT object
+    // Metadata JSON is the source of truth for all off-chain fields
     return {
       ...nft,
-      name: metadata.name || nft.name,
-      description: metadata.description || nft.description,
-      publisher: metadata.publisher || nft.publisher,
-      image: metadata.image || nft.image,
-      external_url: metadata.external_url || nft.external_url,
-      summary: metadata.summary || nft.summary,
-      owner: metadata.owner || nft.owner, // Owner from metadata JSON
-      legalUrl: metadata.legalUrl || nft.legalUrl,
-      supportUrl: metadata.supportUrl || nft.supportUrl,
-      iwpsPortalUrl: metadata.iwpsPortalUrl || nft.iwpsPortalUrl,
-      screenshotUrls: metadata.screenshotUrls || nft.screenshotUrls,
-      videoUrls: metadata.videoUrls || nft.videoUrls,
-      threeDAssetUrls: metadata['3dAssetUrls'] || metadata.threeDAssetUrls || nft.threeDAssetUrls,
-      platforms: metadata.platforms || nft.platforms,
-      artifacts: metadata.artifacts || nft.artifacts,
-      endpoint: metadata.endpoint || nft.endpoint,
-      interfaceVersions: metadata.interfaceVersions || nft.interfaceVersions,
-      mcp: metadata.mcp || nft.mcp,
-      traits: metadata.traits || nft.traits,
+      name: metadata.name,
+      description: metadata.description,
+      publisher: metadata.publisher,
+      image: metadata.image,
+      external_url: metadata.external_url,
+      summary: metadata.summary,
+      owner: metadata.owner, // Owner from metadata JSON (CAIP-10 format)
+      legalUrl: metadata.legalUrl,
+      supportUrl: metadata.supportUrl,
+      iwpsPortalUrl: metadata.iwpsPortalUrl,
+      screenshotUrls: metadata.screenshotUrls,
+      videoUrls: metadata.videoUrls,
+      threeDAssetUrls: metadata['3dAssetUrls'] || metadata.threeDAssetUrls,
+      platforms: metadata.platforms,
+      artifacts: metadata.artifacts,
+      // Extract endpoint from endpoints array (ERC-8004 format)
+      endpointName: metadata.endpoints?.[0]?.name,
+      endpointUrl: metadata.endpoints?.[0]?.endpoint,
+      endpointSchemaUrl: metadata.endpoints?.[0]?.schemaUrl,
+      interfaceVersions: metadata.interfaceVersions,
+      // Extract MCP config from endpoint if name === "MCP"
+      mcp: extractMcpFromEndpoint(metadata.endpoints?.[0]),
+      traits: metadata.traits,
     };
   } catch (error) {
     console.error(`[hydrateNFTWithMetadata] Error fetching metadata for ${nft.did}:`, error);
