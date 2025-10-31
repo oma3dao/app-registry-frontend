@@ -33,8 +33,9 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
   
   // Auto-fill endpoint name from API type
   // MUST be called before any conditional returns (React Hooks rules)
+  // Always update endpointName when apiType changes to keep them in sync
   React.useEffect(() => {
-    if (apiType && !state.endpointName) {
+    if (apiType) {
       const nameMap: Record<string, string> = {
         'mcp': 'MCP',
         'a2a': 'A2A',
