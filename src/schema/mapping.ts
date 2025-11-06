@@ -106,7 +106,6 @@ export function toUpdateAppInput(
   return {
     did: nft.did,
     major: currentMajor,
-    newDataUrl: nft.dataUrl || '',
     newDataHash: dataHash,
     newDataHashAlgorithm: 0, // keccak256
     newInterfaces: interfaces,
@@ -114,6 +113,7 @@ export function toUpdateAppInput(
     newMinor,
     newPatch,
     // Pass metadataJson only if dataUrl points to our hosted infrastructure
+    // Note: dataUrl is immutable, so we check the existing NFT's dataUrl
     metadataJson: isOurHostedUrl(nft.dataUrl) ? jcs.jcsJson : "",
   };
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ExternalLinkIcon, AlertCircleIcon, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { validateUrl } from '@/lib/validation'
@@ -22,8 +22,8 @@ export function ImagePreview({ url, className = '', alt = 'Image preview' }: Ima
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null)
   const [debouncedUrl, setDebouncedUrl] = useState<string>('')
   
-  const updateDebouncedUrl = useCallback(
-    debounce((newUrl: string) => {
+  const updateDebouncedUrl = useMemo(
+    () => debounce((newUrl: string) => {
       setDebouncedUrl(newUrl)
     }, 800),
     []

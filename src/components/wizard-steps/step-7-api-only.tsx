@@ -31,6 +31,23 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
   const apiType = state.apiType;
   const isContractOnly = state.interfaceFlags?.smartContract && !state.interfaceFlags?.api;
   
+  // Auto-fill endpoint name from API type
+  // MUST be called before any conditional returns (React Hooks rules)
+  // Always update endpointName when apiType changes to keep them in sync
+  React.useEffect(() => {
+    if (apiType) {
+      const nameMap: Record<string, string> = {
+        'mcp': 'MCP',
+        'a2a': 'A2A',
+        'openapi': 'OpenAPI',
+        'graphql': 'GraphQL',
+        'jsonrpc': 'JSON-RPC',
+      };
+      updateField('endpointName', nameMap[apiType] || apiType.toUpperCase());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiType]);
+  
   // If API selected but no API type yet, prompt user
   if (state.interfaceFlags?.api && !apiType) {
     return (
@@ -41,8 +58,6 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
       </div>
     );
   }
-
-  const endpoint = state.endpoint || { url: '', schemaUrl: '' };
   
   // Get endpoint labels based on interface type
   const getEndpointLabels = () => {
@@ -153,16 +168,13 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
             id="endpoint-url"
             type="url"
             placeholder={labels.urlPlaceholder}
-            value={endpoint.url || ""}
-            onChange={(e) => {
-              const newEndpoint = { ...endpoint, url: e.target.value };
-              updateField("endpoint", newEndpoint);
-            }}
-            className={errors?.["endpoint.url"] ? "border-red-500" : ""}
+            value={state.endpointUrl || ""}
+            onChange={(e) => updateField("endpointUrl", e.target.value)}
+            className={errors?.endpointUrl ? "border-red-500" : ""}
           />
-          <UrlValidator url={endpoint.url || ""} />
-          {errors?.["endpoint.url"] && (
-            <p className="text-sm text-red-500">{errors["endpoint.url"]}</p>
+          <UrlValidator url={state.endpointUrl || ""} />
+          {errors?.endpointUrl && (
+            <p className="text-sm text-red-500">{errors.endpointUrl}</p>
           )}
         </div>
         
@@ -185,13 +197,10 @@ export default function Step7_ApiOnly(ctx: StepRenderContext) {
               isContractOnly ? 'https://etherscan.io/address/0x...' :
               'https://api.example.com/schema.json'
             }
-            value={endpoint.schemaUrl || ""}
-            onChange={(e) => {
-              const newEndpoint = { ...endpoint, schemaUrl: e.target.value };
-              updateField("endpoint", newEndpoint);
-            }}
+            value={state.endpointSchemaUrl || ""}
+            onChange={(e) => updateField("endpointSchemaUrl", e.target.value)}
           />
-          <UrlValidator url={endpoint.schemaUrl || ""} />
+          <UrlValidator url={state.endpointSchemaUrl || ""} />
           <p className="text-xs text-muted-foreground">
             {apiType === 'graphql' && 'Ideally: GraphQL SDL/schema file. Fallback: Documentation page'}
             {apiType === 'openapi' && 'Ideally: OpenAPI/Swagger JSON spec. Fallback: Documentation page'}

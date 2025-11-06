@@ -129,13 +129,13 @@ export interface MintAppInput {
 
 /**
  * Input for updating app (controlled update with versioning)
+ * Note: dataUrl is immutable and cannot be changed after minting
  */
 export interface UpdateAppInput {
   did: string;
   major: number;
   
   // Optional updates (empty string or 0 = no change)
-  newDataUrl?: string;
   newDataHash?: string;
   newDataHashAlgorithm?: number;
   newInterfaces?: number;         // Must be additive only

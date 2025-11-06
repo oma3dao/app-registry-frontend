@@ -25,7 +25,7 @@ export function Navigation() {
     },
     {
       name: "Attest",
-      href: "https://reputation.oma3.org",
+      href: "https://reputation.omatrust.org",
       isActive: false,
       isExternal: true
     }

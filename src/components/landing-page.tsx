@@ -191,12 +191,12 @@ export default function LandingPage() {
               <p className="text-slate-600 dark:text-slate-400 text-sm">
                 Collect attestations and grow your app&apos;s reputation. Integrate user review widgets and encourage your community to visit {' '}
                 <a 
-                  href="https://reputation.oma3.org" 
+                  href="https://reputation.omatrust.org" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-blue-600 dark:text-blue-400 hover:underline"
                 >
-                  reputation.oma3.org
+                  reputation.omatrust.org
                 </a>
                 {' '}to vouch for your app.
               </p>

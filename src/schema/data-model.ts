@@ -38,6 +38,32 @@ export const OnChainApp = z.object({
 export type TOnChainApp = z.infer<typeof OnChainApp>;
 
 /**
+ * MCP-specific fields (embedded in endpoint when name === "MCP")
+ * Based on MCP v1.0 specification (modelcontextprotocol.io)
+ */
+export const McpEndpointFields = z.object({
+  tools: z.array(z.any()).optional(),
+  resources: z.array(z.any()).optional(),
+  prompts: z.array(z.any()).optional(),
+  transport: z.any().optional(),
+  authentication: z.any().optional(),
+}).passthrough();
+
+/**
+ * API endpoint configuration (ERC-8004 compliant)
+ * Defined before OffChainMetadata to avoid circular dependency
+ * 
+ * When name === "MCP", additional MCP fields are embedded in this object
+ */
+export const EndpointConfig = z.object({
+  name: z.string().optional(),        // Endpoint name: "MCP", "A2A", etc.
+  endpoint: z.string().url().optional(), // Endpoint URL
+  schemaUrl: z.string().url().optional(), // OpenAPI/GraphQL schema URL
+}).merge(McpEndpointFields); // Allow MCP fields to be embedded
+
+export type TEndpointConfig = z.infer<typeof EndpointConfig>;
+
+/**
  * Application metadata as stored in the dataUrl JSON (off-chain)
  */
 export const OffChainMetadata = z.object({
@@ -63,10 +89,10 @@ export const OffChainMetadata = z.object({
   platforms: z.record(z.string(), z.any()).optional(), // TODO: proper PlatformDetails schema
   artifacts: z.record(z.string(), z.any()).optional(),
 
-  // API configuration
-  endpoint: z.any().optional(), // TODO: proper EndpointConfig schema
+  // API configuration (ERC-8004: endpoints array)
+  // Note: MCP config is embedded in the endpoint object where name === "MCP"
+  endpoints: z.array(EndpointConfig).optional(),
   interfaceVersions: z.array(z.string()).optional(),
-  mcp: z.any().optional(), // TODO: proper McpConfig schema
 
   // Traits (stored here but hashed on-chain)
   traits: z.array(z.string()).max(20).default([]),
@@ -108,16 +134,6 @@ export const Artifact = z.object({
 });
 
 export type TArtifact = z.infer<typeof Artifact>;
-
-/**
- * API endpoint configuration
- */
-export const EndpointConfig = z.object({
-  url: z.string().url().optional(),
-  schemaUrl: z.string().url().optional(), // OpenAPI/GraphQL schema URL
-});
-
-export type TEndpointConfig = z.infer<typeof EndpointConfig>;
 
 /**
  * MCP (Model Context Protocol) configuration
@@ -171,7 +187,9 @@ export const DomainForm = z.object({
   iwpsPortalUrl: z.string().url().optional(),
   platforms: z.record(z.string(), z.any()).optional(),
   artifacts: z.record(z.string(), z.any()).optional(),
-  endpoint: z.any().optional(),
+  endpointName: z.string().optional(),
+  endpointUrl: z.string().url().optional(),
+  endpointSchemaUrl: z.string().url().optional(),
   interfaceVersions: z.array(z.string()).optional(),
   mcp: z.any().optional(),
   traits: z.array(z.string()).max(20).default([]),
@@ -273,7 +291,9 @@ export const defaultFormState: TFormState = {
   iwpsPortalUrl: "",
   platforms: {},
   artifacts: {},
-  endpoint: undefined,
+  endpointName: undefined,
+  endpointUrl: undefined,
+  endpointSchemaUrl: undefined,
   interfaceVersions: [],
   mcp: undefined,
   traits: [],
@@ -372,8 +392,9 @@ export const F = {
   platforms: "platforms" as FieldId,
 
   // Step 6: API endpoint
-  endpoint_url: "endpoint.url" as FieldId,
-  endpoint_schemaUrl: "endpoint.schemaUrl" as FieldId,
+  endpointName: "endpointName" as FieldId,
+  endpointUrl: "endpointUrl" as FieldId,
+  endpointSchemaUrl: "endpointSchemaUrl" as FieldId,
   interfaceVersions: "interfaceVersions" as FieldId,
 
   // Step 7: MCP
@@ -618,7 +639,17 @@ export const FIELDS: FieldDef[] = [
 
   // Step 6: API endpoint
   {
-    id: F.endpoint_url,
+    id: F.endpointName,
+    title: "Endpoint Name",
+    description: "Type of API endpoint (auto-filled from API type)",
+    widget: "text",
+    step: "api-config",
+    interfaces: ["api"],
+    required: false,
+    onChain: false,
+  },
+  {
+    id: F.endpointUrl,
     title: "Endpoint URL",
     description: "API endpoint URL",
     widget: "url",
@@ -628,7 +659,7 @@ export const FIELDS: FieldDef[] = [
     onChain: false,
   },
   {
-    id: F.endpoint_schemaUrl,
+    id: F.endpointSchemaUrl,
     title: "Schema URL",
     description: "URL to OpenAPI/GraphQL schema definition",
     widget: "url",
@@ -704,7 +735,9 @@ export interface NFT {
   iwpsPortalUrl?: string;
   platforms?: Record<string, any>;
   artifacts?: Record<string, any>;
-  endpoint?: any;
+  endpointName?: string;
+  endpointUrl?: string;
+  endpointSchemaUrl?: string;
   interfaceVersions?: string[];
   mcp?: any;
   traits: string[];
