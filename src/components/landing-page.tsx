@@ -12,6 +12,18 @@ import { log } from "@/lib/log"
 import { useActiveAccount } from "thirdweb/react"
 import { appSummariesToNFTsWithMetadata } from "@/lib/utils/app-converter"
 
+const ROTATING_SERVICES = [
+  "Online Services",
+  "Websites",
+  "Apps",
+  "Downloads",
+  "APIs",
+  "x402",
+  "MCP",
+  "A2A",
+  "Smart Contracts"
+];
+
 export default function LandingPage() {
   const [latestApps, setLatestApps] = useState<NFT[]>([])
   const [isLoadingImages, setIsLoadingImages] = useState(false)
@@ -20,6 +32,7 @@ export default function LandingPage() {
   const account = useActiveAccount()
   const [shouldLoadNFTs, setShouldLoadNFTs] = useState(false)
   const [startIndex, setStartIndex] = useState(1)
+  const [currentServiceIndex, setCurrentServiceIndex] = useState(0)
   
   // Fetch total and latest apps (client-side for landing page)
   const [totalAppsCount, setTotalAppsCount] = useState(0);
@@ -108,6 +121,15 @@ export default function LandingPage() {
     
     return () => clearTimeout(timer)
   }, [])
+
+  // Rotate through service types
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentServiceIndex((prev) => (prev + 1) % ROTATING_SERVICES.length)
+    }, 3000) // 1s fade in + 2s display + 1s fade out
+    
+    return () => clearInterval(interval)
+  }, [])
   
   const isLoading = isLoadingApps || isLoadingImages
 
@@ -138,31 +160,38 @@ export default function LandingPage() {
     <div className="flex flex-col items-center justify-center px-4 text-center">
       <div className="max-w-5xl mx-auto space-y-8 pb-12">
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl pt-12">
-          <span className="block text-primary">OMATrust App Registry</span>
-          <span className="block text-slate-700 dark:text-slate-300">Trust for Online Services</span>
+          <span className="block text-primary">OMATrust is Trust for</span>
+          <span className="block text-slate-700 dark:text-slate-300">
+            <span 
+              key={currentServiceIndex} 
+              className="inline-block animate-fade-in"
+            >
+              {ROTATING_SERVICES[currentServiceIndex]}
+            </span>
+          </span>
         </h1>
 
         <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-          OMATrust is the open internet&apos;s decentralized trust layer. It brings the security and comfort of curated stores to the whole internet. Get started and register your services today.
+          OMATrust is the internet&apos;s decentralized trust layer. It brings app store trust to the whole internet. Register your services to get started.
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4" id="hero-connect">
           <Button 
             size="lg" 
             isConnectButton 
-            className="min-w-[165px] px-8 py-6 text-lg font-semibold rounded-md"
+            className="min-w-[165px] px-8 py-6 text-xl font-bold rounded-md"
             connectButtonProps={{ label: "Get Started" }}
           />
           <style>{`
             #hero-connect .tw-connect-wallet {
               min-width: 165px !important;
               height: auto !important;
-              font-size: 1.125rem !important;
+              font-size: 1.25rem !important;
               padding: 1.5rem 2rem !important;
               background-color: rgb(37 99 235) !important;
               color: white !important;
               border-radius: 0.375rem !important;
-              font-weight: 600 !important;
+              font-weight: 700 !important;
               line-height: 1.75rem !important;
             }
             #hero-connect .tw-connect-wallet:hover {
@@ -172,24 +201,33 @@ export default function LandingPage() {
               outline: none !important;
               box-shadow: 0 0 0 2px rgb(59 130 246 / 0.5), 0 0 0 4px white !important;
             }
+            
+            @keyframes fadeIn {
+              0% { opacity: 0; }
+              25% { opacity: 1; }
+              75% { opacity: 1; }
+              100% { opacity: 0; }
+            }
+            
+            .animate-fade-in {
+              animation: fadeIn 4s ease-in-out;
+            }
           `}</style>
         </div>
 
         {/* Row 1: Core Actions */}
         <div className="pt-8">
-          <h3 className="text-3xl font-bold mb-6 text-slate-700 dark:text-slate-300">How It Works</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-medium mb-2">Register & Manage</h4>
-              <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Tokenize your apps and make them discoverable by websites, app stores, and agents. 
-                Update metadata and ownership information as your apps evolve.
+              <h4 className="text-3xl font-bold mb-6 text-slate-700 dark:text-slate-300">Register Services</h4>
+              <p className="text-slate-600 dark:text-slate-400 text-lg">
+                Register your apps and make them discoverable by websites, app stores, and agents
               </p>
             </div>
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-medium mb-2">Build Reputation</h4>
-              <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Collect attestations and grow your app&apos;s reputation. Integrate user review widgets and encourage your community to visit {' '}
+              <h4 className="text-3xl font-bold mb-6 text-slate-700 dark:text-slate-300">Build Reputation</h4>
+              <p className="text-slate-600 dark:text-slate-400 text-lg">
+                Encourage your community to visit {' '}
                 <a 
                   href="https://reputation.omatrust.org" 
                   target="_blank" 
@@ -198,14 +236,14 @@ export default function LandingPage() {
                 >
                   reputation.omatrust.org
                 </a>
-                {' '}to vouch for your app.
+                {' '}to build your reputation
               </p>
             </div>
           </div>
         </div>
 
         {/* Row 2: Example Use Cases */}
-        <div className="pt-8">
+        {/* <div className="pt-8">
           <h3 className="text-3xl font-bold mb-6 text-slate-700 dark:text-slate-300">What You Can Register</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
@@ -233,7 +271,7 @@ export default function LandingPage() {
               </p>
             </div>
           </div>
-        </div>
+        </div> */}
         
         {shouldLoadNFTs && (
           <div className="pt-16 w-full">
