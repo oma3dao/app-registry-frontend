@@ -67,7 +67,7 @@ export function Navigation() {
               isConnectButton 
               size="sm" 
               className="h-9 px-3 bg-black text-white hover:bg-black/80 rounded-md"
-              connectButtonProps={{ label: "Login" }}
+              connectButtonProps={{ label: "Sign In" }}
             />
             <style>{`
               #nav-connect .tw-connect-wallet {
