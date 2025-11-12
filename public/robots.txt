@@ -1,0 +1,22 @@
+# Allow all bots and agents
+User-agent: *
+Allow: /
+
+# Specifically allow AI/LLM crawlers
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+# Sitemap
+Sitemap: https://registry.omatrust.org/sitemap.xml
