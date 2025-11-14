@@ -24,7 +24,7 @@ export function Navigation() {
       isExternal: true
     },
     {
-      name: "Attest",
+      name: "Reputation",
       href: "https://reputation.omatrust.org",
       isActive: false,
       isExternal: true
@@ -62,12 +62,29 @@ export function Navigation() {
               {link.name}
             </Link>
           ))}
-          <Button 
-            isConnectButton 
-            size="sm" 
-            className="h-9 px-3 bg-black text-white hover:bg-black/80 rounded-md"
-            connectButtonProps={{ label: "Connect" }}
-          />
+          <div id="nav-connect">
+            <Button 
+              isConnectButton 
+              size="sm" 
+              className="h-9 px-3 bg-black text-white hover:bg-black/80 rounded-md"
+              connectButtonProps={{ label: "Sign In" }}
+            />
+            <style>{`
+              #nav-connect .tw-connect-wallet {
+                height: 2.25rem !important;
+                padding: 0 0.75rem !important;
+                background-color: rgb(0 0 0) !important;
+                color: white !important;
+                border-radius: 0.375rem !important;
+                font-weight: 500 !important;
+                font-size: 0.875rem !important;
+                border: none !important;
+              }
+              #nav-connect .tw-connect-wallet:hover {
+                background-color: rgb(0 0 0 / 0.8) !important;
+              }
+            `}</style>
+          </div>
         </div>
       </div>
     </nav>
