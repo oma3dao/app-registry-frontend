@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import Step1_Verification from '@/components/wizard-steps/step-1-verification'
 import Step3_Common from '@/components/wizard-steps/step-3-common'
 import Step5_HumanDistribution from '@/components/wizard-steps/step-5-human-distribution'
@@ -30,10 +30,15 @@ describe('Wizard Steps coverage', () => {
 	})
 
 	it('Step5_HumanDistribution shows platforms grid and artifact section after download URL', () => {
+		vi.useFakeTimers()
 		const ctx = mkCtx({ platforms: { web: { downloadUrl: 'https://example.com' } }, artifacts: {} })
 		render(<Step5_HumanDistribution {...ctx as any} />)
 		expect(screen.getByText(/Platforms \(at least one URL required\)/i)).toBeInTheDocument()
 		expect(screen.getByText(/Binary Verification \(Optional\)/i)).toBeInTheDocument()
+		act(() => {
+			vi.runAllTimers()
+		})
+		vi.useRealTimers()
 	})
 
 	it('Step6_Review renders computed sections and JSON preview', () => {

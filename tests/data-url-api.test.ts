@@ -1,5 +1,10 @@
+/**
+ * Tests for data-url API route
+ * Tests metadata retrieval via path-based URLs
+ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GET } from '../src/app/api/data-url/[...versionedDid]/route';
+import { GET, OPTIONS } from '../src/app/api/data-url/[...versionedDid]/route';
 
 // Mock thirdweb's readContract
 vi.mock('thirdweb', () => ({
@@ -144,5 +149,99 @@ describe('data-url API', () => {
 
     // Should handle errors gracefully
     expect([200, 404, 500]).toContain(response.status);
+  });
+
+  it('returns 404 when metadata contains only whitespace', async () => {
+    // Test whitespace-only metadata
+    vi.mocked(readContract).mockResolvedValue('   ');
+    
+    const request = new Request('http://localhost/api/data-url/did:web:example.com/v/1.0');
+    const params = { params: { versionedDid: ['did:web:example.com', 'v', '1.0'] } };
+
+    const response = await GET(request, params);
+    const data = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe('Metadata not found for this app');
+  });
+
+  it('handles Error instance in catch block', async () => {
+    // Test Error instance handling
+    vi.mocked(readContract).mockRejectedValue(new Error('Contract read failed'));
+    
+    const request = new Request('http://localhost/api/data-url/did:web:example.com/v/1.0');
+    const params = { params: { versionedDid: ['did:web:example.com', 'v', '1.0'] } };
+
+    const response = await GET(request, params);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('Contract read failed');
+  });
+
+  it('handles non-Error exceptions in catch block', async () => {
+    // Test non-Error exception handling (string, object, etc.)
+    vi.mocked(readContract).mockRejectedValue('String error');
+    
+    const request = new Request('http://localhost/api/data-url/did:web:example.com/v/1.0');
+    const params = { params: { versionedDid: ['did:web:example.com', 'v', '1.0'] } };
+
+    const response = await GET(request, params);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('Failed to retrieve or process metadata');
+  });
+
+  it('returns CORS headers in successful response', async () => {
+    // Test CORS headers
+    const metadata = '{"name":"Test App","platforms":{"web":{"launchUrl":"https://example.com"}}}';
+    vi.mocked(readContract).mockResolvedValue(metadata);
+    
+    const request = new Request('http://localhost/api/data-url/did:web:example.com/v/1.0');
+    const params = { params: { versionedDid: ['did:web:example.com', 'v', '1.0'] } };
+
+    const response = await GET(request, params);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET, OPTIONS');
+    expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type');
+    expect(response.headers.get('Content-Type')).toBe('application/json');
+  });
+
+  it('returns raw metadata JSON from contract', async () => {
+    // Test that raw metadata is returned as-is
+    const metadata = '{"name":"My App","version":"2.0.0","platforms":{"web":{"launchUrl":"https://myapp.com"}}}';
+    vi.mocked(readContract).mockResolvedValue(metadata);
+    
+    const request = new Request('http://localhost/api/data-url/did:web:myapp.com/v/2.0.0');
+    const params = { params: { versionedDid: ['did:web:myapp.com', 'v', '2.0.0'] } };
+
+    const response = await GET(request, params);
+    const responseText = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(responseText).toBe(metadata);
+  });
+
+  describe('OPTIONS method (CORS preflight)', () => {
+    it('handles CORS preflight requests', async () => {
+      // Test OPTIONS method for CORS preflight
+      const response = await OPTIONS();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+      expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET, OPTIONS');
+      expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type');
+    });
+
+    it('returns null body for OPTIONS request', async () => {
+      // Test that OPTIONS returns empty body
+      const response = await OPTIONS();
+      const body = await response.text();
+
+      expect(body).toBe('');
+    });
   });
 }); 

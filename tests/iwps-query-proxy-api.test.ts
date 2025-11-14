@@ -355,4 +355,150 @@ describe('/api/iwps-query-proxy API', () => {
       error: 'Internal Server Error in proxy',
     });
   });
+
+  /**
+   * Test: verifies that text() is called when target server returns error status (covers line 56)
+   */
+  it('calls text() method when target server returns error status', async () => {
+    const mockText = vi.fn().mockResolvedValue('Error response body');
+    const mockResponse = {
+      ok: false,
+      status: 404,
+      text: mockText,
+      json: vi.fn(),
+    } as any;
+    (global.fetch as any).mockResolvedValue(mockResponse);
+
+    const requestBody = {
+      targetIwpsPortalUrl: 'https://target-server.com/iwps',
+      iwpsParams: { [AppConfig.IWPS_LOCATION_KEY]: 'test-location' },
+    };
+
+    const request = createMockRequest(requestBody);
+    const result = await POST(request);
+    const data = await result.json();
+
+    expect(result.status).toBe(502);
+    expect(data.error).toBe('Target server returned error: 404');
+    // Verify text() was called to get error body
+    expect(mockText).toHaveBeenCalled();
+  });
+
+  /**
+   * Test: handles fetch error with empty message (covers line 51)
+   */
+  it('handles fetch error with empty message', async () => {
+    const fetchError = { message: '' };
+    (global.fetch as any).mockRejectedValue(fetchError);
+
+    const requestBody = {
+      targetIwpsPortalUrl: 'https://target-server.com/iwps',
+      iwpsParams: { [AppConfig.IWPS_LOCATION_KEY]: 'test-location' },
+    };
+
+    const request = createMockRequest(requestBody);
+    const result = await POST(request);
+    const data = await result.json();
+
+    expect(result.status).toBe(502);
+    expect(data.error).toBe('Failed to connect to target server: Unknown fetch error');
+  });
+
+  /**
+   * Test: handles fetch error without message property (covers line 51)
+   */
+  it('handles fetch error without message property', async () => {
+    const fetchError = {};
+    (global.fetch as any).mockRejectedValue(fetchError);
+
+    const requestBody = {
+      targetIwpsPortalUrl: 'https://target-server.com/iwps',
+      iwpsParams: { [AppConfig.IWPS_LOCATION_KEY]: 'test-location' },
+    };
+
+    const request = createMockRequest(requestBody);
+    const result = await POST(request);
+    const data = await result.json();
+
+    expect(result.status).toBe(502);
+    expect(data.error).toBe('Failed to connect to target server: Unknown fetch error');
+  });
+
+  /**
+   * Test: handles different error status codes (covers line 55-58)
+   */
+  it('handles 400 error status from target server', async () => {
+    const mockText = vi.fn().mockResolvedValue('Bad Request');
+    const mockResponse = {
+      ok: false,
+      status: 400,
+      text: mockText,
+    } as any;
+    (global.fetch as any).mockResolvedValue(mockResponse);
+
+    const requestBody = {
+      targetIwpsPortalUrl: 'https://target-server.com/iwps',
+      iwpsParams: { [AppConfig.IWPS_LOCATION_KEY]: 'test-location' },
+    };
+
+    const request = createMockRequest(requestBody);
+    const result = await POST(request);
+    const data = await result.json();
+
+    expect(result.status).toBe(502);
+    expect(data.error).toBe('Target server returned error: 400');
+  });
+
+  /**
+   * Test: handles response with only approval field (covers lines 73-90)
+   */
+  it('handles response with only approval field', async () => {
+    const targetResponse = {
+      [AppConfig.IWPS_APPROVAL_KEY]: true,
+    };
+    const mockResponse = createMockResponse(targetResponse);
+    (global.fetch as any).mockResolvedValue(mockResponse);
+
+    const requestBody = {
+      targetIwpsPortalUrl: 'https://target-server.com/iwps',
+      iwpsParams: { [AppConfig.IWPS_LOCATION_KEY]: 'test-location' },
+    };
+
+    const request = createMockRequest(requestBody);
+    const result = await POST(request);
+    const data = await result.json();
+
+    expect(result.status).toBe(200);
+    expect(data).toEqual({
+      [AppConfig.IWPS_APPROVAL_KEY]: true,
+    });
+    // Should not include undefined fields
+    expect(data[AppConfig.IWPS_LOCATION_KEY]).toBeUndefined();
+    expect(data[AppConfig.IWPS_ERROR_KEY]).toBeUndefined();
+  });
+
+  /**
+   * Test: handles response with approval false and custom error message (covers line 79)
+   */
+  it('handles response with approval false and custom error message', async () => {
+    const targetResponse = {
+      [AppConfig.IWPS_APPROVAL_KEY]: false,
+      [AppConfig.IWPS_ERROR_KEY]: 'Custom error message',
+    };
+    const mockResponse = createMockResponse(targetResponse);
+    (global.fetch as any).mockResolvedValue(mockResponse);
+
+    const requestBody = {
+      targetIwpsPortalUrl: 'https://target-server.com/iwps',
+      iwpsParams: { [AppConfig.IWPS_LOCATION_KEY]: 'test-location' },
+    };
+
+    const request = createMockRequest(requestBody);
+    const result = await POST(request);
+    const data = await result.json();
+
+    expect(result.status).toBe(200);
+    expect(data[AppConfig.IWPS_APPROVAL_KEY]).toBe(false);
+    expect(data[AppConfig.IWPS_ERROR_KEY]).toBe('Custom error message');
+  });
 }); 

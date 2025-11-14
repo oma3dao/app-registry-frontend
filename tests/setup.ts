@@ -1,7 +1,56 @@
 // tests/setup.ts
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { vi, afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 import React from 'react';
+
+declare global {
+  // Shared mocks accessible across tests
+  // eslint-disable-next-line no-var
+  var __useActiveAccountMock: vi.Mock | undefined;
+  // eslint-disable-next-line no-var
+  var __mockValidateUrlResponse:
+    | ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>)
+    | undefined;
+}
+
+const originalFetch = globalThis.fetch;
+const defaultValidateUrlResponse = {
+  status: 200,
+  body: { isValid: true, error: null },
+};
+
+const sharedFetch = vi.fn(
+  async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    let url: string = '';
+    if (typeof input === 'string') {
+      url = input;
+    } else if (input instanceof URL) {
+      url = input.toString();
+    } else if (typeof Request !== 'undefined' && input instanceof Request) {
+      url = input.url;
+    }
+
+    if (typeof url === 'string' && url.startsWith('/api/validate-url')) {
+      if (typeof globalThis.__mockValidateUrlResponse === 'function') {
+        return globalThis.__mockValidateUrlResponse(input, init);
+      }
+
+      return new Response(JSON.stringify(defaultValidateUrlResponse.body), {
+        status: defaultValidateUrlResponse.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (typeof originalFetch === 'function') {
+      return originalFetch(input as any, init as any);
+    }
+
+    throw new Error(`Unhandled fetch request for ${url || '<unknown url>'}`);
+  }
+) as unknown as typeof fetch;
+
+globalThis.fetch = sharedFetch;
 
 // Mock environment variables for tests
 process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID = 'test-client-id';
@@ -89,11 +138,41 @@ vi.mock('ethers', () => {
     return '0x' + hexHash;
   };
 
+  // Mock sha256 (returns a hex string)
+  const mockSha256 = (data: Uint8Array): string => {
+    // Simple deterministic hash for testing
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      const char = data[i];
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    const hexHash = Math.abs(hash).toString(16).padStart(64, '0');
+    return '0x' + hexHash;
+  };
+
+  // Mock toUtf8Bytes (converts string to Uint8Array)
+  const mockToUtf8Bytes = (str: string): Uint8Array => {
+    return new TextEncoder().encode(str);
+  };
+
+  // Mock hexlify (returns hex string)
+  const mockHexlify = (value: string | Uint8Array): string => {
+    if (typeof value === 'string') {
+      return value.startsWith('0x') ? value : '0x' + value;
+    }
+    // Convert Uint8Array to hex
+    return '0x' + Array.from(value).map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
   return {
     ethers: {
       isAddress: isValidAddress,
       getAddress: checksumAddress,
       id: mockId,
+      sha256: mockSha256,
+      toUtf8Bytes: mockToUtf8Bytes,
+      hexlify: mockHexlify,
       Contract: vi.fn(),
       providers: {
         JsonRpcProvider: vi.fn(),
@@ -102,6 +181,9 @@ vi.mock('ethers', () => {
     isAddress: isValidAddress,
     getAddress: checksumAddress,
     id: mockId,
+    sha256: mockSha256,
+    toUtf8Bytes: mockToUtf8Bytes,
+    hexlify: mockHexlify,
   };
 });
 
@@ -209,3 +291,10 @@ HTMLElement.prototype.scrollTo = vi.fn();
 if (typeof window !== 'undefined') {
   window.scrollTo = vi.fn();
 } 
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllTimers();
+  sharedFetch.mockClear();
+  globalThis.__mockValidateUrlResponse = undefined;
+});

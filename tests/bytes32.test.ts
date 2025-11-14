@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   hexToString,
   stringToBytes32,
@@ -41,6 +41,25 @@ describe('bytes32 utilities', () => {
     it('handles invalid hex gracefully', () => {
       const result = hexToString('0xinvalid');
       expect(typeof result).toBe('string');
+    });
+
+    it('handles errors in hex conversion and returns empty string', () => {
+      // Mock console.error to verify error is logged
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      // Use a spy on Buffer.from to simulate an error during conversion
+      const originalBufferFrom = Buffer.from;
+      vi.spyOn(Buffer, 'from').mockImplementationOnce(() => {
+        throw new Error('Buffer conversion failed');
+      });
+      
+      const result = hexToString('0xvalidhex');
+      expect(result).toBe('');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error converting hex to string:', expect.any(Error));
+      
+      // Restore
+      Buffer.from = originalBufferFrom;
+      consoleErrorSpy.mockRestore();
     });
   });
 

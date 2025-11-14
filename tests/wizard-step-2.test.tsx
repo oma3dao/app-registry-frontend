@@ -8,8 +8,8 @@
  * - Traits input and parsing
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import Step2_Onchain from '@/components/wizard-steps/step-2-onchain';
 import type { StepRenderContext } from '@/lib/wizard';
@@ -80,6 +80,12 @@ describe('Wizard Step 2 - Onchain Data', () => {
       updateField: vi.fn(),
       errors: {},
     };
+  });
+
+  afterEach(async () => {
+    cleanup();
+    // Wait for any pending async operations
+    await new Promise(resolve => setTimeout(resolve, 0));
   });
 
   /**
@@ -232,19 +238,20 @@ describe('Wizard Step 2 - Onchain Data', () => {
   });
 
   /**
-   * Test: displays validation errors
-   * Note: UrlValidator component handles its own validation, not wizard context errors
+   * Test: displays validation errors for data URL
+   * The UrlValidator component handles its own validation internally and displays error messages
    */
-  it.skip('displays validation errors for data URL', () => {
-    mockContext.errors = {
-      dataUrl: 'Invalid URL format',
+  it('displays validation errors for data URL', () => {
+    // Set an invalid URL format in the state
+    mockContext.state = {
+      ...mockContext.state,
+      dataUrl: 'not-a-valid-url',
     };
     
     render(<Step2_Onchain {...mockContext} />);
 
-    // Error may appear in multiple places, just check it exists
-    const errors = screen.queryAllByText('Invalid URL format');
-    expect(errors.length).toBeGreaterThan(0);
+    // The UrlValidator component should display "Invalid URL format" error for malformed URLs
+    expect(screen.getByText('Invalid URL format')).toBeInTheDocument();
   });
 
   /**

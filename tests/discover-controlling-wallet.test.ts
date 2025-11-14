@@ -270,4 +270,128 @@ describe('/api/discover-controlling-wallet', () => {
     expect(response.status).toBe(404);
     expect(data.ok).toBe(false);
   });
+
+  /**
+   * Test: handles EIP-1967 storage slot with non-zero but invalid address (covers line 91-98)
+   */
+  it('handles EIP-1967 storage slot with non-zero but invalid address', async () => {
+    mockContract.owner.mockRejectedValue(new Error('No owner function'));
+    mockContract.admin.mockRejectedValue(new Error('No admin function'));
+    mockContract.getOwner.mockRejectedValue(new Error('No getOwner function'));
+    
+    // Mock storage slot with non-zero value but extract to zero address
+    // The slice(-40) will extract the last 40 chars, but if the value leads to zero address after getAddress, it's invalid
+    mockProvider.getStorage.mockResolvedValue('0x0000000000000000000000000000000000000000000000000000000000000001');
+    // Mock getAddress to return zero address (invalid extraction)
+    const { ethers } = await import('ethers');
+    vi.mocked(ethers.getAddress).mockImplementationOnce(() => '0x0000000000000000000000000000000000000000');
+
+    const request = new NextRequest('http://localhost:3000/api/discover-controlling-wallet', {
+      method: 'POST',
+      body: JSON.stringify({ did: 'did:pkh:eip155:1:0x1234567890123456789012345678901234567890' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(data.ok).toBe(false);
+  });
+
+  /**
+   * Test: handles error in EIP-1967 storage slot check (covers line 99-101)
+   */
+  it('handles error when checking EIP-1967 storage slot', async () => {
+    mockContract.owner.mockRejectedValue(new Error('No owner function'));
+    mockContract.admin.mockRejectedValue(new Error('No admin function'));
+    mockContract.getOwner.mockRejectedValue(new Error('No getOwner function'));
+    
+    // Mock getStorage to throw an error
+    mockProvider.getStorage.mockRejectedValue(new Error('Storage read failed'));
+
+    const request = new NextRequest('http://localhost:3000/api/discover-controlling-wallet', {
+      method: 'POST',
+      body: JSON.stringify({ did: 'did:pkh:eip155:1:0x1234567890123456789012345678901234567890' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(data.ok).toBe(false);
+    expect(data.error).toContain('Could not discover controlling wallet');
+  });
+
+  /**
+   * Test: handles error in contract function call that's not caught (covers line 80-82)
+   */
+  it('handles error in contract function call and continues to next pattern', async () => {
+    // Mock owner() to throw, admin() to succeed
+    mockContract.owner.mockRejectedValue(new Error('Contract call failed'));
+    const adminAddress = '0x2222222222222222222222222222222222222222';
+    mockContract.admin.mockResolvedValue(adminAddress);
+
+    const request = new NextRequest('http://localhost:3000/api/discover-controlling-wallet', {
+      method: 'POST',
+      body: JSON.stringify({ did: 'did:pkh:eip155:1:0x1234567890123456789012345678901234567890' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.controllingWallet).toBe(adminAddress);
+  });
+
+  /**
+   * Test: handles non-Error object in catch block (covers line 153-162)
+   */
+  it('handles non-Error object in catch block', async () => {
+    // Mock request.json() to throw a non-Error object
+    const request = {
+      json: vi.fn().mockRejectedValue({ message: 'Not an Error instance' }),
+    } as any;
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe('Unknown error');
+  });
+
+  /**
+   * Test: handles parseDid with CAIP-10 that has wrong number of parts (covers line 29-30)
+   */
+  it('handles CAIP-10 with wrong number of parts', async () => {
+    const request = new NextRequest('http://localhost:3000/api/discover-controlling-wallet', {
+      method: 'POST',
+      body: JSON.stringify({ did: 'did:pkh:eip155:1' }), // Missing address part
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe('Invalid did:pkh format');
+  });
+
+  /**
+   * Test: handles parseDid with CAIP-10 that has extra parts (covers line 29-30)
+   */
+  it('handles CAIP-10 with extra parts', async () => {
+    const request = new NextRequest('http://localhost:3000/api/discover-controlling-wallet', {
+      method: 'POST',
+      body: JSON.stringify({ did: 'did:pkh:eip155:1:0x123:extra' }), // Extra part
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe('Invalid did:pkh format');
+  });
 });

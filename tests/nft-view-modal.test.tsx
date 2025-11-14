@@ -33,7 +33,7 @@ vi.mock('../src/lib/iwps', () => ({
 
 vi.mock('../src/lib/nft-metadata-context', () => ({
   useNFTMetadata: vi.fn(() => ({
-    getNFTMetadata: vi.fn(() => ({
+    getNFTMetadata: vi.fn((nft) => ({
       displayData: {
         image: 'https://example.com/image.png',
         external_url: 'https://example.com',
@@ -45,6 +45,7 @@ vi.mock('../src/lib/nft-metadata-context', () => ({
       isLoading: false,
     })),
     fetchNFTDescription: vi.fn(),
+    clearCache: vi.fn(),
   })),
 }));
 
@@ -80,10 +81,11 @@ describe('NFTViewModal component', () => {
     name: 'Test App',
     version: '1.0',
     dataUrl: 'https://example.com/data',
-    iwpsPortalUri: 'https://example.com/portal',
+    iwpsPortalUrl: 'https://example.com/portal',
     agentApiUri: 'https://example.com/api',
     status: 0,
     minter: '0x1234567890123456789012345678901234567890',
+    currentOwner: '0x1234567890123456789012345678901234567890',
   };
 
   const mockHandleCloseViewModal = vi.fn();
@@ -345,7 +347,7 @@ describe('NFTViewModal component', () => {
   });
 
   // This test checks that the modal shows platforms when available
-  it('shows platforms when available', () => {
+  it('shows platforms when available', async () => {
     render(
       <NFTViewModal
         isOpen={true}
@@ -356,7 +358,9 @@ describe('NFTViewModal component', () => {
       />
     );
 
-    expect(screen.getByText('Platforms')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Supported Platforms')).toBeInTheDocument();
+    });
     expect(screen.getByText('web')).toBeInTheDocument();
   });
 }); 

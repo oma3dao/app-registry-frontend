@@ -27,7 +27,7 @@ import {
   getTotalApps,
   searchByDid,
 } from '@/lib/contracts/registry.read';
-import { prepareMintApp, prepareUpdateStatus, prepareUpdateApp } from '@/lib/contracts/registry.write';
+import { prepareMintApp, prepareRegisterApp8004, prepareUpdateStatus, prepareUpdateApp } from '@/lib/contracts/registry.write';
 import { normalizeEvmError, formatErrorMessage } from '@/lib/contracts/errors';
 import { ensureWalletOnEnvChain } from '@/lib/contracts/chain-guard';
 import { sendTransaction } from 'thirdweb';
@@ -37,8 +37,16 @@ import type { AppSummary, Status, MintAppInput, Paginated } from '@/lib/contract
 
 vi.mock('@/lib/contracts/registry.write', () => ({
   prepareMintApp: vi.fn(),
+  prepareRegisterApp8004: vi.fn(),
   prepareUpdateStatus: vi.fn(),
   prepareUpdateApp: vi.fn(),
+}));
+
+// Mock env config to control ERC-8004 behavior
+vi.mock('@/config/env', () => ({
+  env: {
+    useErc8004Register: false, // Use legacy mint() for tests to match current mocks
+  },
 }));
 
 vi.mock('@/lib/contracts/errors', () => ({
@@ -353,8 +361,24 @@ describe('useAppsList hook', () => {
     await waitFor(() => {
       expect(mockListApps).toHaveBeenCalledTimes(2);
     });
-    });
   });
+
+  // Test error path in useAppsList (line 104)
+  it('should handle errors and call formatErrorMessage', async () => {
+    const error = new Error('Network error');
+    mockListApps.mockRejectedValue(error);
+    mockFormatErrorMessage.mockReturnValue('Network error');
+
+    const { result } = renderHook(() => useAppsList());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.error).toEqual(new Error('Network error'));
+    expect(mockFormatErrorMessage).toHaveBeenCalledWith(error);
+  });
+});
 
 describe('useTotalApps hook', () => {
   const mockGetTotalApps = vi.mocked(getTotalApps);
@@ -499,12 +523,18 @@ describe('useMintApp hook', () => {
     mockPrepareMintApp.mockReturnValue(mockTransaction);
     
     // First call fails with network error, second succeeds
-    mockNormalizeEvmError
-      .mockReturnValueOnce({ code: 'NETWORK_ERROR', message: 'Network error' })
-      .mockReturnValueOnce({ code: 'UNKNOWN_ERROR', message: 'Success' });
+    const networkError = new Error('Network error');
+    let callCount = 0;
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      callCount++;
+      if (error.message === 'Network error' && callCount === 1) {
+        return { code: 'NETWORK_ERROR', message: 'Network error' };
+      }
+      return { code: 'UNKNOWN_ERROR', message: 'Success' };
+    });
     
     mockSendTransaction
-      .mockRejectedValueOnce(new Error('Network error'))
+      .mockRejectedValueOnce(networkError)
       .mockResolvedValueOnce({ transactionHash: mockTxHash });
 
     const { result } = renderHook(() => useMintApp());
@@ -526,12 +556,19 @@ describe('useMintApp hook', () => {
     mockEnsureWalletOnEnvChain.mockResolvedValue(undefined);
     mockPrepareMintApp.mockReturnValue(mockTransaction);
     
-    mockNormalizeEvmError.mockReturnValue({ 
-      code: 'REVERT_ERROR', 
-      message: 'Transaction reverted' 
+    // Mock normalizeEvmError to return REVERT_ERROR for the transaction error
+    const revertError = new Error('Transaction reverted');
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      if (error.message === 'Transaction reverted') {
+        return { 
+          code: 'REVERT_ERROR', 
+          message: 'Transaction reverted' 
+        };
+      }
+      return { code: 'UNKNOWN_ERROR', message: error.message || 'Unknown error' };
     });
     
-    mockSendTransaction.mockRejectedValue(new Error('Transaction reverted'));
+    mockSendTransaction.mockRejectedValue(revertError);
 
     const { result } = renderHook(() => useMintApp());
 
@@ -553,11 +590,17 @@ describe('useMintApp hook', () => {
     mockPrepareMintApp.mockReturnValue(mockTransaction);
     
     // Both calls fail with network error
-    mockNormalizeEvmError
-      .mockReturnValue({ code: 'NETWORK_ERROR', message: 'Network error' });
+    const networkError = new Error('Network error');
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      if (error.message === 'Network error') {
+        return { code: 'NETWORK_ERROR', message: 'Network error' };
+      }
+      return { code: 'UNKNOWN_ERROR', message: error.message || 'Unknown error' };
+    });
     
     mockSendTransaction
-      .mockRejectedValue(new Error('Network error'));
+      .mockRejectedValueOnce(networkError)
+      .mockRejectedValueOnce(networkError);
 
     const { result } = renderHook(() => useMintApp());
 
@@ -571,6 +614,37 @@ describe('useMintApp hook', () => {
     expect(result.current.error).not.toBeNull();
     expect(result.current.error?.message).toBe('Network error');
     expect(result.current.isPending).toBe(false);
+  });
+
+  // Test ERC-8004 path in useMintApp (lines 166, 172)
+  it('should use ERC-8004 register when useErc8004Register is true', async () => {
+    const mockPrepareRegisterApp8004 = vi.mocked(prepareRegisterApp8004);
+    const mockTransaction = { to: '0x123', data: '0x456' };
+
+    // Temporarily set env.useErc8004Register to true
+    const { env } = await import('@/config/env');
+    const originalUseErc8004 = env.useErc8004Register;
+    env.useErc8004Register = true;
+
+    try {
+      mockEnsureWalletOnEnvChain.mockResolvedValue(undefined);
+      mockPrepareRegisterApp8004.mockReturnValue(mockTransaction);
+      mockSendTransaction.mockResolvedValue({ transactionHash: '0xabc123' });
+
+      const { result } = renderHook(() => useMintApp());
+
+      await act(async () => {
+        await result.current.mint(mockMintInput);
+      });
+
+      // Should use prepareRegisterApp8004 instead of prepareMintApp
+      expect(mockPrepareRegisterApp8004).toHaveBeenCalledWith(mockMintInput);
+      expect(mockPrepareMintApp).not.toHaveBeenCalled();
+      expect(result.current.txHash).toBe('0xabc123');
+    } finally {
+      // Restore original value
+      env.useErc8004Register = originalUseErc8004;
+    }
   });
 
   it('should set error state on failure', async () => {
@@ -708,12 +782,18 @@ describe('useUpdateStatus hook', () => {
     mockPrepareUpdateStatus.mockReturnValue(mockTransaction);
     
     // First call fails with network error, second succeeds
-    mockNormalizeEvmError
-      .mockReturnValueOnce({ code: 'NETWORK_ERROR', message: 'Network error' })
-      .mockReturnValueOnce({ code: 'UNKNOWN_ERROR', message: 'Success' });
+    const networkError = new Error('Network error');
+    let callCount = 0;
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      callCount++;
+      if (error.message === 'Network error' && callCount === 1) {
+        return { code: 'NETWORK_ERROR', message: 'Network error' };
+      }
+      return { code: 'UNKNOWN_ERROR', message: 'Success' };
+    });
     
     mockSendTransaction
-      .mockRejectedValueOnce(new Error('Network error'))
+      .mockRejectedValueOnce(networkError)
       .mockResolvedValueOnce({ transactionHash: mockTxHash });
 
     const { result } = renderHook(() => useUpdateStatus());
@@ -752,11 +832,17 @@ describe('useUpdateStatus hook', () => {
     mockPrepareUpdateStatus.mockReturnValue(mockTransaction);
     
     // Both calls fail with network error
-    mockNormalizeEvmError
-      .mockReturnValue({ code: 'NETWORK_ERROR', message: 'Network error' });
+    const networkError = new Error('Network error');
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      if (error.message === 'Network error') {
+        return { code: 'NETWORK_ERROR', message: 'Network error' };
+      }
+      return { code: 'UNKNOWN_ERROR', message: error.message || 'Unknown error' };
+    });
     
     mockSendTransaction
-      .mockRejectedValue(new Error('Network error'));
+      .mockRejectedValueOnce(networkError)
+      .mockRejectedValueOnce(networkError);
 
     const { result } = renderHook(() => useUpdateStatus());
 
@@ -793,12 +879,19 @@ describe('useUpdateStatus hook', () => {
     mockGetAppByDid.mockResolvedValue(mockApp);
     mockPrepareUpdateStatus.mockReturnValue(mockTransaction);
     
-    mockNormalizeEvmError.mockReturnValue({ 
-      code: 'REVERT_ERROR', 
-      message: 'Transaction reverted' 
+    // Mock normalizeEvmError to return REVERT_ERROR for the transaction error
+    const revertError = new Error('Transaction reverted');
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      if (error.message === 'Transaction reverted') {
+        return { 
+          code: 'REVERT_ERROR', 
+          message: 'Transaction reverted' 
+        };
+      }
+      return { code: 'UNKNOWN_ERROR', message: error.message || 'Unknown error' };
     });
     
-    mockSendTransaction.mockRejectedValue(new Error('Transaction reverted'));
+    mockSendTransaction.mockRejectedValue(revertError);
 
     const { result } = renderHook(() => useUpdateStatus());
 
@@ -906,12 +999,18 @@ describe('useUpdateApp hook', () => {
     mockEnsureWalletOnEnvChain.mockResolvedValue(undefined);
     
     // First call fails with network error, second succeeds
-    mockNormalizeEvmError
-      .mockReturnValueOnce({ code: 'NETWORK_ERROR', message: 'Network error' })
-      .mockReturnValueOnce({ code: 'UNKNOWN_ERROR', message: 'Success' });
+    const networkError = new Error('Network error');
+    let callCount = 0;
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      callCount++;
+      if (error.message === 'Network error' && callCount === 1) {
+        return { code: 'NETWORK_ERROR', message: 'Network error' };
+      }
+      return { code: 'UNKNOWN_ERROR', message: 'Success' };
+    });
     
     mockSendTransaction
-      .mockRejectedValueOnce(new Error('Network error'))
+      .mockRejectedValueOnce(networkError)
       .mockResolvedValueOnce({ transactionHash: mockTxHash });
 
     const { result } = renderHook(() => useUpdateApp());
@@ -934,11 +1033,17 @@ describe('useUpdateApp hook', () => {
     mockEnsureWalletOnEnvChain.mockResolvedValue(undefined);
     
     // Both calls fail with network error
-    mockNormalizeEvmError
-      .mockReturnValue({ code: 'NETWORK_ERROR', message: 'Network error' });
+    const networkError = new Error('Network error');
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      if (error.message === 'Network error') {
+        return { code: 'NETWORK_ERROR', message: 'Network error' };
+      }
+      return { code: 'UNKNOWN_ERROR', message: error.message || 'Unknown error' };
+    });
     
     mockSendTransaction
-      .mockRejectedValue(new Error('Network error'));
+      .mockRejectedValueOnce(networkError)
+      .mockRejectedValueOnce(networkError);
 
     const { result } = renderHook(() => useUpdateApp());
 
@@ -959,12 +1064,19 @@ describe('useUpdateApp hook', () => {
     mockPrepareUpdateApp.mockReturnValue(mockTransaction);
     mockEnsureWalletOnEnvChain.mockResolvedValue(undefined);
     
-    mockNormalizeEvmError.mockReturnValue({ 
-      code: 'REVERT_ERROR', 
-      message: 'Transaction reverted' 
+    // Mock normalizeEvmError to return REVERT_ERROR for the transaction error
+    const revertError = new Error('Transaction reverted');
+    mockNormalizeEvmError.mockImplementation((error: Error) => {
+      if (error.message === 'Transaction reverted') {
+        return { 
+          code: 'REVERT_ERROR', 
+          message: 'Transaction reverted' 
+        };
+      }
+      return { code: 'UNKNOWN_ERROR', message: error.message || 'Unknown error' };
     });
     
-    mockSendTransaction.mockRejectedValue(new Error('Transaction reverted'));
+    mockSendTransaction.mockRejectedValue(revertError);
 
     const { result } = renderHook(() => useUpdateApp());
 

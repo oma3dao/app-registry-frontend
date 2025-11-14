@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateEvm, toEip55, isEvmAddress } from '@/lib/utils/caip10/validators/evm';
+import { isAddress, getAddress } from 'ethers';
+import * as ethers from 'ethers';
 
 describe('EVM CAIP-10 validator', () => {
   // Use a simple address for testing with our deterministic mock
@@ -77,25 +79,33 @@ describe('EVM CAIP-10 validator', () => {
 
     // Tests invalid address format branch (lines 55-59)
     it('rejects address that fails isAddress validation', () => {
-      // Address with correct format but invalid checksum/validation
-      // Use an address that has correct length and hex format but fails isAddress
-      const invalidFormat = '0x0000000000000000000000000000000000000000'; // This should pass isAddress
-      // For a real invalid case, we need to mock isAddress to return false
-      const result = validateEvm('1', invalidFormat);
-      // Since this is a valid address format, it should pass
-      // We'll test the isAddress branch by using a properly formatted invalid address
-      // that passes length/hex checks but fails isAddress check
-      expect(result.valid).toBeDefined();
+      // Create an address that passes format checks but fails isAddress
+      // Spy on the imported isAddress function
+      const testAddress = '0x' + 'a'.repeat(40); // Valid format
+      const isAddressSpy = vi.spyOn(ethers, 'isAddress').mockReturnValueOnce(false);
+      
+      const result = validateEvm('1', testAddress);
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Invalid EVM address');
+      
+      isAddressSpy.mockRestore();
     });
 
-    // Tests checksum error branch (lines 69-73)
+    // Tests catch block when getAddress throws (lines 69-73)
     it('handles checksum error gracefully', () => {
-      // Use a valid-looking address that might cause checksum issues
-      // We'll test the error handling branch
-      const address = validAddress;
-      const result = validateEvm('1', address);
-      // Should succeed normally
-      expect(result.valid).toBe(true);
+      // Create an address that passes all checks but getAddress throws
+      const testAddress = '0x' + 'b'.repeat(40); // Valid format
+      const isAddressSpy = vi.spyOn(ethers, 'isAddress').mockReturnValueOnce(true);
+      const getAddressSpy = vi.spyOn(ethers, 'getAddress').mockImplementationOnce(() => {
+        throw new Error('Checksum failed');
+      });
+      
+      const result = validateEvm('1', testAddress);
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Failed to checksum address');
+      
+      isAddressSpy.mockRestore();
+      getAddressSpy.mockRestore();
     });
 
     it('validates addresses in different cases', () => {

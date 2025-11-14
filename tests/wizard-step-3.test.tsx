@@ -6,8 +6,8 @@
  * - Summary, publisher, legal/support URLs
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import Step3_Common from '@/components/wizard-steps/step-3-common';
 import type { StepRenderContext } from '@/lib/wizard';
@@ -36,6 +36,12 @@ describe('Wizard Step 3 - Common Metadata', () => {
       updateField: vi.fn(),
       errors: {},
     };
+  });
+
+  afterEach(async () => {
+    cleanup();
+    // Wait for any pending async operations (debounced validations)
+    await new Promise(resolve => setTimeout(resolve, 0));
   });
 
   /**

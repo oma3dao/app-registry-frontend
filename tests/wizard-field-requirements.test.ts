@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isFieldRequired } from '@/lib/wizard/field-requirements';
+import { isFieldRequired, getByPath } from '@/lib/wizard/field-requirements';
 import type { InterfaceFlags } from '@/lib/wizard/types';
 
 describe('Wizard Field Requirements', () => {
@@ -158,6 +158,47 @@ describe('Wizard Field Requirements', () => {
       
       // Should handle gracefully
       expect(isFieldRequired('', flags)).toBe(false);
+    });
+  });
+
+  describe('getByPath', () => {
+    // Tests getByPath helper function for nested object access
+    it('retrieves nested values using dot notation', () => {
+      const obj = {
+        level1: {
+          level2: {
+            value: 'found'
+          }
+        }
+      };
+
+      expect(getByPath(obj, 'level1.level2.value')).toBe('found');
+    });
+
+    it('returns undefined for non-existent paths', () => {
+      const obj = { a: 1 };
+
+      expect(getByPath(obj, 'a.b.c')).toBeUndefined();
+      expect(getByPath(obj, 'nonexistent')).toBeUndefined();
+    });
+
+    it('handles empty path', () => {
+      const obj = { value: 'test' };
+
+      expect(getByPath(obj, '')).toBeUndefined();
+    });
+
+    it('handles null/undefined intermediate values', () => {
+      const obj = { a: null };
+
+      expect(getByPath(obj, 'a.b')).toBeUndefined();
+    });
+
+    it('retrieves top-level values', () => {
+      const obj = { name: 'Test', version: '1.0.0' };
+
+      expect(getByPath(obj, 'name')).toBe('Test');
+      expect(getByPath(obj, 'version')).toBe('1.0.0');
     });
   });
 });

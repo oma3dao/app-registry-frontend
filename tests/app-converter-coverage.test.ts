@@ -74,6 +74,98 @@ describe('app-converter', () => {
 		expect(out.did).toBe(baseApp.did)
 	})
 
+	/**
+	 * Test: covers lines 24-32 - extractMcpFromEndpoint with MCP endpoint that has tools/resources/prompts
+	 * Tests that MCP fields are extracted when endpoint name is 'MCP' and has additional fields
+	 */
+	it('hydrateNFTWithMetadata extracts MCP config when endpoint is MCP with tools', async () => {
+		const mcpMetadata = {
+			name: 'MCP App',
+			endpoints: [
+				{
+					name: 'MCP',
+					endpoint: 'https://mcp.example.com',
+					schemaUrl: 'https://schema.example.com',
+					tools: [{ name: 'search', description: 'Search tool' }],
+					resources: [{ uri: 'file:///data', name: 'Data' }],
+					prompts: [{ name: 'hello', description: 'Greeting' }]
+				}
+			]
+		};
+		
+		global.fetch = vi.fn().mockResolvedValue({ 
+			ok: true, 
+			text: async () => JSON.stringify(mcpMetadata),
+			json: async () => mcpMetadata 
+		}) as any;
+		
+		const out = await hydrateNFTWithMetadata(appSummaryToNFT(baseApp));
+		
+		// Should extract MCP config (lines 24-31)
+		expect(out.mcp).toBeDefined();
+		expect(out.mcp?.tools).toBeDefined();
+		expect(out.mcp?.resources).toBeDefined();
+		expect(out.mcp?.prompts).toBeDefined();
+	})
+
+	/**
+	 * Test: covers lines 27-28 - extractMcpFromEndpoint returns undefined when MCP has no extra fields
+	 * Tests the case where MCP endpoint only has name, endpoint, schemaUrl
+	 */
+	it('hydrateNFTWithMetadata returns undefined mcp when MCP endpoint has no extra fields', async () => {
+		const minimalMcpMetadata = {
+			name: 'Minimal MCP App',
+			endpoints: [
+				{
+					name: 'MCP',
+					endpoint: 'https://mcp.example.com',
+					schemaUrl: 'https://schema.example.com'
+					// No tools, resources, prompts - lines 27-28 return undefined
+				}
+			]
+		};
+		
+		global.fetch = vi.fn().mockResolvedValue({ 
+			ok: true, 
+			text: async () => JSON.stringify(minimalMcpMetadata),
+			json: async () => minimalMcpMetadata 
+		}) as any;
+		
+		const out = await hydrateNFTWithMetadata(appSummaryToNFT(baseApp));
+		
+		// extractMcpFromEndpoint should return undefined (lines 27-28)
+		expect(out.mcp).toBeUndefined();
+	})
+
+	/**
+	 * Test: covers lines 19-20 - extractMcpFromEndpoint returns undefined when endpoint is not MCP
+	 * Tests the early return when endpoint name is not 'MCP'
+	 */
+	it('hydrateNFTWithMetadata returns undefined mcp when endpoint name is not MCP', async () => {
+		const nonMcpMetadata = {
+			name: 'Non-MCP App',
+			endpoints: [
+				{
+					name: 'API', // Not 'MCP'
+					endpoint: 'https://api.example.com',
+					schemaUrl: 'https://schema.example.com',
+					tools: [{ name: 'tool1' }] // Even with tools, ignored if not MCP
+				}
+			]
+		};
+		
+		global.fetch = vi.fn().mockResolvedValue({ 
+			ok: true, 
+			text: async () => JSON.stringify(nonMcpMetadata),
+			json: async () => nonMcpMetadata 
+		}) as any;
+		
+		const out = await hydrateNFTWithMetadata(appSummaryToNFT(baseApp));
+		
+		// extractMcpFromEndpoint returns undefined (lines 19-20)
+		expect(out.mcp).toBeUndefined();
+	})
+
 	it('appSummariesToNFTsWithMetadata hydrates all NFTs', async () => {
 		global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as any
 		const out = await appSummariesToNFTsWithMetadata([baseApp, baseApp])

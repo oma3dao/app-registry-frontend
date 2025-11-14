@@ -125,7 +125,7 @@ describe('offchain-json utilities', () => {
         name: 'Test App',
         extra: {
           platforms: { web: 'https://example.com' },
-          endpoint: { url: 'https://api.example.com' },
+          endpointUrl: 'https://api.example.com',
         },
       };
       
@@ -133,7 +133,9 @@ describe('offchain-json utilities', () => {
       // cleanPlatforms destructures platform objects, so strings get converted
       // For now, the test accepts the current behavior
       expect(result.platforms).toBeDefined();
-      expect(result.endpoint).toEqual({ url: 'https://api.example.com' });
+      // New structure uses endpoints array
+      expect(result.endpoints).toBeDefined();
+      expect(result.endpoints?.[0]).toMatchObject({ endpoint: 'https://api.example.com' });
     });
 
     it('handles 3dAssetUrls from metadata', () => {
@@ -191,7 +193,8 @@ describe('offchain-json utilities', () => {
           screenshotUrls: ['https://example.com/shot.png'],
           videoUrls: ['https://example.com/video.mp4'],
           platforms: { web: 'https://web.example.com', mobile: 'https://mobile.example.com' },
-          endpoint: { url: 'https://api.example.com', format: 'REST' },
+          endpointUrl: 'https://api.example.com',
+          endpointName: 'REST',
           payments: [{ method: 'crypto', currency: 'ETH' }],
         },
       };
@@ -210,7 +213,12 @@ describe('offchain-json utilities', () => {
       expect(result.videoUrls).toEqual(['https://example.com/video.mp4']);
       // cleanPlatforms destructures platform objects, so strings get converted
       expect(result.platforms).toBeDefined();
-      expect(result.endpoint).toEqual({ url: 'https://api.example.com', format: 'REST' });
+      // New structure uses endpoints array
+      expect(result.endpoints).toBeDefined();
+      expect(result.endpoints?.[0]).toMatchObject({ 
+        name: 'REST',
+        endpoint: 'https://api.example.com'
+      });
       expect(result.payments).toEqual([{ method: 'crypto', currency: 'ETH' }]);
     });
 
@@ -221,6 +229,34 @@ describe('offchain-json utilities', () => {
       // deepClean removes all empty values, when all values are empty/undefined,
       // the function returns undefined (no valid metadata)
       expect(result).toBeUndefined();
+    });
+
+    // Tests deepClean null/undefined handling (lines 143-144)
+    it('handles nested null/undefined values in deepClean', () => {
+      const input: OffchainBuildInput = {
+        name: 'Test App',
+        metadata: {
+          description: 'Test',
+          // These null/undefined values will be passed to deepClean
+          nested: null,
+          nested2: undefined,
+        },
+        extra: {
+          // More null values that trigger deepClean
+          nested3: null,
+        },
+      };
+      
+      const result = buildOffchainMetadataObject(input);
+      
+      // deepClean should remove null/undefined values (returns undefined for them)
+      expect(result).toBeDefined();
+      expect(result.name).toBe('Test App');
+      expect(result.description).toBe('Test');
+      // null/undefined nested values should be removed
+      expect(result).not.toHaveProperty('nested');
+      expect(result).not.toHaveProperty('nested2');
+      expect(result).not.toHaveProperty('nested3');
     });
 
     it('handles missing metadata object', () => {
@@ -293,6 +329,95 @@ describe('offchain-json utilities', () => {
       expect(result.legalUrl).toBe('https://legal.example.com');
       expect(result.supportUrl).toBe('https://support.example.com');
       expect(result.a2a).toBe('did:web:a2a.example.com');
+    });
+
+    /**
+     * Test: covers lines 124-125 - MCP config embedding in endpoint
+     * Tests that when endpointName is 'MCP', MCP config fields are embedded in the endpoint
+     */
+    it('embeds MCP config fields into MCP endpoint', () => {
+      const input: OffchainBuildInput = {
+        name: 'MCP App',
+        description: 'App with MCP endpoint',
+        endpointName: 'MCP',
+        endpointUrl: 'https://mcp.example.com',
+        endpointSchemaUrl: 'https://schema.example.com',
+        mcp: {
+          tools: [{ name: 'search', description: 'Search tool' }],
+          resources: [{ uri: 'file:///data', name: 'Data' }],
+          prompts: [{ name: 'hello', description: 'Greeting' }]
+        },
+        interfaces: 1,
+        metadata: {},
+      };
+      
+      const result = buildOffchainMetadataObject(input);
+      
+      // MCP config should be embedded in the endpoint (lines 124-125)
+      expect(result.endpoints).toHaveLength(1);
+      expect(result.endpoints![0].name).toBe('MCP');
+      expect(result.endpoints![0].tools).toBeDefined();
+      expect(result.endpoints![0].resources).toBeDefined();
+      expect(result.endpoints![0].prompts).toBeDefined();
+      
+      // Top-level mcp field should be removed
+      expect(result.mcp).toBeUndefined();
+    });
+
+    /**
+     * Test: covers lines 124-125 - No MCP embedding when endpoint name is not 'MCP'
+     * Tests that MCP config is NOT embedded when endpointName is something else
+     */
+    it('does not embed MCP config when endpoint name is not MCP', () => {
+      const input: OffchainBuildInput = {
+        name: 'API App',
+        description: 'App with regular endpoint',
+        endpointName: 'API',
+        endpointUrl: 'https://api.example.com',
+        endpointSchemaUrl: 'https://schema.example.com',
+        mcp: {
+          tools: [{ name: 'search' }]
+        },
+        interfaces: 1,
+        metadata: {},
+      };
+      
+      const result = buildOffchainMetadataObject(input);
+      
+      // MCP config should NOT be embedded (line 123 condition fails)
+      expect(result.endpoints).toHaveLength(1);
+      expect(result.endpoints![0].name).toBe('API');
+      expect(result.endpoints![0].tools).toBeUndefined();
+      
+      // Top-level mcp field should still be removed
+      expect(result.mcp).toBeUndefined();
+    });
+
+    /**
+     * Test: covers lines 169-170 - deepClean handles null and undefined
+     * Tests that deepClean properly returns undefined for null/undefined values
+     */
+    it('cleanly removes null and undefined values from metadata', () => {
+      const input: OffchainBuildInput = {
+        name: 'Clean App',
+        description: null as any, // null value
+        publisher: undefined as any, // undefined value
+        image: 'valid-image.png', // valid value
+        external_url: null as any, // null value
+        interfaces: 1,
+        metadata: {},
+      };
+      
+      const result = buildOffchainMetadataObject(input);
+      
+      // Null and undefined values should be cleaned (lines 169-170)
+      expect(result.description).toBeUndefined();
+      expect(result.publisher).toBeUndefined();
+      expect(result.external_url).toBeUndefined();
+      
+      // Valid values should remain
+      expect(result.name).toBe('Clean App');
+      expect(result.image).toBe('valid-image.png');
     });
   });
 
