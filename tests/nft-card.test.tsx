@@ -223,4 +223,173 @@ describe('NFTCard', () => {
     // Should be keyboard accessible
     expect(card).toBeInTheDocument();
   });
+
+  /**
+   * Test: covers lines 67-170 - interface badges, platform icons, external URL, image handling
+   */
+  describe('Interface badges and platform display', () => {
+    // Test: covers line 67 - interfaces extraction
+    it('extracts interfaces from NFT', () => {
+      const nftWithInterfaces: NFT = {
+        ...baseNFT,
+        interfaces: 3, // Human (1) + API (2)
+      };
+      render(<NFTCard nft={nftWithInterfaces} onNFTCardClick={() => {}} />);
+      
+      expect(screen.getByText('Human')).toBeInTheDocument();
+      expect(screen.getByText('API')).toBeInTheDocument();
+    });
+
+    // Test: covers lines 82-93 - platform extraction logic
+    it('uses platforms from NFT when available', () => {
+      const nftWithPlatforms: NFT = {
+        ...baseNFT,
+        platforms: {
+          web: { launchUrl: 'https://example.com' },
+          android: { downloadUrl: 'https://example.com/android' },
+        },
+      };
+      render(<NFTCard nft={nftWithPlatforms} onNFTCardClick={() => {}} />);
+      
+      expect(screen.getByLabelText('Web')).toBeInTheDocument();
+      expect(screen.getByLabelText('Android')).toBeInTheDocument();
+    });
+
+    // Test: covers lines 87-93 - fallback to platformIcons when platforms exist but not in context
+    it('falls back to platformIcons when platforms exist but not in context', () => {
+      const nftWithPlatforms: NFT = {
+        ...baseNFT,
+        platforms: {
+          web: {},
+          ios: {},
+        },
+      };
+      render(<NFTCard nft={nftWithPlatforms} onNFTCardClick={() => {}} />);
+      
+      // Should show platform icons
+      expect(screen.getByLabelText('Web')).toBeInTheDocument();
+      expect(screen.getByLabelText('iOS')).toBeInTheDocument();
+    });
+
+    // Test: covers lines 149-160, 189-200 - external URL link with stopPropagation
+    it('external URL link stops event propagation', () => {
+      const nftWithUrl: NFT = {
+        ...baseNFT,
+        image: 'https://example.com/image.png',
+        external_url: 'https://example.com',
+      };
+      const handleClick = vi.fn();
+      render(<NFTCard nft={nftWithUrl} onNFTCardClick={handleClick} />);
+      
+      const externalLink = screen.getByRole('link');
+      const clickEvent = new MouseEvent('click', { bubbles: true });
+      const stopPropagationSpy = vi.spyOn(clickEvent, 'stopPropagation');
+      
+      fireEvent(externalLink, clickEvent);
+      
+      // stopPropagation should be called
+      expect(stopPropagationSpy).toHaveBeenCalled();
+    });
+
+    // Test: covers lines 125-175 - image layout rendering
+    it('renders with-image layout when image is available', () => {
+      const nftWithImage: NFT = {
+        ...baseNFT,
+        image: 'https://example.com/image.png',
+      };
+      render(<NFTCard nft={nftWithImage} onNFTCardClick={() => {}} />);
+      
+      const image = screen.getByAltText('Test NFT icon');
+      expect(image).toBeInTheDocument();
+      expect(image).toHaveAttribute('src', 'https://example.com/image.png');
+    });
+
+    // Test: covers lines 163-173 - interface badges in with-image layout
+    it('displays interface badges in with-image layout', () => {
+      const nftWithImageAndInterfaces: NFT = {
+        ...baseNFT,
+        image: 'https://example.com/image.png',
+        interfaces: 5, // Human (1) + Contract (4)
+      };
+      render(<NFTCard nft={nftWithImageAndInterfaces} onNFTCardClick={() => {}} />);
+      
+      expect(screen.getByText('Human')).toBeInTheDocument();
+      expect(screen.getByText('Contract')).toBeInTheDocument();
+    });
+
+    // Test: covers lines 202-213 - interface badges in text-only layout
+    it('displays interface badges in text-only layout', () => {
+      const nftNoImage: NFT = {
+        ...baseNFT,
+        image: '',
+        interfaces: 6, // API (2) + Contract (4)
+      };
+      render(<NFTCard nft={nftNoImage} onNFTCardClick={() => {}} />);
+      
+      expect(screen.getByText('API')).toBeInTheDocument();
+      expect(screen.getByText('Contract')).toBeInTheDocument();
+    });
+
+    // Test: covers lines 227-235 - platform icons display
+    it('displays platform icons section when platforms are available', () => {
+      const nftWithPlatforms: NFT = {
+        ...baseNFT,
+        platforms: {
+          web: {},
+          windows: {},
+        },
+      };
+      render(<NFTCard nft={nftWithPlatforms} onNFTCardClick={() => {}} />);
+      
+      expect(screen.getByText('Platforms:')).toBeInTheDocument();
+      expect(screen.getByLabelText('Web')).toBeInTheDocument();
+      expect(screen.getByLabelText('Windows')).toBeInTheDocument();
+    });
+
+    // Test: covers lines 237-241 - no platforms message
+    it('displays message when no platforms are available', () => {
+      const nftNoPlatforms: NFT = {
+        ...baseNFT,
+        platforms: {},
+      };
+      render(<NFTCard nft={nftNoPlatforms} onNFTCardClick={() => {}} />);
+      
+      expect(screen.getByText('No platform information provided.')).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * Test: covers lines 251-254 - contractId display
+   */
+  describe('Contract ID display', () => {
+    it('displays contractId when present', () => {
+      const nftWithContract: NFT = {
+        ...baseNFT,
+        contractId: '0x1234567890123456789012345678901234567890',
+      };
+      render(<NFTCard nft={nftWithContract} onNFTCardClick={() => {}} />);
+      
+      expect(screen.getByText(/Contract:/i)).toBeInTheDocument();
+      expect(screen.getByText(/0x1234567890123456789012345678901234567890/i)).toBeInTheDocument();
+    });
+
+    it('does not display contractId when absent', () => {
+      render(<NFTCard nft={baseNFT} onNFTCardClick={() => {}} />);
+      
+      // Contract section should not be visible
+      const contractElements = screen.queryAllByText(/Contract:/i);
+      expect(contractElements.length).toBe(0);
+    });
+
+    it('handles long contractId gracefully', () => {
+      const nftWithLongContract: NFT = {
+        ...baseNFT,
+        contractId: '0x' + 'a'.repeat(64),
+      };
+      render(<NFTCard nft={nftWithLongContract} onNFTCardClick={() => {}} />);
+      
+      // Should still render
+      expect(screen.getByText('Test NFT')).toBeInTheDocument();
+    });
+  });
 }); 

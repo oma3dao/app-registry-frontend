@@ -10,6 +10,7 @@ const baseNft = {
 	status: 0,
 	minter: '0xowner000000000000000000000000000000000000',
 	owner: '0xowner000000000000000000000000000000000000',
+	currentOwner: '0xOwner000000000000000000000000000000000000',
 	dataUrl: 'https://example.com/data.json',
 	image: '',
 	external_url: '',

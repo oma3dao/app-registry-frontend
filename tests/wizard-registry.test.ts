@@ -19,33 +19,31 @@ describe('wizard/registry', () => {
 		expect(() => new Date(REGISTRY_META.lastModified).toISOString()).not.toThrow()
 	})
 
-	// Tests development-only validation branch (lines 397-400)
-	it('runs development validation when NODE_ENV is development', () => {
+	it('invokes registry validator when NODE_ENV=development', async () => {
 		const originalEnv = process.env.NODE_ENV
-		const mockAssertValidRegistry = vi.fn()
-		
-		// Mock require to capture the call
-		const originalRequire = require
-		vi.stubGlobal('require', vi.fn((path: string) => {
-			if (path === './linter') {
-				return { assertValidRegistry: mockAssertValidRegistry }
-			}
-			return originalRequire(path)
-		}))
+		const { Module } = await import('module')
+		const originalModuleRequire = Module.prototype.require
+		vi.resetModules()
+		process.env.NODE_ENV = 'development'
 
-		try {
-			// Set NODE_ENV to development
-			process.env.NODE_ENV = 'development'
-			
-			// Re-import the registry to trigger the development check
-			// Note: This might not work perfectly due to module caching, but the branch exists
-			// The actual validation happens at module load time
-			expect(process.env.NODE_ENV).toBe('development')
-		} finally {
-			// Restore original environment
-			process.env.NODE_ENV = originalEnv
-			vi.unstubAllGlobals()
+		const assertValidRegistry = vi.fn()
+		Module.prototype.require = function (path: string) {
+			if (path.endsWith('wizard/linter') || path === './linter') {
+				return { assertValidRegistry }
+			}
+			return originalModuleRequire.call(this, path)
 		}
+
+		const registryModule = await import('@/lib/wizard/registry')
+
+		expect(assertValidRegistry).toHaveBeenCalledWith(
+			registryModule.ALL_STEPS,
+			registryModule.REGISTRY_META,
+		)
+
+		process.env.NODE_ENV = originalEnv
+		Module.prototype.require = originalModuleRequire
+		vi.resetModules()
 	})
 
 	it('appliesTo rules behave for human-specific and api/contract steps', () => {
@@ -359,6 +357,63 @@ describe('wizard/registry', () => {
 		expect(result.success).toBe(false)
 		if (!result.success) {
 			expect(result.error.issues.some(i => i.path.includes('publisher'))).toBe(true)
+		}
+	})
+
+	// Tests Step3_Common optional URL validation branch (lines 208-210)
+	it('Step3_Common validates optional URLs when provided as non-empty strings', () => {
+		const result = Step3_Common.schema.safeParse({
+			interfaceFlags: mkFlags(),
+			description: 'desc',
+			publisher: 'pub',
+			external_url: 'https://example.com',
+			image: 'https://example.com/icon.png',
+			legalUrl: 'https://example.com/legal', // Optional but provided
+			supportUrl: 'https://example.com/support', // Optional but provided
+		})
+		expect(result.success).toBe(true)
+	})
+
+	// Tests Step4_HumanMedia screenshot requirement when mustScreens is true (lines 251-252)
+	it('Step4_HumanMedia requires at least one screenshot when mustScreens is true', () => {
+		// This test covers the conditional check on lines 251-252
+		// When isFieldRequired returns true for screenshotUrls, it should require at least one
+		const result = Step4_HumanMedia.schema.safeParse({
+			interfaceFlags: mkFlags({ human: true }),
+			screenshotUrls: [], // Empty array when required
+		})
+		expect(result.success).toBe(false)
+		if (!result.success) {
+			expect(result.error.issues.some(i => 
+				i.path.includes('screenshotUrls') && 
+				i.message?.includes('At least one screenshot')
+			)).toBe(true)
+		}
+	})
+
+	// Tests Step4_HumanMedia handles non-string values in screenshotUrls array
+	it('Step4_HumanMedia filters out non-string values from screenshotUrls', () => {
+		const result = Step4_HumanMedia.schema.safeParse({
+			interfaceFlags: mkFlags({ human: true }),
+			screenshotUrls: ['https://valid.com/img.png', null, '', undefined, 'https://another.com/img.png'],
+		})
+		// Should pass validation (filters out non-strings and empty strings)
+		expect(result.success).toBe(true)
+	})
+
+	// Tests Step4_HumanMedia URL validation in loop (lines 255-259)
+	it('Step4_HumanMedia validates each screenshot URL in the array', () => {
+		const result = Step4_HumanMedia.schema.safeParse({
+			interfaceFlags: mkFlags({ human: true }),
+			screenshotUrls: ['https://valid.com/img.png', 'invalid-url', 'https://another.com/img.png'],
+		})
+		expect(result.success).toBe(false)
+		if (!result.success) {
+			expect(result.error.issues.some(i => 
+				i.path.includes('screenshotUrls') && 
+				Array.isArray(i.path) && 
+				i.path[1] === 1 // Second item (index 1) should have error
+			)).toBe(true)
 		}
 	})
 })

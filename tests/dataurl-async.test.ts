@@ -161,6 +161,34 @@ describe('DataURL Async Functions', () => {
       
       expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
     });
+
+    // Tests sha256 algorithm (line 52)
+    it('supports sha256 algorithm parameter (algorithm = 1)', async () => {
+      const mockJson = { test: true };
+      
+      global.fetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        headers: {
+          get: (name: string) => name === 'content-type' ? 'application/json' : null,
+        },
+        body: {
+          getReader: () => ({
+            read: vi.fn()
+              .mockResolvedValueOnce({
+                done: false,
+                value: new TextEncoder().encode(JSON.stringify(mockJson)),
+              })
+              .mockResolvedValueOnce({ done: true }),
+          }),
+        },
+      });
+
+      const result = await computeDataHashFromDataUrl('https://example.com/data.json', 1);
+      
+      // Should use sha256 instead of keccak256
+      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(result.jcsJson).toBeDefined();
+    });
   });
 
   describe('verifyDataUrlHash', () => {

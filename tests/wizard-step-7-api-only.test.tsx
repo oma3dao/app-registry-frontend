@@ -28,7 +28,9 @@ describe('Step7_ApiOnly', () => {
       metadata: {},
       interfaceFlags: { human: true, api: true, smartContract: false },
       apiType: 'a2a', // Add apiType to pass the early return check
-      endpoint: { url: '', schemaUrl: '' },
+      endpointUrl: '',
+      endpointSchemaUrl: '',
+      endpointName: 'A2A',
     },
     updateField: vi.fn(),
     status: 'idle' as const,
@@ -84,7 +86,8 @@ describe('Step7_ApiOnly', () => {
     const input = screen.getByLabelText(/Agent Card URL/);
     fireEvent.change(input, { target: { value: 'https://example.com/agent-card.json' } });
     
-    expect(mockUpdateField).toHaveBeenCalledWith('endpoint', { url: 'https://example.com/agent-card.json', schemaUrl: '' });
+    // New structure uses separate fields
+    expect(mockUpdateField).toHaveBeenCalledWith('endpointUrl', 'https://example.com/agent-card.json');
   });
 
   it('handles MCP JSON input and apply', () => {
@@ -112,10 +115,8 @@ describe('Step7_ApiOnly', () => {
       ...defaultContext,
       state: {
         ...defaultContext.state,
-        endpoint: {
-          url: 'https://existing.com/agent-card.json',
-          schemaUrl: ''
-        },
+        endpointUrl: 'https://existing.com/agent-card.json',
+        endpointSchemaUrl: '',
         mcp: { tools: ['test'] }
       }
     };
@@ -128,14 +129,23 @@ describe('Step7_ApiOnly', () => {
   it('shows error styling for invalid fields', () => {
     const contextWithErrors = {
       ...defaultContext,
+      state: {
+        ...defaultContext.state,
+        endpointUrl: 'invalid-url',
+      },
       errors: {
-        'endpoint.url': 'Invalid URL'
+        endpointUrl: 'Invalid URL'
       }
     };
     
     render(<Step7_ApiOnly {...contextWithErrors} />);
     
-    expect(screen.getByText('Invalid URL')).toBeInTheDocument();
+    // Error message should be displayed in the component
+    const errorMessage = screen.getByText('Invalid URL');
+    expect(errorMessage).toBeInTheDocument();
+    // Input should also have error styling
+    const input = screen.getByLabelText(/Agent Card URL/);
+    expect(input).toBeInTheDocument();
   });
 
   it('shows error styling for MCP configuration', () => {
@@ -153,5 +163,93 @@ describe('Step7_ApiOnly', () => {
     render(<Step7_ApiOnly {...contextWithMcpErrors} />);
     
     expect(screen.getByText('Invalid configuration')).toBeInTheDocument();
+  });
+
+  it('renders smart contract guidance when only contract interface is enabled', () => {
+    const contractOnlyContext = {
+      ...defaultContext,
+      state: {
+        ...defaultContext.state,
+        interfaceFlags: { human: false, api: false, smartContract: true },
+        apiType: null,
+      },
+    };
+
+    render(<Step7_ApiOnly {...contractOnlyContext} />);
+
+    expect(screen.getByText(/Smart Contract Configuration/)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Recommended RPC Endpoint/)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/Interface Versions/)
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders combined note when both API and smart contract interfaces are selected', () => {
+    const combinedContext = {
+      ...defaultContext,
+      state: {
+        ...defaultContext.state,
+        interfaceFlags: { human: false, api: true, smartContract: true },
+        apiType: 'jsonrpc' as const,
+      },
+    };
+
+    render(<Step7_ApiOnly {...combinedContext} />);
+
+    expect(
+      screen.getByText(/You've selected both API and Smart Contract interfaces/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/JSON-RPC Endpoint URL/)
+    ).toBeInTheDocument();
+  });
+
+  it('auto-populates endpoint name based on API type', () => {
+    const mockUpdateField = vi.fn();
+    const graphqlContext = {
+      ...defaultContext,
+      state: {
+        ...defaultContext.state,
+        apiType: 'graphql' as const,
+      },
+      updateField: mockUpdateField,
+    };
+
+    render(<Step7_ApiOnly {...graphqlContext} />);
+
+    expect(mockUpdateField).toHaveBeenCalledWith('endpointName', 'GraphQL');
+  });
+
+  it('updates interface versions list when user types values', () => {
+    const mockUpdateField = vi.fn();
+    const context = { ...defaultContext, updateField: mockUpdateField };
+
+    render(<Step7_ApiOnly {...context} />);
+
+    const versionsInput = screen.getByLabelText(/Interface Versions/i);
+    fireEvent.change(versionsInput, { target: { value: 'v1, v2, ' } });
+
+    expect(mockUpdateField).toHaveBeenCalledWith('interfaceVersions', ['v1', 'v2']);
+  });
+
+  it('uses GraphQL-specific schema placeholder and helper text', () => {
+    const graphqlContext = {
+      ...defaultContext,
+      state: {
+        ...defaultContext.state,
+        apiType: 'graphql' as const,
+      },
+    };
+
+    render(<Step7_ApiOnly {...graphqlContext} />);
+
+    expect(
+      screen.getByPlaceholderText('https://api.example.com/graphql?sdl')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Ideally: GraphQL SDL\/schema file/)
+    ).toBeInTheDocument();
   });
 });
