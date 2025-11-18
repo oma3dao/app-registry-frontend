@@ -41,6 +41,7 @@
     "thirdweb": "^5.108.5"
   },
   "devDependencies": {
+    "@next/swc-win32-x64-msvc": "^16.0.3",
     "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",

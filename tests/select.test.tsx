@@ -100,7 +100,7 @@ describe('Select component', () => {
     // This test is skipped because Radix UI Select dropdown cannot open in JSDOM
   });
 
-  // For full interaction tests, use Cypress or Playwright in a real browser environment.
+  // For full interaction tests, use a real browser environment.
 
   /**
    * Test: covers lines 106-111 - SelectLabel component

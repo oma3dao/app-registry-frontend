@@ -21,6 +21,6 @@ describe('LandingPage', () => {
   it('renders the main heading', () => {
     render(<LandingPage />);
     const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toHaveTextContent('OMATrust App Registry');
+    expect(heading).toHaveTextContent('OMATrust is Trust for');
   });
 }); 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { POST } from '../src/app/api/validate-url/route';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { POST, OPTIONS } from '../src/app/api/validate-url/route';
 
 // Mock fetch globally
 global.fetch = vi.fn();
@@ -7,6 +7,21 @@ global.fetch = vi.fn();
 describe('validate-url API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  /**
+   * Test: Covers OPTIONS function (line 11-13)
+   * Tests CORS preflight handling
+   */
+  it('handles OPTIONS request for CORS preflight', async () => {
+    const response = await OPTIONS();
+    const data = await response.json();
+    
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(response.headers.get('Access-Control-Allow-Methods')).toBe('POST, OPTIONS');
+    expect(response.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type, Authorization');
+    expect(data).toEqual({});
   });
 
   it('returns success for a valid URL', async () => {
