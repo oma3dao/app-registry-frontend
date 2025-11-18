@@ -10,7 +10,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['tests/setup.ts'],
     watch: false, // Disable watch mode by default
-    exclude: ['**/node_modules/**', '**/dist/**', '**/tests/e2e/**', '**/.next/**'], // Exclude e2e folder
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
     server: {
       deps: {
         inline: ['ethers'],
