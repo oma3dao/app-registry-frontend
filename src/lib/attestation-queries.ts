@@ -1,0 +1,230 @@
+/**
+ * Attestation Query Utilities for App Registry
+ * 
+ * Functions for querying attestations by DID subject
+ */
+
+import { EAS, SchemaEncoder } from '@ethereum-attestation-service/eas-sdk'
+import { ethers } from 'ethers'
+import { getAllSchemas, type AttestationSchema } from '@/config/schemas'
+import { getContractAddress } from '@/config/attestation-services'
+import { didToIndexAddress } from '@/lib/did-index'
+import { log } from '@/lib/log'
+
+const OMACHAIN_TESTNET_RPC = 'https://rpc.testnet.chain.oma3.org/'
+const OMACHAIN_TESTNET_ID = 66238
+
+export interface AttestationQueryResult {
+    uid: string
+    attester: string
+    recipient: string
+    data: string
+    time: number
+    expirationTime: number
+    revocationTime: number
+    refUID: string
+    revocable: boolean
+    schemaId?: string
+    schemaTitle?: string
+    decodedData?: Record<string, any>
+}
+
+/**
+ * Get attestations for a specific DID (by subject field)
+ * @param did - The DID to query attestations for
+ * @param limit - Maximum number of attestations to return
+ * @returns Promise resolving to attestations for this DID
+ */
+export async function getAttestationsForDID(
+    did: string,
+    limit: number = 5
+): Promise<AttestationQueryResult[]> {
+    try {
+        const chainId = OMACHAIN_TESTNET_ID
+        
+        // Get EAS contract address
+        const easContractAddress = getContractAddress('eas', chainId)
+        log(`[AttestationQuery] EAS contract address for chain ${chainId}: ${easContractAddress}`)
+        
+        if (!easContractAddress) {
+            throw new Error(`EAS not deployed on chain ${chainId}`)
+        }
+
+        // Get all schemas
+        const schemas = getAllSchemas()
+        const deployedSchemas = schemas.filter(schema => {
+            const uid = schema.deployedUIDs?.[chainId]
+            return uid && uid !== '0x0000000000000000000000000000000000000000000000000000000000000000'
+        })
+
+        log(`[AttestationQuery] Found ${deployedSchemas.length} deployed schemas`)
+        
+        if (deployedSchemas.length === 0) {
+            log('[AttestationQuery] No schemas deployed')
+            return []
+        }
+
+        // Setup provider and EAS
+        const provider = new ethers.JsonRpcProvider(OMACHAIN_TESTNET_RPC)
+        const eas = new EAS(easContractAddress)
+        eas.connect(provider as any)
+
+        // Compute DID index address for querying
+        const didIndexAddress = didToIndexAddress(did)
+        
+        log(`[AttestationQuery] Querying attestations for DID: ${did}`)
+        log(`[AttestationQuery] DID Index Address: ${didIndexAddress}`)
+
+        // Setup contract for querying
+        const contract = new ethers.Contract(
+            easContractAddress,
+            ['event Attested(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schemaUID)'],
+            provider
+        )
+
+        const currentBlock = await provider.getBlockNumber()
+        const startBlock = Math.max(0, currentBlock - 50000) // ~28 hours
+
+        log(`[AttestationQuery] Querying blocks ${startBlock} to ${currentBlock}`)
+        
+        // Query events where recipient = didIndexAddress
+        const filter = contract.filters.Attested(didIndexAddress)
+        const events = await contract.queryFilter(filter, startBlock, currentBlock)
+
+        log(`[AttestationQuery] Found ${events.length} events for DID`)
+
+        // Process events (newest first)
+        const attestations: AttestationQueryResult[] = []
+
+        for (let i = events.length - 1; i >= 0; i--) {
+            const event = events[i]
+            
+            try {
+                // Type guard for EventLog
+                if (!('args' in event)) continue
+                
+                const uid = event.args?.uid
+                const schemaUID = event.args?.schemaUID
+
+                if (!uid || !schemaUID) continue
+
+                // Find matching schema
+                const schema = deployedSchemas.find(s => 
+                    s.deployedUIDs?.[chainId] === schemaUID
+                )
+
+                if (!schema) continue
+
+                // Fetch full attestation data
+                const attestation = await eas.getAttestation(uid)
+                
+                // Decode the attestation data
+                const decodedData = decodeAttestationData(schema, attestation.data)
+
+                // Verify this attestation is actually for our DID
+                // (recipient is index address, but subject should match the DID)
+                if (decodedData.subject !== did) {
+                    log(`[AttestationQuery] Skipping - subject mismatch: ${decodedData.subject} !== ${did}`)
+                    continue
+                }
+
+                attestations.push({
+                    uid: attestation.uid,
+                    attester: attestation.attester,
+                    recipient: attestation.recipient,
+                    data: attestation.data,
+                    time: Number(attestation.time),
+                    expirationTime: Number(attestation.expirationTime),
+                    revocationTime: Number(attestation.revocationTime),
+                    refUID: attestation.refUID,
+                    revocable: attestation.revocable,
+                    schemaId: schema.id,
+                    schemaTitle: schema.title,
+                    decodedData
+                })
+
+                if (attestations.length >= limit) {
+                    break
+                }
+            } catch (err) {
+                log('[AttestationQuery] Error processing event:', err)
+            }
+        }
+
+        log(`[AttestationQuery] Returning ${attestations.length} attestations`)
+        return attestations
+
+    } catch (error) {
+        log('[AttestationQuery] Failed to get attestations:', error)
+        return []
+    }
+}
+
+/**
+ * Calculate average rating from user review attestations
+ * @param attestations - List of attestations
+ * @returns Average rating and count
+ */
+export function calculateAverageRating(attestations: AttestationQueryResult[]): { average: number, count: number } {
+    const reviews = attestations.filter(a => 
+        a.schemaId === 'user-review' && 
+        (a.decodedData?.ratingValue || a.decodedData?.rating) &&
+        a.revocationTime === 0 // Not revoked
+    )
+
+    if (reviews.length === 0) {
+        return { average: 0, count: 0 }
+    }
+
+    const sum = reviews.reduce((total, review) => {
+        const ratingValue = review.decodedData?.ratingValue || review.decodedData?.rating;
+        const rating = typeof ratingValue === 'bigint' ? Number(ratingValue) : Number(ratingValue || 0);
+        return total + rating
+    }, 0)
+
+    return {
+        average: sum / reviews.length,
+        count: reviews.length
+    }
+}
+
+/**
+ * Decode attestation data using schema definition
+ */
+function decodeAttestationData(schema: AttestationSchema, encodedData: string): Record<string, any> {
+    try {
+        const schemaString = schema.fields.map(field => {
+            let solidityType: string
+            switch (field.type) {
+                case 'integer':
+                    solidityType = field.max && field.max <= 255 ? 'uint8' : 'uint256'
+                    break
+                case 'datetime':
+                case 'uri':
+                case 'enum':
+                    solidityType = 'string'
+                    break
+                case 'array':
+                    solidityType = 'string[]'
+                    break
+                default:
+                    solidityType = 'string'
+                    break
+            }
+            return `${solidityType} ${field.name}`
+        }).join(',')
+
+        const encoder = new SchemaEncoder(schemaString)
+        const decoded = encoder.decodeData(encodedData)
+
+        const result: Record<string, any> = {}
+        decoded.forEach((item: any) => {
+            result[item.name] = item.value.value || item.value
+        })
+
+        return result
+    } catch (err) {
+        log('[AttestationQuery] Error decoding:', err)
+        return {}
+    }
+}

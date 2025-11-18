@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import NFTGrid from "@/components/nft-grid"
 import { useAppsList } from "@/lib/contracts"
@@ -156,6 +156,25 @@ export default function LandingPage() {
     log("Mint modal cannot be opened from landing page")
   }
   
+  // Memoize the NFT grid to prevent re-renders when only the rotating text changes
+  const nftGridSection = useMemo(() => {
+    if (!shouldLoadNFTs) return null
+    
+    return (
+      <div className="pt-16 w-full">
+        <h1 className="text-3xl font-bold mb-8 text-left">Latest Registrations</h1>
+        <NFTGrid 
+          nfts={latestApps} 
+          onNFTCardClick={handleOpenViewModal}
+          onOpenMintModal={handleOpenMintModal}
+          isLoading={isLoading}
+          showStatus={false}
+          className="sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
+        />
+      </div>
+    )
+  }, [shouldLoadNFTs, latestApps, isLoading])
+  
   return (
     <div className="flex flex-col items-center justify-center px-4 text-center">
       <div className="max-w-5xl mx-auto space-y-8 pb-12">
@@ -273,19 +292,7 @@ export default function LandingPage() {
           </div>
         </div> */}
         
-        {shouldLoadNFTs && (
-          <div className="pt-16 w-full">
-            <h1 className="text-3xl font-bold mb-8 text-left">Latest Registrations</h1>
-            <NFTGrid 
-              nfts={latestApps} 
-              onNFTCardClick={handleOpenViewModal}
-              onOpenMintModal={handleOpenMintModal}
-              isLoading={isLoading}
-              showStatus={false}
-              className="sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
-            />
-          </div>
-        )}
+        {nftGridSection}
       </div>
 
       {/* View Modal - Used for viewing app details */}

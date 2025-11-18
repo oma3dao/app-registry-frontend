@@ -27,7 +27,7 @@ import { TransactionAlert } from "@/components/ui/transaction-alert"
 import { isMobile, buildVersionedDID } from "@/lib/utils"
 import { log } from "@/lib/log"
 import { useMetadata } from "@/lib/contracts"
-import { AlertCircleIcon, Image as ImageIcon, ExternalLinkIcon, RocketIcon, CheckCircle2, XCircle, Loader2, Shield } from 'lucide-react';
+import { AlertCircleIcon, Image as ImageIcon, ExternalLinkIcon, RocketIcon, CheckCircle2, XCircle, Loader2, Shield, Star } from 'lucide-react';
 import { toast } from "sonner"
 import * as AppConfig from "@/config/app-config";
 import { useNFTMetadata } from "@/lib/nft-metadata-context";
@@ -35,6 +35,8 @@ import { buildIwpsProxyRequest } from "@/lib/iwps";
 import LaunchConfirmationDialog from '@/components/launch-confirmation-dialog';
 import { ethers } from "ethers";
 import { env } from "@/config/env";
+import { getAttestationsForDID, calculateAverageRating, type AttestationQueryResult } from "@/lib/attestation-queries";
+import { StarRating } from "@/components/star-rating";
 
 interface NFTViewModalProps {
   isOpen: boolean
@@ -58,6 +60,8 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     hasAttestation: boolean;
     message?: string;
   }>({ checking: false, hasAttestation: false });
+  const [attestations, setAttestations] = useState<AttestationQueryResult[]>([]);
+  const [loadingAttestations, setLoadingAttestations] = useState(false);
   
   // Use metadata hook
   const versionedDid = nft ? buildVersionedDID(nft.did, nft.version) : undefined;
@@ -78,6 +82,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   useEffect(() => {
     if (!isOpen || !nft?.did) {
       setAttestationStatus({ checking: false, hasAttestation: false });
+      setAttestations([]);
       return;
     }
     
@@ -129,6 +134,31 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     };
     
     checkAttestation();
+  }, [isOpen, nft?.did]);
+  
+  // Load attestations for the DID
+  useEffect(() => {
+    if (!isOpen || !nft?.did) {
+      setAttestations([]);
+      return;
+    }
+    
+    const loadAttestations = async () => {
+      try {
+        log(`[NFTViewModal] Loading attestations for DID: ${nft.did}`);
+        setLoadingAttestations(true);
+        const results = await getAttestationsForDID(nft.did, 10);
+        log(`[NFTViewModal] Loaded ${results.length} attestations:`, results);
+        setAttestations(results);
+      } catch (error) {
+        log('[NFTViewModal] Failed to load attestations:', error);
+        setAttestations([]);
+      } finally {
+        setLoadingAttestations(false);
+      }
+    };
+    
+    loadAttestations();
   }, [isOpen, nft?.did]);
   
   // Extract metadata values with fallbacks
@@ -464,6 +494,19 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
               )}
               
+              {/* User Reviews - Star Rating */}
+              {!loadingAttestations && attestations.length > 0 && (() => {
+                const { average, count } = calculateAverageRating(attestations);
+                return count > 0 ? (
+                  <div className="grid gap-1">
+                    <Label className="text-sm font-medium">User Reviews</Label>
+                    <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                      <StarRating rating={average} count={count} size="md" />
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+              
               {/* 2. DID */}
               <div className="grid gap-1">
                 <Label htmlFor="did-display" className="text-sm font-medium">DID</Label>
@@ -665,6 +708,56 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                       </a>
                     ))}
                   </div>
+                </div>
+              )}
+              
+              {/* Attestations List */}
+              {!loadingAttestations && attestations.length > 0 && (
+                <div className="grid gap-1">
+                  <Label className="text-sm font-medium">Recent Attestations ({attestations.length})</Label>
+                  <div className="space-y-2">
+                    {attestations.slice(0, 5).map((attestation) => {
+                      const rating = attestation.decodedData?.ratingValue || attestation.decodedData?.rating;
+                      const comment = attestation.decodedData?.reviewBody || attestation.decodedData?.comment;
+                      const ratingNum = typeof rating === 'bigint' ? Number(rating) : rating;
+                      
+                      return (
+                        <div key={attestation.uid} className="p-2 bg-slate-50 dark:bg-slate-800 rounded text-xs">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="font-medium text-blue-600 dark:text-blue-400">
+                              {attestation.schemaTitle || 'Attestation'}
+                            </span>
+                            <span className="text-gray-500">
+                              {new Date(attestation.time * 1000).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {ratingNum && (
+                            <div className="flex items-center gap-1 mb-1">
+                              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                              <span>{ratingNum}/5</span>
+                            </div>
+                          )}
+                          {comment && (
+                            <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                              {comment}
+                            </p>
+                          )}
+                          {attestation.decodedData?.author && (
+                            <div className="mt-1 text-gray-500">
+                              By: {attestation.decodedData.author}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {loadingAttestations && (
+                <div className="flex items-center gap-2 p-2 text-sm text-gray-500">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Loading attestations...</span>
                 </div>
               )}
             </div>

@@ -51,7 +51,8 @@ export const omachainTestnet = {
   contracts: {
     registry: "0xB752303DECf6b2c5B12818e50Dd8A20EBe0F5F97",
     metadata: "0x9a530e23370C7d820FbaB2E0a884c58be5E4e919",
-    resolver: "0xDc120C00E62822329A4d8C7808f5a43C9CbfC1f8"
+    resolver: "0xDc120C00E62822329A4d8C7808f5a43C9CbfC1f8",
+    easContract: "0x8835AF90f1537777F52E482C8630cE4e947eCa32"
   }
 };
 
@@ -81,7 +82,8 @@ export const omachainMainnet = {
   contracts: {
     registry: "0x", // Not yet deployed
     metadata: "0x",  // Not yet deployed
-    resolver: "0x"  // Not yet deployed
+    resolver: "0x",  // Not yet deployed
+    easContract: "0x"  // Not yet deployed
   }
 };
 
