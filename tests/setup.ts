@@ -7,7 +7,7 @@ import React from 'react';
 declare global {
   // Shared mocks accessible across tests
   // eslint-disable-next-line no-var
-  var __useActiveAccountMock: vi.Mock | undefined;
+  var __useActiveAccountMock: (() => any) | undefined;
   // eslint-disable-next-line no-var
   var __mockValidateUrlResponse:
     | ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>)
