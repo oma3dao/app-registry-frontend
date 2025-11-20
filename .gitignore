@@ -6,6 +6,18 @@
 
 # testing
 /coverage
+*-output.txt
+*-coverage*.txt
+coverage*.txt
+coverage-analysis.json
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# debug screenshots
+debug-*.png
 
 # next.js
 /.next/
