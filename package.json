@@ -11,7 +11,15 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:perf": "vitest run performance.test.ts",
-    "test:all": "npm test"
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:firefox": "playwright test --project=firefox",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:webkit": "playwright test --project=webkit",
+    "test:all": "npm run test:unit && npm run test:e2e"
   },
   "dependencies": {
     "@ethereum-attestation-service/eas-sdk": "^2.9.0",
@@ -35,6 +43,7 @@
   },
   "devDependencies": {
     "@next/swc-win32-x64-msvc": "^16.0.3",
+    "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
