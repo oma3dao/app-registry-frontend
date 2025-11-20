@@ -1,0 +1,36 @@
+# E2E Testing Section (Add to README.md)
+
+## E2E Testing
+
+This project uses Playwright with Firefox for end-to-end testing.
+
+### Quick Start
+
+```bash
+# Run tests with UI (recommended)
+npm run test:e2e:ui
+
+# Run all tests
+npm run test:e2e
+```
+
+### Test Files
+
+- `tests/e2e/landing-page.spec.ts` - Landing page tests
+- `tests/e2e/landing-page-comprehensive.spec.ts` - Comprehensive landing page tests
+- `tests/e2e/dashboard.spec.ts` - Dashboard tests
+- `tests/e2e/wizard-flow.spec.ts` - Wizard flow tests
+- `tests/e2e/verify-firefox.spec.ts` - Firefox verification
+
+### Documentation
+
+See `docs/E2E_TESTING_GUIDE.md` for complete guide.
+
+### Using Cursor's Browser Tools
+
+Use Cursor to explore your app and generate tests:
+```
+Navigate to http://localhost:3000 and explore the app.
+Generate Playwright tests based on what you see.
+```
+
