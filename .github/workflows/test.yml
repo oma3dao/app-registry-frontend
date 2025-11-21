@@ -27,15 +27,21 @@ jobs:
 
     - name: Install dependencies
       run: |
-        npm ci --legacy-peer-deps || npm install
+        npm ci || npm install --legacy-peer-deps
         # Ensure rollup native dependencies are installed (fixes optional deps issue)
         npm rebuild || true
 
     - name: Run linting
       run: npm run lint
+      continue-on-error: false
+
+    - name: Run tests
+      run: npm test
+      continue-on-error: false
 
     - name: Run tests with coverage
-      run: npm run test:coverage
+      run: npm run test:coverage || npm test
+      continue-on-error: true
 
     - name: Upload coverage reports
       if: always()
