@@ -26,10 +26,16 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install --with-deps firefox
 
+    - name: Build application
+      run: npm run build
+      env:
+        NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'test-client-id' }}
+
     - name: Run E2E tests
       run: npm run test:e2e
       env:
         NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'test-client-id' }}
+        CI: true
 
     - name: Upload test results
       if: always()

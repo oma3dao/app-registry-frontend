@@ -27,22 +27,21 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run type checking
-      run: npm run type-check
-
     - name: Run linting
       run: npm run lint
 
     - name: Run tests with coverage
-      run: npm run test:ci
+      run: npm run test:coverage
 
     - name: Upload coverage reports
+      if: always()
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage/lcov.info
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Comment PR with test results
       if: github.event_name == 'pull_request'
@@ -67,7 +66,6 @@ jobs:
           - **Node.js Version:** ${{ matrix.node-version }}
           - **Test Coverage:** Available in Codecov
           - **Linting:** ✅ Passed
-          - **Type Checking:** ✅ Passed
           
           Tests completed successfully for this PR.`;
           

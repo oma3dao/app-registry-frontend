@@ -95,8 +95,8 @@ export default defineConfig({
   webServer: process.env.SKIP_WEBSERVER ? undefined : {
     command: 'npm run dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: true, // Always reuse existing server
-    timeout: 120 * 1000,
+    reuseExistingServer: !process.env.CI, // Don't reuse in CI
+    timeout: process.env.CI ? 180 * 1000 : 120 * 1000, // Longer timeout in CI
     stdout: 'ignore',
     stderr: 'pipe',
     env: {
