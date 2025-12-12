@@ -122,16 +122,19 @@ async function checkDidWebViaDns(domain: string, connectedAddress: string): Prom
     const records = await resolveTxt(txtRecordName);
     debug('verify-did-web', `Found ${records.length} TXT records`, records);
 
+    // Build expected DID for the connected address
+    const expectedDid = `did:pkh:eip155:66238:${connectedAddress}`;
+
     if (records.length === 0) {
       return {
         success: false,
         error: 'No DNS TXT record found',
-        details: `No TXT record found at ${txtRecordName}. Create a TXT record with value: v=1 controller=eip155:66238:${connectedAddress}`
+        details: `No TXT record found at ${txtRecordName}. Create a TXT record with value: v=1;controller=${expectedDid}`
       };
     }
 
     let foundValidRecord = false;
-    let foundAddresses: string[] = [];
+    let foundControllers: string[] = [];
 
     // Parse records looking for v=1 and controller entries (also support legacy caip10)
     for (const record of records) {
@@ -150,7 +153,7 @@ async function checkDidWebViaDns(domain: string, connectedAddress: string): Prom
       }
 
       foundValidRecord = true;
-      // Support both new 'controller=' and legacy 'caip10=' formats
+      // Support new 'controller=' (DID format) and legacy 'caip10=' (CAIP-10 format)
       const controllerEntries = entries.filter(e => e.startsWith('controller=') || e.startsWith('caip10='));
       debug('verify-did-web', `Found ${controllerEntries.length} controller entries`);
 
@@ -158,11 +161,25 @@ async function checkDidWebViaDns(domain: string, connectedAddress: string): Prom
         const controllerValue = entry.replace('controller=', '').replace('caip10=', '').trim();
         debug('verify-did-web', `Checking controller: ${controllerValue}`);
 
-        // Extract address from CAIP-10 (format: namespace:reference:address)
-        const parts = controllerValue.split(':');
-        if (parts.length === 3) {
-          const address = parts[2];
-          foundAddresses.push(address);
+        // Handle both DID format (did:pkh:eip155:chainId:address) and legacy CAIP-10 (eip155:chainId:address)
+        let address: string | null = null;
+        
+        if (controllerValue.startsWith('did:pkh:')) {
+          // DID format: did:pkh:eip155:chainId:address
+          const parts = controllerValue.replace('did:pkh:', '').split(':');
+          if (parts.length === 3) {
+            address = parts[2];
+          }
+        } else {
+          // Legacy CAIP-10 format: eip155:chainId:address
+          const parts = controllerValue.split(':');
+          if (parts.length === 3) {
+            address = parts[2];
+          }
+        }
+
+        if (address) {
+          foundControllers.push(controllerValue);
           debug('verify-did-web', `Extracted address: ${address}`);
 
           if (address.toLowerCase() === connectedAddress.toLowerCase()) {
@@ -177,15 +194,15 @@ async function checkDidWebViaDns(domain: string, connectedAddress: string): Prom
       return {
         success: false,
         error: 'Invalid DNS TXT record format',
-        details: `Found TXT record at ${txtRecordName} but missing "v=1". Record should be: v=1 controller=eip155:66238:${connectedAddress}`
+        details: `Found TXT record at ${txtRecordName} but missing "v=1". Record should be: v=1;controller=${expectedDid}`
       };
     }
 
-    if (foundAddresses.length === 0) {
+    if (foundControllers.length === 0) {
       return {
         success: false,
-        error: 'No controller address in DNS TXT record',
-        details: `Found valid TXT record at ${txtRecordName} but no controller address. Add: controller=eip155:66238:${connectedAddress}`
+        error: 'No controller in DNS TXT record',
+        details: `Found valid TXT record at ${txtRecordName} but no controller. Add: controller=${expectedDid}`
       };
     }
 
@@ -193,7 +210,7 @@ async function checkDidWebViaDns(domain: string, connectedAddress: string): Prom
     return {
       success: false,
       error: 'Address mismatch in DNS TXT record',
-      details: `Found addresses [${foundAddresses.join(', ')}] in TXT record at ${txtRecordName}, but expected ${connectedAddress}`
+      details: `Found controllers [${foundControllers.join(', ')}] in TXT record at ${txtRecordName}, but expected ${expectedDid}`
     };
   } catch (error) {
     debug('verify-did-web', 'DNS TXT lookup failed:', error);
@@ -332,7 +349,7 @@ async function verifyDidWeb(did: string, connectedAddress: string): Promise<Veri
   return {
     success: false,
     error: 'DID ownership verification failed',
-    details: `DNS check: ${dnsResult.error || 'Failed'}. DID document check: ${didDocResult.error || 'Failed'}. Ensure you have either: 1) DNS TXT record at _omatrust.${domain} with value "v=1 controller=eip155:66238:${connectedAddress}" OR 2) DID document at https://${domain}/.well-known/did.json with your address in verificationMethod`
+    details: `DNS check: ${dnsResult.error || 'Failed'}. DID document check: ${didDocResult.error || 'Failed'}. Ensure you have either: 1) DNS TXT record at _omatrust.${domain} with value "v=1;controller=did:pkh:eip155:66238:${connectedAddress}" OR 2) DID document at https://${domain}/.well-known/did.json with your address in verificationMethod`
   };
 }
 

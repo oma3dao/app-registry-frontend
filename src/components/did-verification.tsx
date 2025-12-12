@@ -117,8 +117,8 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
     const walletAddress = account?.address || "0xYOUR_ADDRESS";
     const chainId = env.activeChain.chainId;
 
-    // Format CAIP-10 identifier
-    const controllerAddress = `eip155:${chainId}:${walletAddress}`;
+    // Format controller as full DID
+    const controllerDid = `did:pkh:eip155:${chainId}:${walletAddress}`;
 
     return (
       <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
@@ -133,14 +133,14 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
               <ul className="list-disc ml-4 mt-1 space-y-1">
                 <li>Host a DID document at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs">https://{domain}/.well-known/did.json</code></li>
                 <li>Include your wallet address in the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">verificationMethod</code> field</li>
-                <li>Format: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">blockchainAccountId: &quot;{controllerAddress}&quot;</code></li>
+                <li>Format: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">blockchainAccountId: &quot;eip155:{chainId}:{walletAddress}&quot;</code></li>
               </ul>
 
               <p className="font-medium mt-3">Method 2: DNS TXT Record</p>
               <ul className="list-disc ml-4 mt-1 space-y-1">
                 <li>Add a TXT record at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">_omatrust.{domain}</code></li>
                 <li>Name: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">_omatrust</code></li>
-                <li>Value: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">v=1;controller={controllerAddress}</code></li>
+                <li>Value: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">v=1;controller={controllerDid}</code></li>
                 <li className="text-xs text-gray-600 dark:text-gray-400">Note: Use semicolon (;) as separator. Spaces also supported but not recommended.</li>
                 <li className="font-medium text-amber-700 dark:text-amber-400">⏱️ Wait at least 15 minutes after setup before clicking Verify (DNS propagation time)</li>
                 {!account && <li className="text-amber-600 dark:text-amber-400">⚠️ Connect your wallet to see your exact values</li>}
