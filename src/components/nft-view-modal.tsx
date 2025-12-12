@@ -76,7 +76,17 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
   
   // Use the metadata context to get complete metadata
   const { getNFTMetadata, fetchNFTDescription } = useNFTMetadata();
-  const nftMetadata = nft ? getNFTMetadata(nft) : null;
+  const [nftMetadata, setNftMetadata] = useState<ReturnType<typeof getNFTMetadata>>(null);
+
+  // Fetch metadata in useEffect to avoid setState during render
+  useEffect(() => {
+    if (nft && isOpen) {
+      const metadata = getNFTMetadata(nft);
+      setNftMetadata(metadata);
+    } else {
+      setNftMetadata(null);
+    }
+  }, [nft, isOpen, getNFTMetadata]);
   
   // Check for attestation when modal opens (separate from hash verification)
   useEffect(() => {
@@ -388,6 +398,9 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                 </div>
                 <div className="flex-grow">
                   <DialogTitle className="text-2xl mb-1">{nftMetadata?.displayData.name || nft.name || 'Unnamed App'}</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    View details for {nftMetadata?.displayData.name || nft.name || 'this app'}
+                  </DialogDescription>
                   <div className="text-md flex flex-col gap-2 text-muted-foreground">
                     <span>Version: {nft.version}</span>
                     {/* Interfaces */}
