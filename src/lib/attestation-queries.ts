@@ -219,7 +219,13 @@ function decodeAttestationData(schema: AttestationSchema, encodedData: string): 
 
         const result: Record<string, any> = {}
         decoded.forEach((item: any) => {
-            result[item.name] = item.value.value || item.value
+            // EAS decoded data has structure: { name, type, value: { value, type, name } }
+            // We want the innermost value, not the wrapper object
+            if (item.value && typeof item.value === 'object' && 'value' in item.value) {
+                result[item.name] = item.value.value
+            } else {
+                result[item.name] = item.value
+            }
         })
 
         return result
