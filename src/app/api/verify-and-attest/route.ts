@@ -126,19 +126,19 @@ async function checkDidWebViaDns(domain: string, connectedAddress: string): Prom
       return {
         success: false,
         error: 'No DNS TXT record found',
-        details: `No TXT record found at ${txtRecordName}. Create a TXT record with value: v=1 caip10=eip155:66238:${connectedAddress}`
+        details: `No TXT record found at ${txtRecordName}. Create a TXT record with value: v=1 controller=eip155:66238:${connectedAddress}`
       };
     }
 
     let foundValidRecord = false;
     let foundAddresses: string[] = [];
 
-    // Parse records looking for v=1 and caip10 entries
+    // Parse records looking for v=1 and controller entries (also support legacy caip10)
     for (const record of records) {
       const recordText = Array.isArray(record) ? record.join('') : record;
       debug('verify-did-web', `Parsing record: ${recordText}`);
 
-      // Split by semicolon OR whitespace (to handle both "v=1;caip10=..." and "v=1 caip10=...")
+      // Split by semicolon OR whitespace (to handle both "v=1;controller=..." and "v=1 controller=...")
       const entries = recordText.split(/[;\s]+/).map(e => e.trim()).filter(e => e.length > 0);
       debug('verify-did-web', `Parsed entries:`, entries);
 
@@ -150,15 +150,16 @@ async function checkDidWebViaDns(domain: string, connectedAddress: string): Prom
       }
 
       foundValidRecord = true;
-      const caip10Entries = entries.filter(e => e.startsWith('caip10='));
-      debug('verify-did-web', `Found ${caip10Entries.length} CAIP-10 entries`);
+      // Support both new 'controller=' and legacy 'caip10=' formats
+      const controllerEntries = entries.filter(e => e.startsWith('controller=') || e.startsWith('caip10='));
+      debug('verify-did-web', `Found ${controllerEntries.length} controller entries`);
 
-      for (const entry of caip10Entries) {
-        const caip10 = entry.replace('caip10=', '').trim();
-        debug('verify-did-web', `Checking CAIP-10: ${caip10}`);
+      for (const entry of controllerEntries) {
+        const controllerValue = entry.replace('controller=', '').replace('caip10=', '').trim();
+        debug('verify-did-web', `Checking controller: ${controllerValue}`);
 
         // Extract address from CAIP-10 (format: namespace:reference:address)
-        const parts = caip10.split(':');
+        const parts = controllerValue.split(':');
         if (parts.length === 3) {
           const address = parts[2];
           foundAddresses.push(address);
@@ -176,15 +177,15 @@ async function checkDidWebViaDns(domain: string, connectedAddress: string): Prom
       return {
         success: false,
         error: 'Invalid DNS TXT record format',
-        details: `Found TXT record at ${txtRecordName} but missing "v=1". Record should be: v=1 caip10=eip155:66238:${connectedAddress}`
+        details: `Found TXT record at ${txtRecordName} but missing "v=1". Record should be: v=1 controller=eip155:66238:${connectedAddress}`
       };
     }
 
     if (foundAddresses.length === 0) {
       return {
         success: false,
-        error: 'No CAIP-10 address in DNS TXT record',
-        details: `Found valid TXT record at ${txtRecordName} but no caip10 address. Add: caip10=eip155:66238:${connectedAddress}`
+        error: 'No controller address in DNS TXT record',
+        details: `Found valid TXT record at ${txtRecordName} but no controller address. Add: controller=eip155:66238:${connectedAddress}`
       };
     }
 
@@ -331,7 +332,7 @@ async function verifyDidWeb(did: string, connectedAddress: string): Promise<Veri
   return {
     success: false,
     error: 'DID ownership verification failed',
-    details: `DNS check: ${dnsResult.error || 'Failed'}. DID document check: ${didDocResult.error || 'Failed'}. Ensure you have either: 1) DNS TXT record at _omatrust.${domain} with value "v=1 caip10=eip155:66238:${connectedAddress}" OR 2) DID document at https://${domain}/.well-known/did.json with your address in verificationMethod`
+    details: `DNS check: ${dnsResult.error || 'Failed'}. DID document check: ${didDocResult.error || 'Failed'}. Ensure you have either: 1) DNS TXT record at _omatrust.${domain} with value "v=1 controller=eip155:66238:${connectedAddress}" OR 2) DID document at https://${domain}/.well-known/did.json with your address in verificationMethod`
   };
 }
 
