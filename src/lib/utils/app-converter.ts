@@ -79,6 +79,9 @@ export function appSummaryToNFT(app: AppSummary, fallbackAddress?: string): NFT 
     minter: app.minter || fallbackAddress || '',
     currentOwner: app.currentOwner || '', // Current NFT holder from contract
 
+    // inherited ERC-721 values
+    tokenId: app.tokenId !== undefined ? Number(app.tokenId) : undefined,
+
     // Flattened metadata fields (will be populated by metadata fetching)
     description: '',
     publisher: '',
@@ -126,6 +129,14 @@ export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
     }
 
     const metadata = await response.json();
+    console.log(`[hydrateNFTWithMetadata] ${nft.did} - fetched metadata:`, metadata);
+
+    // Extract tokenId: prefer from NFT (contract), fallback to registrations array (metadata)
+    let tokenId = nft.tokenId;
+    if (tokenId === undefined && metadata.registrations?.[0]?.agentId !== undefined) {
+      tokenId = Number(metadata.registrations[0].agentId);
+      console.log(`[hydrateNFTWithMetadata] ${nft.did} - extracted tokenId from registrations:`, tokenId);
+    }
 
     // Merge all metadata fields into the NFT object
     // Metadata JSON is the source of truth for all off-chain fields
@@ -154,6 +165,9 @@ export async function hydrateNFTWithMetadata(nft: NFT): Promise<NFT> {
       // Extract MCP config from endpoint if name === "MCP"
       mcp: extractMcpFromEndpoint(metadata.endpoints?.[0]),
       traits: metadata.traits,
+      // ERC-8004 registrations array and tokenId
+      tokenId,
+      registrations: metadata.registrations,
     };
   } catch (error) {
     console.error(`[hydrateNFTWithMetadata] Error fetching metadata for ${nft.did}:`, error);

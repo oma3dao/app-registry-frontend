@@ -10,10 +10,11 @@ import { Copy, CheckCircle, ExternalLink, Info } from "lucide-react";
 import {
   calculateTransferAmount,
   formatTransferAmount,
-  getRecipientAddress,
   getChainIdFromDid,
   getExplorerAddressUrl,
   getExplorerTxUrl,
+  buildPkhDid,
+  PROOF_PURPOSE,
 } from "@/lib/verification/onchain-transfer";
 
 interface OnchainTransferInstructionsProps {
@@ -43,8 +44,16 @@ export function OnchainTransferInstructions({
 
     setChainId(extractedChainId);
 
-    // Calculate the exact amount
-    const amount = calculateTransferAmount(did, mintingWallet, extractedChainId);
+    // Calculate the exact amount using the new spec
+    // Subject = the DID being proven (controlling wallet owns this)
+    // Counterparty = the minting wallet (recipient of the transfer)
+    const counterpartyDid = buildPkhDid(extractedChainId, mintingWallet);
+    const amount = calculateTransferAmount(
+      did,
+      counterpartyDid,
+      extractedChainId,
+      PROOF_PURPOSE.SHARED_CONTROL
+    );
     setTransferAmount(amount);
   }, [did, mintingWallet]);
 
@@ -52,8 +61,8 @@ export function OnchainTransferInstructions({
     return null;
   }
 
-  const recipient = getRecipientAddress(chainId, mintingWallet);
-  const { formatted, symbol, wei } = formatTransferAmount(transferAmount, chainId);
+  const recipient = mintingWallet;
+  const { formatted, symbol } = formatTransferAmount(transferAmount, chainId);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -152,7 +161,7 @@ export function OnchainTransferInstructions({
         {/* Amount */}
         <div>
           <Label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-            Exact Amount (CRITICAL - Must be exact!)
+            Exact Amount
           </Label>
           <div className="flex items-center gap-2 mt-1">
             <code className="text-lg font-bold bg-yellow-100 dark:bg-yellow-900 px-3 py-2 rounded flex-1 font-mono">
@@ -170,8 +179,8 @@ export function OnchainTransferInstructions({
               )}
             </Button>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Wei: {wei}
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+            ⚠️ Use the copy button — this value must be pasted exactly as shown
           </p>
         </div>
       </div>
@@ -183,11 +192,11 @@ export function OnchainTransferInstructions({
             ⚠️ Important:
           </p>
           <ul className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
-            <li>Send the <strong>exact amount</strong> shown above (including all decimals)</li>
+            <li><strong>Copy the amount using the button</strong> — do not type it manually</li>
+            <li>Paste the exact value into your wallet — all decimal places matter</li>
             <li>Send from the <strong>controlling wallet</strong> ({controllingWallet.slice(0, 6)}...)</li>
             <li>Send to the <strong>minting wallet</strong> ({recipient.slice(0, 6)}...)</li>
             <li>Wait for transaction confirmation before continuing</li>
-            <li>This creates a public, verifiable link between the two wallets</li>
           </ul>
         </AlertDescription>
       </Alert>
@@ -235,9 +244,8 @@ export function OnchainTransferInstructions({
       <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
         <p className="font-medium">How to send the transfer:</p>
         <ol className="list-decimal list-inside ml-2 space-y-1">
-          <li>Open your wallet (MetaMask, etc.) with the controlling wallet</li>
-          <li>Send a transaction with the exact amount shown above</li>
-          <li>To the minting wallet address</li>
+          <li>Copy the exact transfer amount shown above</li>
+          <li>Send this exact amount from the controlling wallet to the minting wallet</li>
           <li>Wait for confirmation (usually 1-2 minutes)</li>
           <li>Copy the transaction hash and paste it above</li>
         </ol>

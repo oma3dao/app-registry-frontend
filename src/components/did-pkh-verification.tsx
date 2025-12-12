@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useActiveAccount } from "thirdweb/react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, AlertCircle, Info } from "lucide-react";
 
 import { OnchainTransferInstructions } from "@/components/onchain-transfer-instructions";
+import { isEvmDid, getDidNamespace } from "@/lib/verification/onchain-transfer";
 
 interface DidPkhVerificationProps {
   did: string;
@@ -14,7 +15,7 @@ interface DidPkhVerificationProps {
   isVerified: boolean;
 }
 
-type VerificationStatus = "idle" | "checking" | "verified" | "failed";
+type VerificationStatus = "idle" | "discovering" | "ready-for-transfer" | "checking" | "verified" | "failed";
 
 export function DidPkhVerification({
   did,
@@ -29,37 +30,61 @@ export function DidPkhVerification({
   const [verificationMethodUsed, setVerificationMethodUsed] = useState<string | null>(null);
   const [controllingWallet, setControllingWallet] = useState<string | null>(null);
 
-  const handleDiscoverWallet = async () => {
-    setStatus("checking");
-    setError(null);
+  // Check if DID is a supported EVM chain
+  const isEvm = isEvmDid(did);
+  const namespace = getDidNamespace(did);
 
-    try {
-      // Call API to discover controlling wallet (without verification)
-      const response = await fetch("/api/discover-controlling-wallet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ did }),
-      });
+  // Auto-discover controlling wallet when DID changes
+  useEffect(() => {
+    if (!did || !account?.address || isVerified || !isEvm) return;
 
-      const data = await response.json();
+    const discoverAndCheckWallet = async () => {
+      setStatus("discovering");
+      setError(null);
+      setControllingWallet(null);
 
-      if (data.ok && data.controllingWallet) {
-        setControllingWallet(data.controllingWallet);
-        setStatus("idle"); // Back to idle, ready for transfer
-      } else {
+      try {
+        // Call API to discover controlling wallet
+        const response = await fetch("/api/discover-controlling-wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ did }),
+        });
+
+        const data = await response.json();
+
+        if (data.ok && data.controllingWallet) {
+          const discoveredWallet = data.controllingWallet.toLowerCase();
+          const connectedWallet = account.address.toLowerCase();
+
+          setControllingWallet(data.controllingWallet);
+
+          // Check if connected wallet is the controlling wallet
+          if (discoveredWallet === connectedWallet) {
+            // Auto-verify since wallets match
+            await handleAutomatedVerify();
+          } else {
+            // Show transfer instructions
+            setStatus("ready-for-transfer");
+          }
+        } else {
+          setStatus("failed");
+          setError(
+            data.error ||
+            "Could not discover controlling wallet. The contract may not have standard ownership functions."
+          );
+        }
+      } catch (err) {
         setStatus("failed");
         setError(
-          data.error ||
-          "Could not discover controlling wallet. The contract may not have standard ownership functions."
+          err instanceof Error ? err.message : "Failed to discover controlling wallet"
         );
       }
-    } catch (err) {
-      setStatus("failed");
-      setError(
-        err instanceof Error ? err.message : "Failed to discover controlling wallet"
-      );
-    }
-  };
+    };
+
+    discoverAndCheckWallet();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [did, account?.address, isVerified]);
 
   const handleAutomatedVerify = async () => {
     if (!account?.address) {
@@ -159,47 +184,87 @@ export function DidPkhVerification({
     );
   }
 
+  // Show warning for non-EVM DIDs
+  if (!isEvm) {
+    return (
+      <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950">
+        <Info className="h-4 w-4 text-blue-600" />
+        <AlertDescription>
+          <div className="space-y-2">
+            <p className="font-medium text-blue-900 dark:text-blue-100">
+              Non-EVM Chain Detected
+            </p>
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              The DID uses the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{namespace}</code> namespace, 
+              which is not yet supported for direct ownership verification.
+            </p>
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Support for non-EVM chains (Solana, Cosmos, etc.) via key binding attestations is coming soon.
+            </p>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* Verification Status */}
-      {status === "idle" && (
+      {/* Discovering Status */}
+      {status === "discovering" && (
         <Alert>
-          <AlertCircle className="h-4 w-4" />
+          <Loader2 className="h-4 w-4 animate-spin" />
           <AlertDescription>
             <div className="space-y-2">
-              <p className="font-medium">Contract Ownership Verification Required</p>
+              <p className="font-medium">Discovering Controlling Wallet...</p>
               <p className="text-sm">
-                You have two options to verify ownership:
+                Looking up the contract owner on-chain. This may take a few seconds.
               </p>
-              <ul className="text-sm list-disc list-inside ml-2 space-y-2">
-                <li>
-                  <strong>Option 1 (Recommended):</strong> Send a small transfer from the controlling wallet to prove ownership.
-                  Safer - doesn&apos;t require connecting your admin wallet. Click &quot;Discover Controlling Wallet&quot; to start.
-                </li>
-                <li>
-                  <strong>Option 2:</strong> If your connected wallet is the contract owner/admin, 
-                  click &quot;Verify Wallet Ownership&quot; to verify automatically.
-                </li>
-              </ul>
             </div>
           </AlertDescription>
         </Alert>
       )}
 
+      {/* Ready for Transfer - Show instructions */}
+      {status === "ready-for-transfer" && controllingWallet && (
+        <>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p className="font-medium">Ownership Verification Required</p>
+                <p className="text-sm">
+                  The controlling wallet (<code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">{controllingWallet.slice(0, 6)}...{controllingWallet.slice(-4)}</code>) 
+                  is different from your connected wallet. 
+                  Send a small transfer to prove you control both wallets.
+                </p>
+              </div>
+            </AlertDescription>
+          </Alert>
+
+          <OnchainTransferInstructions
+            did={did}
+            controllingWallet={controllingWallet}
+            onTransferProvided={handleTransferVerify}
+          />
+        </>
+      )}
+
+      {/* Checking Status */}
       {status === "checking" && (
         <Alert>
           <Loader2 className="h-4 w-4 animate-spin" />
           <AlertDescription>
             <div className="space-y-2">
-              <p className="font-medium">Verifying Contract Ownership...</p>
+              <p className="font-medium">Verifying Ownership...</p>
               <p className="text-sm">
-                Checking contract ownership patterns on-chain. This may take a few seconds.
+                Checking ownership proof on-chain. This may take a few seconds.
               </p>
             </div>
           </AlertDescription>
         </Alert>
       )}
 
+      {/* Verified Status */}
       {status === "verified" && (
         <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
           <CheckCircle className="h-4 w-4 text-green-600" />
@@ -221,6 +286,7 @@ export function DidPkhVerification({
         </Alert>
       )}
 
+      {/* Failed Status */}
       {status === "failed" && (
         <Alert className="border-red-500 bg-red-50 dark:bg-red-950">
           <XCircle className="h-4 w-4 text-red-600" />
@@ -243,36 +309,15 @@ export function DidPkhVerification({
         </Alert>
       )}
 
-      {/* Verification Buttons */}
-      {(status === "idle" || status === "failed") && (
-        <div className="space-y-3">
-          <Button
-            onClick={handleDiscoverWallet}
-            variant="outline"
-            className="w-full"
-          >
-            Discover Controlling Wallet
-          </Button>
-          
-          <Button
-            onClick={handleAutomatedVerify}
-            variant="default"
-            className="w-full"
-          >
-            Verify Wallet Ownership
-          </Button>
-        </div>
-      )}
-      
-      {/* Show transfer instructions after discovering wallet */}
-      {controllingWallet && (status === "idle" || status === "failed") && (
-        <div className="border-t pt-4 mt-4">
-          <OnchainTransferInstructions
-            did={did}
-            controllingWallet={controllingWallet}
-            onTransferProvided={handleTransferVerify}
-          />
-        </div>
+      {/* Retry button when failed */}
+      {status === "failed" && (
+        <Button
+          onClick={handleAutomatedVerify}
+          variant="default"
+          className="w-full"
+        >
+          Verify Wallet Ownership
+        </Button>
       )}
     </div>
   );

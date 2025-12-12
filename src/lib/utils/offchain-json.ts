@@ -8,6 +8,8 @@
  * - Could share field mapping logic and reduce duplication
  */
 
+import { env } from '@/config/env';
+
 type AnyRecord = Record<string, any> | undefined | null;
 
 export interface OffchainBuildInput {
@@ -16,6 +18,16 @@ export interface OffchainBuildInput {
   // 2. Nested structure (old way) - fields in metadata object
   name?: string;
   metadata?: AnyRecord; // Deprecated: for backwards compatibility only
+  
+  // ERC-8004 Security Extension
+  did?: string;
+  version?: string; // Semantic version for verification against on-chain version
+  tokenId?: number; // ERC-721 tokenId (output as agentId in JSON per ERC-8004)
+  registrations?: Array<{
+    did: string;
+    agentRegistry: string;
+    agentId?: number;
+  }>;
   
   // Flattened fields (new structure)
   external_url?: string;
@@ -77,6 +89,7 @@ export function buildOffchainMetadataObject(input: OffchainBuildInput): Record<s
   const out: Record<string, any> = {
     // Strings / URLs
     name: name || undefined,
+    version: pick('version') || undefined,
     external_url: pick('external_url') || undefined,
     image: pick('image') || undefined,
     description: pick('description') || undefined,
@@ -129,6 +142,39 @@ export function buildOffchainMetadataObject(input: OffchainBuildInput): Record<s
   
   // Remove top-level mcp field (it's now embedded in the endpoint)
   delete out.mcp;
+
+  // Build registrations array (ERC-8004 Security Extension)
+  // Links the metadata back to its on-chain registration for verification
+  const did = input?.did || pick('did');
+  if (did) {
+    // Use existing registrations if present, otherwise create new
+    const existingRegistrations = input?.registrations || pick('registrations');
+    if (Array.isArray(existingRegistrations) && existingRegistrations.length > 0) {
+      // Use existing registrations, but update agentId if we have a newer tokenId
+      const updatedRegistrations = existingRegistrations.map((reg: any) => {
+        if (reg.did === did && typeof input?.tokenId === 'number') {
+          // Validate: if agentId exists and differs from tokenId, log warning
+          if (reg.agentId !== undefined && reg.agentId !== input.tokenId) {
+            console.warn(`[buildOffchainMetadataObject] agentId mismatch: existing=${reg.agentId}, tokenId=${input.tokenId}`);
+          }
+          return { ...reg, agentId: input.tokenId };
+        }
+        return reg;
+      });
+      out.registrations = updatedRegistrations;
+    } else {
+      // Create new registration
+      const registration: Record<string, any> = {
+        did,
+        agentRegistry: `eip155:${env.chainId}:${env.registryAddress}`,
+      };
+      // Include agentId (tokenId) if available (for updates, not initial registration)
+      if (typeof input?.tokenId === 'number') {
+        registration.agentId = input.tokenId;
+      }
+      out.registrations = [registration];
+    }
+  }
 
   // Deep clean: recursively remove empty values
   return deepClean(out);

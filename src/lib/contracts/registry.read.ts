@@ -367,6 +367,83 @@ export async function hasAllTraits(
 }
 
 // ============================================================================
+// Token ID Resolution (for ERC-8004 registrations array)
+// ============================================================================
+
+/**
+ * Get the ERC-721 tokenId for a DID + major version by querying the Registered event logs
+ * This is a fallback until the contract returns tokenId in getApp()
+ * 
+ * @param did The DID of the app
+ * @param major The major version
+ * @returns Token ID or undefined if not found
+ */
+export async function getTokenIdFromEvents(did: string, major: number): Promise<number | undefined> {
+  try {
+    const { getDidHash } = await import('../utils/did');
+    const { getActiveChain } = await import('./client');
+    const { ethers } = await import('ethers');
+    const { env } = await import('@/config/env');
+    
+    const normalizedDid = normalizeDidWeb(did);
+    const didHash = await getDidHash(normalizedDid);
+    
+    console.log('[getTokenIdFromEvents] Searching for tokenId:', { did: normalizedDid, major, didHash });
+    
+    const chain = getActiveChain();
+    const provider = new ethers.JsonRpcProvider(chain.rpc);
+    
+    // Create contract interface for event parsing
+    const registeredEventAbi = [
+      'event Registered(uint256 indexed tokenId, string dataUrl, address indexed registerer, bytes32 indexed didHash, uint8 versionMajor, uint16 interfaces, uint256 registrationBlock, uint256 registrationTimestamp)'
+    ];
+    const iface = new ethers.Interface(registeredEventAbi);
+    
+    const eventFragment = iface.getEvent('Registered');
+    if (!eventFragment) {
+      return undefined;
+    }
+    
+    // Query Registered events filtered by didHash (indexed topic)
+    // Must specify fromBlock: 0 as some RPCs don't search all blocks by default
+    const filter = {
+      address: env.registryAddress,
+      topics: [
+        eventFragment.topicHash,
+        null, // tokenId (indexed but we want all)
+        null, // registerer (indexed but we want all)
+        didHash, // didHash (indexed - filter by this)
+      ] as (string | null)[],
+      fromBlock: 0,
+      toBlock: 'latest',
+    };
+    
+    const logs = await provider.getLogs(filter);
+    console.log('[getTokenIdFromEvents] Found', logs.length, 'Registered events for DID');
+    
+    // Find the log matching our major version
+    for (const log of logs) {
+      try {
+        const parsed = iface.parseLog({ topics: log.topics as string[], data: log.data });
+        if (parsed && Number(parsed.args.versionMajor) === major) {
+          const tokenId = Number(parsed.args.tokenId);
+          console.log('[getTokenIdFromEvents] Found tokenId:', tokenId);
+          return tokenId;
+        }
+      } catch {
+        // Skip unparseable logs
+      }
+    }
+    
+    console.log('[getTokenIdFromEvents] No matching tokenId found for major version:', major);
+    return undefined;
+  } catch (e) {
+    console.error('[getTokenIdFromEvents] Error:', e);
+    return undefined;
+  }
+}
+
+// ============================================================================
 // Convenience aliases for backward compatibility
 // ============================================================================
 

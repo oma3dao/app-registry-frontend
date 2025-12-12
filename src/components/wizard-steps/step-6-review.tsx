@@ -4,7 +4,7 @@
  * plus a JSON preview for custom dataUrl hosting.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { StepRenderContext } from "@/lib/wizard";
 import { computeInterfacesBitmap } from "@/lib/utils/interfaces";
 import { canonicalizeForHash } from "@/lib/utils/dataurl";
@@ -12,6 +12,7 @@ import { buildOffchainMetadataObject } from "@/lib/utils/offchain-json";
 import { buildCaip10 } from "@/lib/utils/caip10";
 import { env } from "@/config/env";
 import { useActiveAccount } from "thirdweb/react";
+import { getTokenIdFromEvents } from "@/lib/contracts/registry.read";
 
 function dashIfEmpty(v: any): string {
   if (v === undefined || v === null) return "—";
@@ -20,8 +21,35 @@ function dashIfEmpty(v: any): string {
   return String(v);
 }
 
-export default function Step6_Review({ state }: StepRenderContext) {
+export default function Step6_Review({ state, updateField }: StepRenderContext) {
   const account = useActiveAccount();
+  const [tokenId, setTokenId] = useState<number | undefined>(state.tokenId);
+
+  // Fetch tokenId from event logs if this is an edit and tokenId is missing
+  useEffect(() => {
+    if (state.tokenId !== undefined) {
+      setTokenId(state.tokenId);
+      return;
+    }
+    // Only fetch if we have a DID (indicates existing registration)
+    if (!state.did) return;
+
+    const fetchTokenId = async () => {
+      try {
+        const versionParts = (state.version || '1.0').split('.').map(Number);
+        const major = versionParts[0] || 1;
+        const id = await getTokenIdFromEvents(state.did!, major);
+        if (id !== undefined) {
+          setTokenId(id);
+          // Persist to wizard state so it's available on submit
+          updateField('tokenId', id);
+        }
+      } catch (e) {
+        console.warn('[Step6 Review] Failed to fetch tokenId:', e);
+      }
+    };
+    fetchTokenId();
+  }, [state.did, state.version, state.tokenId, updateField]);
 
   const interfacesBitmap = useMemo(() => {
     const flags = state.interfaceFlags || { human: false, api: false, smartContract: false };
@@ -35,9 +63,11 @@ export default function Step6_Review({ state }: StepRenderContext) {
         ? buildCaip10('eip155', env.chainId.toString(), account.address)
         : undefined;
 
-      // Pass flattened state directly - all fields at top level (no nested metadata)
+      // Pass flattened state directly - all fields at top level
+      // Include tokenId for registrations array (fetched from events if needed)
       const out = buildOffchainMetadataObject({
-        ...state, // Spread all flattened fields (name, description, endpoint, mcp, platforms, traits, etc.)
+        ...state,
+        tokenId,
         owner, // Override with CAIP-10 formatted owner
       });
 
@@ -54,7 +84,7 @@ export default function Step6_Review({ state }: StepRenderContext) {
       console.error('[Step6 Review] Error building metadata:', err);
       return { metadataPreview: "{}", jcsJsonForHash: "{}" };
     }
-  }, [state, account?.address]);
+  }, [state, account?.address, tokenId]);
 
   const { dataHashHex, dataHashAlgorithm } = useMemo(() => {
     // Algorithm: 0 = keccak256 (default)

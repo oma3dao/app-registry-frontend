@@ -89,8 +89,8 @@ export interface AppSummary {
   name?: string;                  // From off-chain metadata
   description?: string;           // From off-chain metadata
   
-  // === INTERNAL (don't expose to users) ===
-  _tokenId?: bigint;              // ERC721 token ID (internal only)
+  // ERC-721 token ID (output as agentId in ERC-8004 registrations array)
+  tokenId?: bigint;
 }
 
 /**

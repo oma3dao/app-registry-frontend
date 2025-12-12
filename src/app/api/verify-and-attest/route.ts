@@ -421,10 +421,12 @@ async function verifyViaTransfer(
       };
     }
 
-    // 6. Calculate expected amount using spec formula
+    // 6. Calculate expected amount using spec formula (OMATrust Proof Spec §5.3.6)
     // Import the calculation function
-    const { calculateTransferAmount } = await import('@/lib/verification/onchain-transfer');
-    const expectedAmount = calculateTransferAmount(did, mintingWallet, chainId);
+    const { calculateTransferAmount, buildPkhDid, PROOF_PURPOSE } = await import('@/lib/verification/onchain-transfer');
+    // Subject = the DID being proven, Counterparty = minting wallet (recipient)
+    const counterpartyDid = buildPkhDid(chainId, mintingWallet);
+    const expectedAmount = calculateTransferAmount(did, counterpartyDid, chainId, PROOF_PURPOSE.SHARED_CONTROL);
 
     debug('verify-transfer', `Verifying amount:`);
     debug('verify-transfer', `  Expected: ${expectedAmount.toString()} wei (${ethers.formatEther(expectedAmount)} OMA)`);

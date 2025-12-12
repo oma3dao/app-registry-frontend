@@ -171,6 +171,14 @@ export const DomainForm = z.object({
   dataUrl: z.string().url().optional(),
   contractId: z.string().optional(),
   fungibleTokenId: z.string().optional(),
+  
+  // ERC-721 / ERC-8004 data
+  tokenId: z.number().optional(),
+  registrations: z.array(z.object({
+    did: z.string(),
+    agentRegistry: z.string(),
+    agentId: z.number().optional(),
+  })).optional(),
 
   // All metadata fields (flattened)
   name: z.string().min(2).max(80),
@@ -745,6 +753,14 @@ export interface NFT {
   // Frontend flags
   hasError?: boolean;
   errorMessage?: string;
+
+  // ERC-721 / ERC-8004 data
+  tokenId?: number;
+  registrations?: Array<{
+    did: string;
+    agentRegistry: string;
+    agentId?: number;
+  }>;
 }
 
 /**
