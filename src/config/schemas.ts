@@ -2,7 +2,7 @@
 // Do not edit manually - your changes will be overwritten
 
 // Schema definitions for attestation forms
-export type FieldType = 'string' | 'integer' | 'array' | 'enum' | 'datetime' | 'uri' | 'object'
+export type FieldType = 'string' | 'integer' | 'array' | 'enum' | 'datetime' | 'uri' | 'object' | 'json'
 
 export interface FormField {
   name: string
@@ -11,8 +11,9 @@ export interface FormField {
   description?: string
   required: boolean
   placeholder?: string
-  options?: string[] // for enum fields
+  options?: (string | number)[] // for enum fields (strings or integers)
   format?: string // for validation (uri, date-time, etc.)
+  pattern?: string // regex pattern for string validation
   min?: number // for integer fields
   max?: number // for integer fields
   minLength?: number // for string fields
@@ -42,87 +43,20 @@ const certificationFields: FormField[] = [
     "description": "DID of the product, system, or organization being certified.",
     "required": true,
     "placeholder": "Enter subject",
-    "maxLength": 128,
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
     "format": "did"
   },
   {
     "name": "organization",
     "type": "string",
     "label": "Organization",
-    "description": "DID of the parent organization. Use this when certifying a service or resource that belongs to an organization (e.g., certifying did:web:example.com:service:api, set organization to did:web:example.com). Leave empty when certifying an organization directly.",
+    "description": "DID of the parent organization that owns or governs the certified subject. For example, when certifying did:web:example.com:service:api, set organization to did:web:example.com. Leave empty when certifying an organization itself.",
     "required": false,
     "placeholder": "Enter organization",
-    "maxLength": 128,
-    "format": "did"
-  },
-  {
-    "name": "subjectOwner",
-    "type": "string",
-    "label": "Subject Owner ID",
-    "description": "DID of the entity responsible for the subject.  If there is no owner, leave blank.",
-    "required": false,
-    "placeholder": "Enter subjectowner",
-    "maxLength": 128,
-    "format": "did"
-  },
-  {
-    "name": "subjectMetadataURI",
-    "type": "uri",
-    "label": "Subject Informational URI",
-    "description": "Optional URI controlled by the subject that provides mutable, human-readable metadata.",
-    "required": false,
-    "placeholder": "https://example.com",
     "maxLength": 256,
-    "format": "uri"
-  },
-  {
-    "name": "programIdentifier",
-    "type": "string",
-    "label": "Program ID",
-    "description": "DID of the certification program under which this certification was issued. Program release version should be included in the DID.",
-    "required": true,
-    "placeholder": "Enter programidentifier",
-    "maxLength": 128,
+    "pattern": "^did:[a-z0-9]+:.+$",
     "format": "did"
-  },
-  {
-    "name": "programMetadataURI",
-    "type": "uri",
-    "label": "Program Informational URI",
-    "description": "Optional URI for mutable, human-readable certification program info.",
-    "required": false,
-    "placeholder": "https://example.com",
-    "maxLength": 256,
-    "format": "uri"
-  },
-  {
-    "name": "assessor",
-    "type": "string",
-    "label": "Assessor DID",
-    "description": "DID of the authorized assessor (test lab, auditor) who evaluated the subject.",
-    "required": true,
-    "placeholder": "Enter assessor",
-    "maxLength": 128,
-    "format": "did"
-  },
-  {
-    "name": "assessorMetadataURI",
-    "type": "uri",
-    "label": "Assessor Informational URI",
-    "description": "Optional URI with human-readable info about the assessor (e.g., homepage, credentials).",
-    "required": false,
-    "placeholder": "https://example.com",
-    "maxLength": 256,
-    "format": "uri"
-  },
-  {
-    "name": "certificationLevel",
-    "type": "string",
-    "label": "Certification Level",
-    "description": "Optional classification level of certification (e.g., 'Gold', 'Level 2').",
-    "required": false,
-    "placeholder": "Enter certificationlevel",
-    "maxLength": 256
   },
   {
     "name": "version",
@@ -143,6 +77,107 @@ const certificationFields: FormField[] = [
     "maxLength": 50
   },
   {
+    "name": "subjectURI",
+    "type": "uri",
+    "label": "Subject Informational URI",
+    "description": "Optional URI controlled by the subject that provides mutable, human-readable metadata.",
+    "required": false,
+    "placeholder": "https://example.com",
+    "maxLength": 256,
+    "format": "uri"
+  },
+  {
+    "name": "programID",
+    "type": "string",
+    "label": "Program ID",
+    "description": "DID of the certification program under which this certification was issued. Program release version should be included in the DID.",
+    "required": true,
+    "placeholder": "Enter programid",
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
+  },
+  {
+    "name": "programURI",
+    "type": "uri",
+    "label": "Program Informational URI",
+    "description": "Optional URI for mutable, human-readable certification program info.",
+    "required": false,
+    "placeholder": "https://example.com",
+    "maxLength": 256,
+    "format": "uri"
+  },
+  {
+    "name": "assessor",
+    "type": "string",
+    "label": "Assessor DID",
+    "description": "DID of the authorized assessor (test lab, auditor) who evaluated the subject.",
+    "required": true,
+    "placeholder": "Enter assessor",
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
+  },
+  {
+    "name": "assessorURI",
+    "type": "uri",
+    "label": "Assessor Informational URI",
+    "description": "Optional URI with human-readable info about the assessor (e.g., homepage, credentials).",
+    "required": false,
+    "placeholder": "https://example.com",
+    "maxLength": 256,
+    "format": "uri"
+  },
+  {
+    "name": "certificationLevel",
+    "type": "string",
+    "label": "Certification Level",
+    "description": "Optional classification level of certification (e.g., 'Gold', 'Level 2').",
+    "required": false,
+    "placeholder": "Enter certificationlevel",
+    "maxLength": 256
+  },
+  {
+    "name": "outcome",
+    "type": "enum",
+    "label": "Outcome",
+    "description": "Overall outcome of an assessment or certification. If omitted, outcome MUST be interpreted as 'pass'.",
+    "required": false,
+    "placeholder": "Enter outcome",
+    "options": [
+      "pass",
+      "fail"
+    ]
+  },
+  {
+    "name": "reportURI",
+    "type": "uri",
+    "label": "Report URI",
+    "description": "Optional URI to the certification report or assessment documentation.",
+    "required": false,
+    "placeholder": "https://example.com",
+    "maxLength": 256,
+    "format": "uri"
+  },
+  {
+    "name": "reportDigest",
+    "type": "json",
+    "label": "Report Digest",
+    "description": "Content digest of a report for integrity verification. Paste the full JSON object.",
+    "required": false,
+    "placeholder": "Paste JSON object..."
+  },
+  {
+    "name": "issuedAt",
+    "type": "integer",
+    "label": "Issued Date",
+    "description": "Unix timestamp (in seconds) when the certification was issued by the certification body.",
+    "required": true,
+    "placeholder": "0",
+    "autoDefault": "current-timestamp",
+    "subtype": "timestamp"
+  },
+  {
     "name": "effectiveAt",
     "type": "integer",
     "label": "Effective Date",
@@ -160,18 +195,10 @@ const certificationFields: FormField[] = [
     "required": false,
     "placeholder": "0",
     "subtype": "timestamp"
-  },
-  {
-    "name": "issuedAt",
-    "type": "integer",
-    "label": "Issued Date",
-    "description": "Optional timestamp (in seconds) when the certification was issued.",
-    "required": false,
-    "placeholder": "0",
-    "autoDefault": "current-timestamp",
-    "subtype": "timestamp"
   }
 ]
+
+const commonFields: FormField[] = []
 
 const endorsementFields: FormField[] = [
   {
@@ -181,7 +208,9 @@ const endorsementFields: FormField[] = [
     "description": "DID of the entity being endorsed or approved.",
     "required": true,
     "placeholder": "Enter subject",
-    "maxLength": 128
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
   },
   {
     "name": "organization",
@@ -190,7 +219,8 @@ const endorsementFields: FormField[] = [
     "description": "DID of the parent organization. Use this when endorsing a service or resource that belongs to an organization (e.g., endorsing did:web:example.com:service:api, set organization to did:web:example.com). Leave empty when endorsing an organization directly.",
     "required": false,
     "placeholder": "Enter organization",
-    "maxLength": 128,
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
     "format": "did"
   },
   {
@@ -201,7 +231,8 @@ const endorsementFields: FormField[] = [
     "required": false,
     "placeholder": "Enter version",
     "subtype": "semver",
-    "maxLength": 50
+    "maxLength": 50,
+    "pattern": "^\\d+\\.\\d+\\.\\d+$"
   },
   {
     "name": "policyURI",
@@ -247,51 +278,125 @@ const endorsementFields: FormField[] = [
   }
 ]
 
+const keyBindingFields: FormField[] = [
+  {
+    "name": "subject",
+    "type": "string",
+    "label": "Subject ID",
+    "description": "DID to which this key is bound.",
+    "required": true,
+    "placeholder": "Enter subject",
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
+  },
+  {
+    "name": "keyId",
+    "type": "string",
+    "label": "Key Identifier",
+    "description": "DID representing this key. If using did:key or did:pkh:eip155, publicKeyJwk is optional.",
+    "required": true,
+    "placeholder": "Enter keyid",
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
+  },
+  {
+    "name": "publicKeyJwk",
+    "type": "json",
+    "label": "Public Key (JWK)",
+    "description": "JWK-formatted public key. Required if keyId is not a self-certifying did:key. Paste the full JWK JSON object.",
+    "required": false,
+    "placeholder": "Paste JSON object..."
+  },
+  {
+    "name": "keyPurpose",
+    "type": "array",
+    "label": "Key Purpose",
+    "description": "Permitted purposes for this key (e.g., 'authentication', 'assertionMethod', 'keyAgreement', 'capabilityInvocation', 'capabilityDelegation').",
+    "required": true,
+    "placeholder": "Enter keypurpose"
+  },
+  {
+    "name": "proofs",
+    "type": "array",
+    "label": "Proofs",
+    "description": "Array of cryptographic proofs demonstrating the subject's control over the key. Use proofPurpose='shared-control' for key binding attestations.",
+    "required": true,
+    "placeholder": "Enter proofs"
+  },
+  {
+    "name": "issuedAt",
+    "type": "integer",
+    "label": "Issued Date",
+    "description": "Unix timestamp (in seconds) when the key binding was issued.",
+    "required": true,
+    "placeholder": "0",
+    "autoDefault": "current-timestamp",
+    "subtype": "timestamp",
+    "min": 0
+  },
+  {
+    "name": "effectiveAt",
+    "type": "integer",
+    "label": "Effective Date",
+    "description": "Unix timestamp (in seconds) when the key binding becomes effective.",
+    "required": false,
+    "placeholder": "0",
+    "autoDefault": "current-timestamp",
+    "subtype": "timestamp",
+    "min": 0
+  },
+  {
+    "name": "expiresAt",
+    "type": "integer",
+    "label": "Expiration Date",
+    "required": false,
+    "placeholder": "0",
+    "subtype": "timestamp",
+    "min": 0
+  }
+]
+
 const linkedIdentifierFields: FormField[] = [
   {
     "name": "subject",
     "type": "string",
     "label": "Subject ID",
-    "description": "DID of the subject (such as did:pkh for wallet addresses or did:web for web domains) that is claimed to control the linked identifier.",
+    "description": "DID of the identity initiating the link (e.g., did:pkh for wallets, did:web for domains, did:handle for social accounts, did:key for keys).",
     "required": true,
     "placeholder": "Enter subject",
-    "maxLength": 128,
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
     "format": "did"
   },
   {
     "name": "linkedId",
     "type": "string",
     "label": "Linked Identifier",
-    "description": "The identifier being claimed as controlled by the subject (e.g., a did:web, email address, or domain).",
+    "description": "DID of the identity being linked (e.g., did:handle for social accounts, did:web for domains, did:pkh for wallets, did:key for keys). The DID method encodes the platform/type internally.",
     "required": true,
     "placeholder": "Enter linkedid",
-    "maxLength": 256
-  },
-  {
-    "name": "linkedIdType",
-    "type": "string",
-    "label": "Linked ID Type",
-    "description": "Type or namespace of the linkedId being asserted. Examples: did:web (for websites), did:key (for keys), email, twitter, github, facebook, discord, telegram, lens, farcaster, or any other well-known identifier type.",
-    "required": false,
-    "placeholder": "Enter linkedidtype",
-    "maxLength": 100
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
   },
   {
     "name": "method",
-    "type": "enum",
+    "type": "string",
     "label": "Verification Method",
-    "description": "Verification method used by the attester to confirm the subject's control of the linkedId.",
+    "description": "Verification method used by the attester to confirm the subject's control of the linkedId. Use 'proof' for cryptographic proofs (pop-eip712, pop-jwt, evidence-pointer). Platform authority or URL-based evidence may be used to prove control of did:handle identifiers. Custom methods are permitted.",
     "required": true,
     "placeholder": "Enter method",
-    "options": [
-      "http-file",
-      "dns-txt",
-      "email-challenge",
-      "social-post",
-      "manual",
-      "oauth",
-      "other"
-    ]
+    "maxLength": 64
+  },
+  {
+    "name": "proofs",
+    "type": "array",
+    "label": "Proofs",
+    "description": "Array of cryptographic proofs demonstrating the subject's control over the linked identifier. Use proofPurpose='shared-control' for linked identifier attestations.",
+    "required": false,
+    "placeholder": "Enter proofs"
   },
   {
     "name": "issuedAt",
@@ -335,7 +440,8 @@ const securityAssessmentFields: FormField[] = [
     "description": "ID of the assessed application/contract/service. Select an ID type below and enter the proper identity.",
     "required": true,
     "placeholder": "Enter subject",
-    "maxLength": 128,
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
     "format": "did"
   },
   {
@@ -345,7 +451,8 @@ const securityAssessmentFields: FormField[] = [
     "description": "DID of the parent organization. Use this when assessing a service or resource that belongs to an organization (e.g., assessing did:web:example.com:service:api, set organization to did:web:example.com). Leave empty when assessing an organization directly.",
     "required": false,
     "placeholder": "Enter organization",
-    "maxLength": 128,
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
     "format": "did"
   },
   {
@@ -356,6 +463,16 @@ const securityAssessmentFields: FormField[] = [
     "required": false,
     "placeholder": "Enter version",
     "subtype": "semver",
+    "maxLength": 50,
+    "pattern": "^\\d+\\.\\d+\\.\\d+$"
+  },
+  {
+    "name": "versionHW",
+    "type": "string",
+    "label": "Hardware Version",
+    "description": "Hardware version of the assessed subject, if applicable.",
+    "required": false,
+    "placeholder": "Enter versionhw",
     "maxLength": 50
   },
   {
@@ -367,17 +484,12 @@ const securityAssessmentFields: FormField[] = [
     "subFields": [
       {
         "name": "assessmentKind",
-        "type": "enum",
+        "type": "string",
         "label": "Assessment Kind",
-        "description": "High-level category of the assessment.",
+        "description": "High-level category of the assessment. Registered kinds are defined in the OMA3 Assessment Kind Registry.",
         "required": true,
         "placeholder": "Enter assessmentkind",
-        "options": [
-          "pentest",
-          "security-audit",
-          "code-review",
-          "vulnerability-scan"
-        ]
+        "maxLength": 64
       },
       {
         "name": "methodURI",
@@ -401,50 +513,53 @@ const securityAssessmentFields: FormField[] = [
       },
       {
         "name": "reportDigest",
-        "type": "object",
+        "type": "json",
         "label": "Report Digest",
-        "description": "Content digest of the report for integrity verification.",
+        "description": "Content digest of a report for integrity verification. Paste the full JSON object.",
         "required": false,
-        "subFields": [
-          {
-            "name": "algo",
-            "type": "enum",
-            "label": "Report Hash Algorithm",
-            "description": "Hash algorithm used for report digest computation. Per OMATrust spec, only keccak256 and sha256 are supported.",
-            "required": false,
-            "placeholder": "Enter algo",
-            "default": "keccak256",
-            "options": [
-              "keccak256",
-              "sha256"
-            ]
-          },
-          {
-            "name": "hex",
-            "type": "string",
-            "label": "Report Hash Value",
-            "description": "0x-prefixed hex digest of the canonical report bytes.",
-            "required": false,
-            "placeholder": "Enter hex",
-            "maxLength": 200
-          }
-        ]
+        "placeholder": "Paste JSON object..."
       },
       {
         "name": "outcome",
         "type": "enum",
-        "label": "Assessment Outcome",
-        "description": "Overall outcome of the assessment.",
+        "label": "Outcome",
+        "description": "Overall outcome of an assessment or certification. If omitted, outcome MUST be interpreted as 'pass'.",
         "required": false,
         "placeholder": "Enter outcome",
         "options": [
           "pass",
-          "pass-with-findings",
-          "fail",
-          "informational"
+          "fail"
         ]
       }
     ]
+  },
+  {
+    "name": "payloadVersion",
+    "type": "string",
+    "label": "Payload Version",
+    "description": "Semver describing the shape of the payload.",
+    "required": true,
+    "placeholder": "Enter payloadversion",
+    "default": "1.0.0",
+    "maxLength": 50
+  },
+  {
+    "name": "payloadSpecURI",
+    "type": "uri",
+    "label": "Payload Specification URI",
+    "description": "URI to the JSON schema specification for this attestation type.",
+    "required": false,
+    "placeholder": "https://example.com",
+    "maxLength": 256,
+    "format": "uri"
+  },
+  {
+    "name": "payloadSpecDigest",
+    "type": "json",
+    "label": "Payload Specification Digest",
+    "description": "Integrity digest for payloadSpecURI. Paste the full JSON object.",
+    "required": false,
+    "placeholder": "Paste JSON object..."
   },
   {
     "name": "issuedAt",
@@ -484,11 +599,22 @@ const userReviewResponseFields: FormField[] = [
   {
     "name": "subject",
     "type": "string",
-    "label": "Subject ID",
-    "description": "Address of the original reviewer being responded to.",
-    "required": true,
+    "label": "Reviewer ID",
+    "description": "DID of the original reviewer being responded to.",
+    "required": false,
     "placeholder": "Enter subject",
-    "maxLength": 128
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
+  },
+  {
+    "name": "refUID",
+    "type": "string",
+    "label": "User Review UID",
+    "description": "The UID of the user review being responded to.",
+    "required": true,
+    "placeholder": "Enter refuid",
+    "maxLength": 66
   },
   {
     "name": "responseBody",
@@ -498,69 +624,6 @@ const userReviewResponseFields: FormField[] = [
     "required": true,
     "placeholder": "Enter responsebody",
     "maxLength": 500
-  },
-  {
-    "name": "datePublished",
-    "type": "datetime",
-    "label": "Date Published",
-    "description": "Timestamp when the response was written or published, in ISO 8601 format.",
-    "required": false,
-    "placeholder": "2024-01-01T00:00:00Z",
-    "maxLength": 50,
-    "format": "date-time"
-  },
-  {
-    "name": "anchoredDataURL",
-    "type": "uri",
-    "label": "Anchored Data URL",
-    "description": "URI pointing to offchain response content (e.g., IPFS, Cloudinary, Arweave).",
-    "required": false,
-    "placeholder": "https://example.com",
-    "maxLength": 256,
-    "format": "uri"
-  },
-  {
-    "name": "anchoredDataAlgorithm",
-    "type": "string",
-    "label": "Anchored Data Hash Algorithm",
-    "description": "Hashing algorithm used for 'anchoredDataHash' (e.g., 'sha3-256').",
-    "required": false,
-    "placeholder": "Enter anchoreddataalgorithm",
-    "maxLength": 50
-  },
-  {
-    "name": "anchoredDataHash",
-    "type": "string",
-    "label": "Anchored Data Hash",
-    "description": "Cryptographic hash of the content located at 'anchoredDataURL'.",
-    "required": false,
-    "placeholder": "Enter anchoreddatahash",
-    "maxLength": 200
-  },
-  {
-    "name": "attestationType",
-    "type": "string",
-    "label": "Attestation Type",
-    "description": "Type identifier for this attestation (e.g., 'UserReviewResponse').",
-    "required": false,
-    "placeholder": "Enter attestationtype",
-    "maxLength": 100
-  },
-  {
-    "name": "issuedAt",
-    "type": "integer",
-    "label": "Issued Date",
-    "description": "Unix timestamp (in seconds) for when the response was submitted.",
-    "required": false,
-    "placeholder": "0"
-  },
-  {
-    "name": "expiresAt",
-    "type": "integer",
-    "label": "Expiration Date",
-    "description": "Optional expiration timestamp for the attestation.",
-    "required": false,
-    "placeholder": "0"
   }
 ]
 
@@ -568,21 +631,12 @@ const userReviewFields: FormField[] = [
   {
     "name": "subject",
     "type": "string",
-    "label": "Subject ID",
+    "label": "Review Subject",
     "description": "DID of the thing being reviewed.",
     "required": true,
     "placeholder": "Enter subject",
-    "maxLength": 128,
-    "format": "did"
-  },
-  {
-    "name": "organization",
-    "type": "string",
-    "label": "Owning Organization",
-    "description": "DID of the service organization. Use this when reviewing a service that belongs to an organization. Leave empty when reviewing an organization directly.",
-    "required": false,
-    "placeholder": "Enter organization",
-    "maxLength": 128,
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
     "format": "did"
   },
   {
@@ -593,16 +647,23 @@ const userReviewFields: FormField[] = [
     "required": false,
     "placeholder": "Enter version",
     "subtype": "semver",
-    "maxLength": 50
+    "maxLength": 50,
+    "pattern": "^\\d+\\.\\d+\\.\\d+$"
   },
   {
-    "name": "summary",
-    "type": "string",
-    "label": "Review Summary",
-    "description": "Short headline for the review (e.g., 'Loved it', 'Buggy experience').",
-    "required": false,
-    "placeholder": "Enter summary",
-    "maxLength": 200
+    "name": "ratingValue",
+    "type": "enum",
+    "label": "Rating",
+    "description": "Numerical rating from 1 (worst) to 5 (best).",
+    "required": true,
+    "placeholder": "0",
+    "options": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
   },
   {
     "name": "reviewBody",
@@ -614,25 +675,6 @@ const userReviewFields: FormField[] = [
     "maxLength": 500
   },
   {
-    "name": "author",
-    "type": "string",
-    "label": "Author ID",
-    "description": "Your DID, handle, or name.",
-    "required": false,
-    "placeholder": "Enter author",
-    "maxLength": 200
-  },
-  {
-    "name": "ratingValue",
-    "type": "integer",
-    "label": "Rating",
-    "description": "Numerical rating from 1 (worst) to 5 (best).",
-    "required": true,
-    "placeholder": "0",
-    "min": 1,
-    "max": 5
-  },
-  {
     "name": "screenshotUrls",
     "type": "array",
     "label": "Screenshots",
@@ -641,36 +683,12 @@ const userReviewFields: FormField[] = [
     "placeholder": "Enter screenshoturls"
   },
   {
-    "name": "issuedAt",
-    "type": "integer",
-    "label": "Issued Date",
-    "description": "Timestamp (in seconds) when the review was issued. Default is the current time.",
+    "name": "proofs",
+    "type": "array",
+    "label": "Proofs",
+    "description": "Array of cryptographic proofs demonstrating the reviewer used the service. Use proofPurpose='commercial-tx' for user review attestations.",
     "required": false,
-    "placeholder": "0",
-    "autoDefault": "current-timestamp",
-    "subtype": "timestamp",
-    "min": 0
-  },
-  {
-    "name": "effectiveAt",
-    "type": "integer",
-    "label": "Effective Date",
-    "description": "Timestamp (in seconds) when the review becomes effective. Default is the current time.",
-    "required": false,
-    "placeholder": "0",
-    "autoDefault": "current-timestamp",
-    "subtype": "timestamp",
-    "min": 0
-  },
-  {
-    "name": "expiresAt",
-    "type": "integer",
-    "label": "Expiration Date",
-    "description": "Timestamp (in seconds) after which the review expires. Leave empty if the review does not expire.",
-    "required": false,
-    "placeholder": "0",
-    "subtype": "timestamp",
-    "min": 0
+    "placeholder": "Enter proofs"
   }
 ]
 
@@ -683,13 +701,32 @@ export const certificationSchema: AttestationSchema = {
   deployedUIDs: {
     97: '0xbb9e58a64550b7956561e9c9266e0a0747fc80c40bd57bb2637be7f8f2817bf7', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0xa798698f86b62e0fa2e63cff94e7bcdf275ab015702d1e9ed85d1a95af7bff78', // OMAchain Testnet
+    66238: '0x2b0d1100f7943c0c2ea29e35c1286bd860fa752124e035cafb503bb83f234805', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
   },
   deployedBlocks: {
     97: 52415269, // BSC Testnet
     56: 0, // BSC Mainnet
-    66238: 128, // OMAchain Testnet
+    66238: 289, // OMAchain Testnet
+    6623: 0  // OMAchain Mainnet
+  }
+};
+
+export const commonSchema: AttestationSchema = {
+  id: 'common',
+  title: 'OMA3 Common Definitions',
+  description: 'Shared data types and proof structures for OMATrust schemas.',
+  fields: commonFields,
+  deployedUIDs: {
+    97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
+    56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
+    66238: '0x0000000000000000000000000000000000000000000000000000000000000000', // OMAchain Testnet
+    6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
+  },
+  deployedBlocks: {
+    97: 0, // BSC Testnet
+    56: 0, // BSC Mainnet
+    66238: 0, // OMAchain Testnet
     6623: 0  // OMAchain Mainnet
   }
 };
@@ -702,13 +739,32 @@ export const endorsementSchema: AttestationSchema = {
   deployedUIDs: {
     97: '0xda787e2c5b89cd1b2c77d7a9565573cc89bac752e9b587f3348e85c62d606a68', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0xa349c19677b8c98c44e176eb03e8481e700f1e50ca22cfdfb395f32243e51abe', // OMAchain Testnet
+    66238: '0xb0cf93ef0f3feb858aa5d07a54f6589da5852883f378dfd0cae5315da1d679ac', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
   },
   deployedBlocks: {
     97: 52288891, // BSC Testnet
     56: 0, // BSC Mainnet
-    66238: 127, // OMAchain Testnet
+    66238: 290, // OMAchain Testnet
+    6623: 0  // OMAchain Mainnet
+  }
+};
+
+export const keyBindingSchema: AttestationSchema = {
+  id: 'key-binding',
+  title: 'Key Binding',
+  description: 'Publishes a cryptographic key associated with a DID. Supports multi-purpose bindings, rotation, and revocation. Each attestation binds one key to one subject.',
+  fields: keyBindingFields,
+  deployedUIDs: {
+    97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
+    56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
+    66238: '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d', // OMAchain Testnet
+    6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
+  },
+  deployedBlocks: {
+    97: 0, // BSC Testnet
+    56: 0, // BSC Mainnet
+    66238: 291, // OMAchain Testnet
     6623: 0  // OMAchain Mainnet
   }
 };
@@ -716,18 +772,18 @@ export const endorsementSchema: AttestationSchema = {
 export const linkedIdentifierSchema: AttestationSchema = {
   id: 'linked-identifier',
   title: 'Linked Identifier',
-  description: 'An attestation where the attester (a trusted third party) asserts that the subject controls the linked identifier, effectively attesting that two identities are owned by the same entity.',
+  description: 'An attestation where the attester (a trusted third party) asserts that the subject controls the linked identifier. Both subject and linkedId MUST be valid DIDs, creating a symmetric DID-to-DID link that attests two identities are owned by the same entity.',
   fields: linkedIdentifierFields,
   deployedUIDs: {
     97: '0xd6ef74f4f2f8d79a8993132577713ada1ae9ba937d8bbd69a174cd6afe6beef6', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0xd6ef74f4f2f8d79a8993132577713ada1ae9ba937d8bbd69a174cd6afe6beef6', // OMAchain Testnet
+    66238: '0xed79388b434965a35d50573b75f4bbd6e3bc7912103c4a6ac0aff6a510ccadac', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
   },
   deployedBlocks: {
     97: 52415311, // BSC Testnet
     56: 0, // BSC Mainnet
-    66238: 50, // OMAchain Testnet
+    66238: 292, // OMAchain Testnet
     6623: 0  // OMAchain Mainnet
   }
 };
@@ -740,13 +796,13 @@ export const securityAssessmentSchema: AttestationSchema = {
   deployedUIDs: {
     97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0x99eeac6a1110ac16e8abf80118ddab37cf37916e3f79f995384d034f56cd0c1c', // OMAchain Testnet
+    66238: '0x67bcc2424e3721d56e85bb650c6aba8bf7f1711d9c9a434c3afae3a22d23eed7', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
   },
   deployedBlocks: {
     97: 0, // BSC Testnet
     56: 0, // BSC Mainnet
-    66238: 126, // OMAchain Testnet
+    66238: 293, // OMAchain Testnet
     6623: 0  // OMAchain Mainnet
   }
 };
@@ -759,13 +815,13 @@ export const userReviewResponseSchema: AttestationSchema = {
   deployedUIDs: {
     97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0xb28cd01484fe76c3cd24a2df64051a281eba7724f527ed6b3d99a72c4d6293ae', // OMAchain Testnet
+    66238: '0x53498ae8ae4928a8789e09663f44d6e3c77daeb703c3765aa184b958c3ca41be', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
   },
   deployedBlocks: {
     97: 0, // BSC Testnet
     56: 0, // BSC Mainnet
-    66238: 51, // OMAchain Testnet
+    66238: 294, // OMAchain Testnet
     6623: 0  // OMAchain Mainnet
   }
 };
@@ -778,13 +834,13 @@ export const userReviewSchema: AttestationSchema = {
   deployedUIDs: {
     97: '0x21deb2c39c4899b39d3f4af965d455be97862c6be18ffd2c15dbd74aaf50a5f6', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0xdcc94cf54d3b13c6718c796f44d69609f459f81d80800ecc0ae3083168010571', // OMAchain Testnet
+    66238: '0x7ab3911527e5e47eaab9f5a2c571060026532dde8cb4398185553053963b2a47', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
   },
   deployedBlocks: {
     97: 52291400, // BSC Testnet
     56: 0, // BSC Mainnet
-    66238: 125, // OMAchain Testnet
+    66238: 295, // OMAchain Testnet
     6623: 0  // OMAchain Mainnet
   }
 };
@@ -792,7 +848,9 @@ export const userReviewSchema: AttestationSchema = {
 // Export all schemas
 const allSchemas: AttestationSchema[] = [
   certificationSchema,
+  commonSchema,
   endorsementSchema,
+  keyBindingSchema,
   linkedIdentifierSchema,
   securityAssessmentSchema,
   userReviewResponseSchema,

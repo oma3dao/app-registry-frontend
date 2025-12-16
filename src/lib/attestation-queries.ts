@@ -14,6 +14,9 @@ import { log } from '@/lib/log'
 const OMACHAIN_TESTNET_RPC = 'https://rpc.testnet.chain.oma3.org/'
 const OMACHAIN_TESTNET_ID = 66238
 
+// Minimum number of attestations before including unversioned attestations
+const MIN_ATTESTATIONS_THRESHOLD = 10
+
 export interface AttestationQueryResult {
     uid: string
     attester: string
@@ -30,14 +33,25 @@ export interface AttestationQueryResult {
 }
 
 /**
+ * Extract major version from a semver string (e.g., "1.2.3" -> "1")
+ */
+export function getMajorVersion(version: string | undefined): string | undefined {
+    if (!version) return undefined
+    const match = version.match(/^(\d+)/)
+    return match ? match[1] : undefined
+}
+
+/**
  * Get attestations for a specific DID (by subject field)
  * @param did - The DID to query attestations for
  * @param limit - Maximum number of attestations to return
+ * @param majorVersion - Optional major version to filter by (only include attestations with matching major version)
  * @returns Promise resolving to attestations for this DID
  */
 export async function getAttestationsForDID(
     did: string,
-    limit: number = 5
+    limit: number = 5,
+    majorVersion?: string
 ): Promise<AttestationQueryResult[]> {
     try {
         const chainId = OMACHAIN_TESTNET_ID
@@ -94,7 +108,9 @@ export async function getAttestationsForDID(
         log(`[AttestationQuery] Found ${events.length} events for DID`)
 
         // Process events (newest first)
-        const attestations: AttestationQueryResult[] = []
+        // Collect version-matched and unversioned attestations separately
+        const versionMatchedAttestations: AttestationQueryResult[] = []
+        const unversionedAttestations: AttestationQueryResult[] = []
 
         for (let i = events.length - 1; i >= 0; i--) {
             const event = events[i]
@@ -128,7 +144,7 @@ export async function getAttestationsForDID(
                     continue
                 }
 
-                attestations.push({
+                const attestationResult: AttestationQueryResult = {
                     uid: attestation.uid,
                     attester: attestation.attester,
                     recipient: attestation.recipient,
@@ -141,9 +157,26 @@ export async function getAttestationsForDID(
                     schemaId: schema.id,
                     schemaTitle: schema.title,
                     decodedData
-                })
+                }
 
-                if (attestations.length >= limit) {
+                // Categorize by version match
+                if (majorVersion) {
+                    const attestationMajorVersion = getMajorVersion(decodedData.version)
+                    if (attestationMajorVersion === majorVersion) {
+                        versionMatchedAttestations.push(attestationResult)
+                    } else if (!attestationMajorVersion) {
+                        // No version specified in attestation - collect separately
+                        unversionedAttestations.push(attestationResult)
+                    } else {
+                        log(`[AttestationQuery] Skipping - major version mismatch: ${attestationMajorVersion} !== ${majorVersion}`)
+                    }
+                } else {
+                    // No version filter - include all
+                    versionMatchedAttestations.push(attestationResult)
+                }
+
+                // Stop if we have enough in both buckets
+                if (versionMatchedAttestations.length >= limit && unversionedAttestations.length >= limit) {
                     break
                 }
             } catch (err) {
@@ -151,7 +184,17 @@ export async function getAttestationsForDID(
             }
         }
 
-        log(`[AttestationQuery] Returning ${attestations.length} attestations`)
+        // Combine results: version-matched first, then fill with unversioned if below threshold
+        let attestations = versionMatchedAttestations.slice(0, limit)
+        
+        if (majorVersion && attestations.length < MIN_ATTESTATIONS_THRESHOLD) {
+            const remaining = limit - attestations.length
+            const unversionedToAdd = unversionedAttestations.slice(0, remaining)
+            attestations = [...attestations, ...unversionedToAdd]
+            log(`[AttestationQuery] Added ${unversionedToAdd.length} unversioned attestations (below threshold of ${MIN_ATTESTATIONS_THRESHOLD})`)
+        }
+
+        log(`[AttestationQuery] Returning ${attestations.length} attestations (${versionMatchedAttestations.length} version-matched, ${unversionedAttestations.length} unversioned)`)
         return attestations
 
     } catch (error) {
@@ -161,12 +204,47 @@ export async function getAttestationsForDID(
 }
 
 /**
+ * Deduplicate attestations by keeping only the latest per attester+subject+version combination.
+ * This implements the supersession logic defined in the spec: when a user submits multiple
+ * reviews for the same subject (and version), only the most recent one should be considered.
+ * 
+ * @param attestations - List of attestations (should already be sorted newest first)
+ * @returns Deduplicated list with only the latest attestation per attester+subject+version
+ */
+export function deduplicateReviews(attestations: AttestationQueryResult[]): AttestationQueryResult[] {
+    const seen = new Map<string, AttestationQueryResult>()
+    
+    for (const attestation of attestations) {
+        if (attestation.schemaId !== 'user-review') {
+            continue
+        }
+        
+        // Create unique key from attester + subject + version
+        const subject = attestation.decodedData?.subject || ''
+        const version = attestation.decodedData?.version || ''
+        const key = `${attestation.attester}|${subject}|${version}`
+        
+        // Keep only the first (newest) attestation for each key
+        // Since attestations are sorted newest first, we skip if we've already seen this key
+        if (!seen.has(key)) {
+            seen.set(key, attestation)
+        }
+    }
+    
+    return Array.from(seen.values())
+}
+
+/**
  * Calculate average rating from user review attestations
+ * Automatically deduplicates reviews to only count the latest per attester+subject+version
  * @param attestations - List of attestations
  * @returns Average rating and count
  */
 export function calculateAverageRating(attestations: AttestationQueryResult[]): { average: number, count: number } {
-    const reviews = attestations.filter(a => 
+    // First deduplicate to get only latest review per attester+subject+version
+    const dedupedReviews = deduplicateReviews(attestations)
+    
+    const reviews = dedupedReviews.filter(a => 
         a.schemaId === 'user-review' && 
         (a.decodedData?.ratingValue || a.decodedData?.rating) &&
         a.revocationTime === 0 // Not revoked

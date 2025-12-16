@@ -35,7 +35,7 @@ import { buildIwpsProxyRequest } from "@/lib/iwps";
 import LaunchConfirmationDialog from '@/components/launch-confirmation-dialog';
 import { ethers } from "ethers";
 import { env } from "@/config/env";
-import { getAttestationsForDID, calculateAverageRating, type AttestationQueryResult } from "@/lib/attestation-queries";
+import { getAttestationsForDID, calculateAverageRating, deduplicateReviews, getMajorVersion, type AttestationQueryResult } from "@/lib/attestation-queries";
 import { StarRating } from "@/components/star-rating";
 
 interface NFTViewModalProps {
@@ -155,9 +155,10 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     
     const loadAttestations = async () => {
       try {
-        log(`[NFTViewModal] Loading attestations for DID: ${nft.did}`);
+        const majorVersion = getMajorVersion(nft.version);
+        log(`[NFTViewModal] Loading attestations for DID: ${nft.did}, major version: ${majorVersion}`);
         setLoadingAttestations(true);
-        const results = await getAttestationsForDID(nft.did, 10);
+        const results = await getAttestationsForDID(nft.did, 10, majorVersion);
         log(`[NFTViewModal] Loaded ${results.length} attestations:`, results);
         setAttestations(results);
       } catch (error) {
@@ -169,7 +170,7 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
     };
     
     loadAttestations();
-  }, [isOpen, nft?.did]);
+  }, [isOpen, nft?.did, nft?.version]);
   
   // Extract metadata values with fallbacks
   const image = nftMetadata?.displayData.image || nft?.image || "";
@@ -725,11 +726,17 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
               )}
               
               {/* Attestations List */}
-              {!loadingAttestations && attestations.length > 0 && (
+              {!loadingAttestations && attestations.length > 0 && (() => {
+                // Deduplicate user reviews (keep latest per attester+subject+version)
+                const dedupedAttestations = [
+                  ...deduplicateReviews(attestations),
+                  ...attestations.filter(a => a.schemaId !== 'user-review')
+                ];
+                return (
                 <div className="grid gap-1">
-                  <Label className="text-sm font-medium">Recent Attestations ({attestations.length})</Label>
+                  <Label className="text-sm font-medium">Recent Attestations ({dedupedAttestations.length})</Label>
                   <div className="space-y-2">
-                    {attestations.slice(0, 5).map((attestation) => {
+                    {dedupedAttestations.slice(0, 5).map((attestation) => {
                       const rating = attestation.decodedData?.ratingValue || attestation.decodedData?.rating;
                       const comment = attestation.decodedData?.reviewBody || attestation.decodedData?.comment;
                       const ratingNum = typeof rating === 'bigint' ? Number(rating) : rating;
@@ -765,7 +772,8 @@ export default function NFTViewModal({ isOpen, handleCloseViewModal, nft, onUpda
                     })}
                   </div>
                 </div>
-              )}
+                );
+              })()}
               
               {loadingAttestations && (
                 <div className="flex items-center gap-2 p-2 text-sm text-gray-500">
