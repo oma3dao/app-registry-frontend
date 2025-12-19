@@ -5,10 +5,30 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { setupTestWithIsolation } from './test-setup-helper';
+import { performanceMonitor } from './test-helpers';
 
-test('debug - check what is actually on the page', async ({ page }) => {
+test.describe('Debug Tests', () => {
+  // Performance summary after all tests
+  test.afterAll(() => {
+    const summary = performanceMonitor.getSummary();
+    if (summary.total > 0) {
+      console.log('\n📊 Debug Tests Performance Summary:');
+      console.log(`  Total Tests: ${summary.total}`);
+      console.log(`  Average Duration: ${summary.average.toFixed(2)}ms`);
+    }
+  });
+
+  test.beforeEach(async ({ page }) => {
+    // Test isolation setup
+    await setupTestWithIsolation(page);
+  });
+
+  test('debug - check what is actually on the page', async ({ page }) => {
+    performanceMonitor.startTest('debug - check what is actually on the page');
+    try {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(5000);
+  await new Promise(resolve => setTimeout(resolve, 5000));
   
   // Take screenshot first
   await page.screenshot({ path: 'debug-page.png', fullPage: true });
@@ -74,5 +94,12 @@ test('debug - check what is actually on the page', async ({ page }) => {
   });
   
   console.log('Console errors:', consoleErrors);
+    } finally {
+      const metric = performanceMonitor.endTest();
+      if (metric && metric.duration > 5000) {
+        console.log(`⚠️  Slow test: ${metric.testName} took ${metric.duration}ms`);
+      }
+    }
+  });
 });
 
