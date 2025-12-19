@@ -73,6 +73,12 @@ vi.mock('@/schema/mapping', () => ({
 // Mock ethers for hash verification
 vi.mock('ethers', async () => {
   const actual = await vi.importActual('ethers') as any;
+  // Mock ContractFactory for EAS SDK compatibility
+  const MockContractFactory = vi.fn().mockImplementation(() => ({
+    connect: vi.fn(),
+    deploy: vi.fn(),
+    attach: vi.fn(),
+  }));
   const mockKeccak256 = vi.fn((data: string | Buffer | Uint8Array) => {
     // Convert Buffer to hex string if needed
     if (Buffer.isBuffer(data)) {
@@ -87,9 +93,11 @@ vi.mock('ethers', async () => {
   return {
     ...actual,
     keccak256: mockKeccak256,
+    ContractFactory: MockContractFactory,
     ethers: {
       ...actual.ethers,
       keccak256: mockKeccak256,
+      ContractFactory: MockContractFactory,
     },
   };
 });

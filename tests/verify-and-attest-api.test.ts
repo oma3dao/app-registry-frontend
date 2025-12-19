@@ -13,6 +13,7 @@ import { POST } from '@/app/api/verify-and-attest/route';
 import { getThirdwebManagedWallet, loadIssuerPrivateKey } from '@/lib/server/issuer-key';
 import * as thirdweb from 'thirdweb';
 import dns from 'dns';
+import { calculateTransferAmount, PROOF_PURPOSE } from '@/lib/verification/onchain-transfer';
 
 // Mock environment variables
 const mockEnv = {
@@ -47,6 +48,12 @@ vi.mock('thirdweb/wallets', () => ({
 // Mock ethers
 vi.mock('ethers', async () => {
   const realEthers = await vi.importActual('ethers') as any;
+  // Mock ContractFactory for EAS SDK compatibility
+  const MockContractFactory = vi.fn().mockImplementation(() => ({
+    connect: vi.fn(),
+    deploy: vi.fn(),
+    attach: vi.fn(),
+  }));
   return {
     ...realEthers,
     ethers: {
@@ -55,6 +62,7 @@ vi.mock('ethers', async () => {
       zeroPadValue: vi.fn((address: string) => `${address.padEnd(66, '0')}`),
       JsonRpcProvider: vi.fn(),
       Contract: vi.fn(),
+      ContractFactory: MockContractFactory,
       getAddress: vi.fn((addr: string) => addr),
       solidityPacked: vi.fn((types: string[], values: any[]) => {
         // Mock implementation - simulate abi.encodePacked using actual ethers v6 functions
@@ -69,6 +77,7 @@ vi.mock('ethers', async () => {
       keccak256: realEthers.ethers.keccak256,
       ZeroAddress: '0x0000000000000000000000000000000000000000',
     },
+    ContractFactory: MockContractFactory,
   };
 });
 
@@ -1020,11 +1029,19 @@ describe('/api/verify-and-attest', () => {
     vi.mocked(readContract).mockResolvedValueOnce('0x0000000000000000000000000000000000000000');
     
     // Mock ethers provider for transfer verification
+    // Calculate expected amount - ensure it's a BigInt
+    const expectedAmount = calculateTransferAmount(
+      `did:pkh:eip155:1:${contractAddress}`, 
+      `did:pkh:eip155:1:${connectedAddress}`, 
+      1, 
+      PROOF_PURPOSE.SHARED_CONTROL
+    );
+    
     const mockProvider = {
       getTransaction: vi.fn().mockResolvedValue({
         from: controllingWallet,
         to: connectedAddress,
-        value: calculateTransferAmount(`did:pkh:eip155:1:${contractAddress}`, connectedAddress, 1),
+        value: expectedAmount, // This is a bigint
         blockNumber: 100,
       }),
       getTransactionReceipt: vi.fn().mockResolvedValue({
