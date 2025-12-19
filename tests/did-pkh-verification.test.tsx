@@ -34,6 +34,7 @@ describe("DidPkhVerification", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset fetch mock - tests will set up their own mocks as needed
     global.fetch = vi.fn();
   });
 
@@ -55,11 +56,16 @@ describe("DidPkhVerification", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows verification options when wallet is connected", () => {
-      // Test with connected wallet
+    it("shows discovering status when wallet is connected", async () => {
+      // Test that component starts auto-discovery when wallet is connected
       mockUseActiveAccount.mockReturnValue({
         address: "0xConnectedWallet",
       } as any);
+
+      // Mock discovery that never completes (stays in discovering state)
+      global.fetch = vi.fn().mockImplementation(() => 
+        new Promise(() => {}) // Never resolves
+      );
 
       render(
         <DidPkhVerification
@@ -69,8 +75,10 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      expect(screen.getByRole("button", { name: /Discover Controlling Wallet/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+      // Component should show discovering status
+      await waitFor(() => {
+        expect(screen.getByText(/Discovering Controlling Wallet/i)).toBeInTheDocument();
+      });
     });
   });
 
@@ -81,8 +89,10 @@ describe("DidPkhVerification", () => {
       } as any);
     });
 
-    it("shows idle status when not verified", () => {
-      // Test initial idle state
+    it("shows failed status with retry button when auto-discovery fails", async () => {
+      // Test that failed auto-discovery shows error and retry button
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
+
       render(
         <DidPkhVerification
           did={mockDid}
@@ -91,11 +101,13 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      expect(
-        screen.getByText(/Contract Ownership Verification Required/i)
-      ).toBeInTheDocument();
-      expect(screen.getByText(/Option 1 \(Recommended\)/i)).toBeInTheDocument();
-      expect(screen.getByText(/Option 2/i)).toBeInTheDocument();
+      // Wait for discovery to fail
+      await waitFor(() => {
+        expect(screen.getByText(/❌ Verification Failed/i)).toBeInTheDocument();
+      });
+
+      expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
     });
 
     it("shows verified status when already verified", () => {
@@ -115,23 +127,57 @@ describe("DidPkhVerification", () => {
     });
   });
 
-  describe("Discover Controlling Wallet Flow", () => {
+  describe("Auto-Discovery Flow", () => {
     beforeEach(() => {
       mockUseActiveAccount.mockReturnValue({
         address: "0xConnectedWallet",
       } as any);
     });
 
-    it("discovers controlling wallet successfully", async () => {
-      // Test successful discovery of controlling wallet
-      const user = userEvent.setup();
-      const mockFetch = vi.fn().mockResolvedValue({
+    it("auto-discovers controlling wallet and shows transfer instructions when wallets differ", async () => {
+      // Test successful auto-discovery where controlling wallet is different
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
           ok: true,
-          controllingWallet: "0xControllingWallet",
+          controllingWallet: "0xDifferentWallet",
         }),
       });
+
+      render(
+        <DidPkhVerification
+          did={mockDid}
+          onVerificationComplete={mockOnVerificationComplete}
+          isVerified={false}
+        />
+      );
+
+      // Should show transfer instructions after auto-discovery
+      await waitFor(() => {
+        expect(screen.getByTestId("transfer-instructions")).toBeInTheDocument();
+      });
+
+      expect(screen.getByText(/Ownership Verification Required/i)).toBeInTheDocument();
+    });
+
+    it("auto-discovers and auto-verifies when wallets match", async () => {
+      // Test successful auto-discovery where wallets match - should auto-verify
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            controllingWallet: "0xConnectedWallet", // Same as connected wallet
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            status: "ready",
+          }),
+        });
+      
       global.fetch = mockFetch;
 
       render(
@@ -142,38 +188,24 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
-
+      // Should auto-verify and show success
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(
-          "/api/discover-controlling-wallet",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ did: mockDid }),
-          }
-        );
+        expect(screen.getByText(/✅ Contract Ownership Verified/i)).toBeInTheDocument();
       });
 
-      // Should show transfer instructions after discovery
-      await waitFor(() => {
-        expect(screen.getByTestId("transfer-instructions")).toBeInTheDocument();
-      });
+      expect(mockOnVerificationComplete).toHaveBeenCalledWith(true);
     });
 
-    it("handles discovery failure with error message", async () => {
-      // Test when discovery fails
-      const user = userEvent.setup();
+    it("handles auto-discovery failure with error message", async () => {
+      // Test auto-discovery failure with specific error
       const errorMessage = "Could not find contract owner";
-      const mockFetch = vi.fn().mockResolvedValue({
+      global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         json: async () => ({
           ok: false,
           error: errorMessage,
         }),
       });
-      global.fetch = mockFetch;
 
       render(
         <DidPkhVerification
@@ -182,9 +214,6 @@ describe("DidPkhVerification", () => {
           isVerified={false}
         />
       );
-
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
 
       await waitFor(() => {
         expect(screen.getByText(/❌ Verification Failed/i)).toBeInTheDocument();
@@ -192,16 +221,12 @@ describe("DidPkhVerification", () => {
       });
     });
 
-    it("handles discovery failure without error message", async () => {
-      // Test when discovery fails without specific error
-      const user = userEvent.setup();
-      const mockFetch = vi.fn().mockResolvedValue({
+    it("handles auto-discovery failure without error message", async () => {
+      // Test auto-discovery failure without specific error
+      global.fetch = vi.fn().mockResolvedValue({
         ok: false,
-        json: async () => ({
-          ok: false,
-        }),
+        json: async () => ({ ok: false }),
       });
-      global.fetch = mockFetch;
 
       render(
         <DidPkhVerification
@@ -210,9 +235,6 @@ describe("DidPkhVerification", () => {
           isVerified={false}
         />
       );
-
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
 
       await waitFor(() => {
         expect(screen.getByText(/❌ Verification Failed/i)).toBeInTheDocument();
@@ -224,11 +246,9 @@ describe("DidPkhVerification", () => {
       });
     });
 
-    it("handles network error during discovery", async () => {
-      // Test network error handling
-      const user = userEvent.setup();
-      const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
-      global.fetch = mockFetch;
+    it("handles network error during auto-discovery", async () => {
+      // Test network error during auto-discovery
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
       render(
         <DidPkhVerification
@@ -237,9 +257,6 @@ describe("DidPkhVerification", () => {
           isVerified={false}
         />
       );
-
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
 
       await waitFor(() => {
         expect(screen.getByText(/❌ Verification Failed/i)).toBeInTheDocument();
@@ -247,11 +264,9 @@ describe("DidPkhVerification", () => {
       });
     });
 
-    it("handles non-Error exceptions during discovery", async () => {
-      // Test non-Error exception handling
-      const user = userEvent.setup();
-      const mockFetch = vi.fn().mockRejectedValue("String error");
-      global.fetch = mockFetch;
+    it("handles non-Error exceptions during auto-discovery", async () => {
+      // Test non-Error exception during auto-discovery
+      global.fetch = vi.fn().mockRejectedValue("String error");
 
       render(
         <DidPkhVerification
@@ -260,9 +275,6 @@ describe("DidPkhVerification", () => {
           isVerified={false}
         />
       );
-
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
 
       await waitFor(() => {
         expect(screen.getByText(/❌ Verification Failed/i)).toBeInTheDocument();
@@ -273,26 +285,29 @@ describe("DidPkhVerification", () => {
     });
   });
 
-  describe("Automated Verification Flow", () => {
+  describe("Retry Verification After Failed Auto-Discovery", () => {
     beforeEach(() => {
       mockUseActiveAccount.mockReturnValue({
         address: "0xConnectedWallet",
       } as any);
     });
 
-    it("verifies wallet ownership successfully", async () => {
-      // Test successful automated verification
+    it("retries verification successfully after auto-discovery fails", async () => {
+      // Test clicking retry button after auto-discovery failure
       const user = userEvent.setup();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
+      const mockFetch = vi.fn()
+        .mockRejectedValueOnce(new Error("Auto-discovery failed")) // Auto-discovery fails
+        .mockResolvedValueOnce({ // Retry succeeds
           ok: true,
-          status: "ready",
-          debug: {
-            verificationMethod: "contract ownership via owner()",
-          },
-        }),
-      });
+          json: async () => ({
+            ok: true,
+            status: "ready",
+            debug: {
+              verificationMethod: "contract ownership via owner()",
+            },
+          }),
+        });
+      
       global.fetch = mockFetch;
 
       render(
@@ -303,20 +318,13 @@ describe("DidPkhVerification", () => {
         />
       );
 
+      // Wait for auto-discovery to fail and retry button to appear
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+      });
+      
       const verifyButton = screen.getByRole("button", { name: /Verify Wallet Ownership/i });
       await user.click(verifyButton);
-
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith("/api/verify-and-attest", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            did: mockDid,
-            connectedAddress: "0xConnectedWallet",
-            requiredSchemas: ["oma3.ownership.v1"],
-          }),
-        });
-      });
 
       await waitFor(() => {
         expect(
@@ -329,16 +337,19 @@ describe("DidPkhVerification", () => {
       });
     });
 
-    it("verifies wallet ownership successfully without debug info", async () => {
-      // Test successful verification without debug method info
+    it("retries verification successfully without debug info", async () => {
+      // Test retry without debug method info
       const user = userEvent.setup();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
+      const mockFetch = vi.fn()
+        .mockRejectedValueOnce(new Error("Failed"))
+        .mockResolvedValueOnce({
           ok: true,
-          status: "ready",
-        }),
-      });
+          json: async () => ({
+            ok: true,
+            status: "ready",
+          }),
+        });
+      
       global.fetch = mockFetch;
 
       render(
@@ -349,6 +360,10 @@ describe("DidPkhVerification", () => {
         />
       );
 
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+      });
+      
       const verifyButton = screen.getByRole("button", { name: /Verify Wallet Ownership/i });
       await user.click(verifyButton);
 
@@ -363,17 +378,20 @@ describe("DidPkhVerification", () => {
       });
     });
 
-    it("handles automated verification failure with error message", async () => {
+    it("handles retry verification failure with error message", async () => {
       // Test verification failure with specific error
       const user = userEvent.setup();
       const errorMessage = "Your wallet is not the contract owner";
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({
+      const mockFetch = vi.fn()
+        .mockRejectedValueOnce(new Error("Failed"))
+        .mockResolvedValueOnce({
           ok: false,
-          error: errorMessage,
-        }),
-      });
+          json: async () => ({
+            ok: false,
+            error: errorMessage,
+          }),
+        });
+      
       global.fetch = mockFetch;
 
       render(
@@ -384,6 +402,10 @@ describe("DidPkhVerification", () => {
         />
       );
 
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+      });
+      
       const verifyButton = screen.getByRole("button", { name: /Verify Wallet Ownership/i });
       await user.click(verifyButton);
 
@@ -394,15 +416,18 @@ describe("DidPkhVerification", () => {
       });
     });
 
-    it("handles automated verification failure without error message", async () => {
+    it("handles retry verification failure without error message", async () => {
       // Test verification failure without specific error
       const user = userEvent.setup();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({
+      const mockFetch = vi.fn()
+        .mockRejectedValueOnce(new Error("Failed"))
+        .mockResolvedValueOnce({
           ok: false,
-        }),
-      });
+          json: async () => ({
+            ok: false,
+          }),
+        });
+      
       global.fetch = mockFetch;
 
       render(
@@ -413,6 +438,10 @@ describe("DidPkhVerification", () => {
         />
       );
 
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+      });
+      
       const verifyButton = screen.getByRole("button", { name: /Verify Wallet Ownership/i });
       await user.click(verifyButton);
 
@@ -427,10 +456,13 @@ describe("DidPkhVerification", () => {
       });
     });
 
-    it("handles network error during automated verification", async () => {
+    it("handles network error during retry verification", async () => {
       // Test network error handling
       const user = userEvent.setup();
-      const mockFetch = vi.fn().mockRejectedValue(new Error("Network timeout"));
+      const mockFetch = vi.fn()
+        .mockRejectedValueOnce(new Error("Failed"))
+        .mockRejectedValueOnce(new Error("Network timeout"));
+      
       global.fetch = mockFetch;
 
       render(
@@ -441,6 +473,10 @@ describe("DidPkhVerification", () => {
         />
       );
 
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+      });
+      
       const verifyButton = screen.getByRole("button", { name: /Verify Wallet Ownership/i });
       await user.click(verifyButton);
 
@@ -451,10 +487,13 @@ describe("DidPkhVerification", () => {
       });
     });
 
-    it("handles non-Error exceptions during automated verification", async () => {
+    it("handles non-Error exceptions during retry verification", async () => {
       // Test non-Error exception handling
       const user = userEvent.setup();
-      const mockFetch = vi.fn().mockRejectedValue("Unknown error");
+      const mockFetch = vi.fn()
+        .mockRejectedValueOnce(new Error("Failed"))
+        .mockRejectedValueOnce("Unknown error");
+      
       global.fetch = mockFetch;
 
       render(
@@ -465,6 +504,10 @@ describe("DidPkhVerification", () => {
         />
       );
 
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+      });
+      
       const verifyButton = screen.getByRole("button", { name: /Verify Wallet Ownership/i });
       await user.click(verifyButton);
 
@@ -481,8 +524,6 @@ describe("DidPkhVerification", () => {
       // Test that verification is prevented without wallet
       mockUseActiveAccount.mockReturnValue(null);
 
-      const user = userEvent.setup();
-
       render(
         <DidPkhVerification
           did={mockDid}
@@ -498,32 +539,39 @@ describe("DidPkhVerification", () => {
     });
   });
 
-  describe("Transfer Verification Flow", () => {
+  describe("Transfer Verification Flow (Auto-Discovered Wallet)", () => {
     beforeEach(() => {
       mockUseActiveAccount.mockReturnValue({
         address: "0xConnectedWallet",
       } as any);
     });
 
-    it("verifies transfer successfully", async () => {
+    it("verifies transfer successfully after auto-discovery finds different wallet", async () => {
       // Test successful transfer verification
       const user = userEvent.setup();
-      const discoverFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          ok: true,
-          controllingWallet: "0xControllingWallet",
-        }),
+      
+      // Auto-discovery finds a different controlling wallet
+      global.fetch = vi.fn().mockImplementation((url: string | Request | URL) => {
+        const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+        if (urlString.includes('/api/discover-controlling-wallet')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              ok: true,
+              controllingWallet: "0xDifferentWallet", // Different from connected wallet
+            }),
+          } as Response);
+        } else if (urlString.includes('/api/verify-and-attest')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              ok: true,
+              status: "ready",
+            }),
+          } as Response);
+        }
+        return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
       });
-      const verifyFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          ok: true,
-          status: "ready",
-        }),
-      });
-
-      global.fetch = discoverFetch;
 
       render(
         <DidPkhVerification
@@ -533,32 +581,16 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      // First discover the controlling wallet
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
-
+      // Auto-discovery should complete and show transfer instructions
       await waitFor(() => {
         expect(screen.getByTestId("transfer-instructions")).toBeInTheDocument();
       });
 
-      // Now submit the transfer
-      global.fetch = verifyFetch;
+      // Submit the transfer
       const submitButton = screen.getByText("Submit Transfer");
       await user.click(submitButton);
 
-      await waitFor(() => {
-        expect(verifyFetch).toHaveBeenCalledWith("/api/verify-and-attest", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            did: mockDid,
-            connectedAddress: "0xConnectedWallet",
-            requiredSchemas: ["oma3.ownership.v1"],
-            txHash: "0xmocktxhash",
-          }),
-        });
-      });
-
+      // Verify the transfer succeeded
       await waitFor(() => {
         expect(
           screen.getByText(/✅ Contract Ownership Verified/i)
@@ -568,19 +600,33 @@ describe("DidPkhVerification", () => {
         ).toBeInTheDocument();
         expect(mockOnVerificationComplete).toHaveBeenCalledWith(true);
       });
+
+      // Verify the API was called correctly
+      expect(global.fetch).toHaveBeenCalledWith("/api/verify-and-attest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          did: mockDid,
+          connectedAddress: "0xConnectedWallet",
+          requiredSchemas: ["oma3.ownership.v1"],
+          txHash: "0xmocktxhash",
+        }),
+      });
     });
 
     it("handles transfer verification failure with error message", async () => {
-      // Test transfer verification failure
+      // Test transfer verification failure with error
       const user = userEvent.setup();
+      const errorMessage = "Invalid transaction hash";
+      
       const discoverFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
           ok: true,
-          controllingWallet: "0xControllingWallet",
+          controllingWallet: "0xDifferentWallet",
         }),
       });
-      const errorMessage = "Invalid transaction hash";
+      
       const verifyFetch = vi.fn().mockResolvedValue({
         ok: false,
         json: async () => ({
@@ -589,7 +635,15 @@ describe("DidPkhVerification", () => {
         }),
       });
 
-      global.fetch = discoverFetch;
+      global.fetch = vi.fn().mockImplementation((url: string | Request | URL) => {
+        const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+        if (urlString.includes('/api/discover-controlling-wallet')) {
+          return discoverFetch(url);
+        } else if (urlString.includes('/api/verify-and-attest')) {
+          return verifyFetch(url);
+        }
+        return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
+      });
 
       render(
         <DidPkhVerification
@@ -599,16 +653,12 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      // First discover the controlling wallet
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
-
+      // Wait for auto-discovery to complete and transfer instructions to appear
       await waitFor(() => {
         expect(screen.getByTestId("transfer-instructions")).toBeInTheDocument();
       });
 
-      // Now submit the transfer
-      global.fetch = verifyFetch;
+      // Submit the transfer
       const submitButton = screen.getByText("Submit Transfer");
       await user.click(submitButton);
 
@@ -622,13 +672,15 @@ describe("DidPkhVerification", () => {
     it("handles transfer verification failure without error message", async () => {
       // Test transfer verification failure without specific error
       const user = userEvent.setup();
+      
       const discoverFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
           ok: true,
-          controllingWallet: "0xControllingWallet",
+          controllingWallet: "0xDifferentWallet",
         }),
       });
+      
       const verifyFetch = vi.fn().mockResolvedValue({
         ok: false,
         json: async () => ({
@@ -636,7 +688,15 @@ describe("DidPkhVerification", () => {
         }),
       });
 
-      global.fetch = discoverFetch;
+      global.fetch = vi.fn().mockImplementation((url: string | Request | URL) => {
+        const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+        if (urlString.includes('/api/discover-controlling-wallet')) {
+          return discoverFetch(url);
+        } else if (urlString.includes('/api/verify-and-attest')) {
+          return verifyFetch(url);
+        }
+        return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
+      });
 
       render(
         <DidPkhVerification
@@ -646,16 +706,12 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      // First discover the controlling wallet
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
-
+      // Wait for auto-discovery and transfer instructions
       await waitFor(() => {
         expect(screen.getByTestId("transfer-instructions")).toBeInTheDocument();
       });
 
-      // Now submit the transfer
-      global.fetch = verifyFetch;
+      // Submit the transfer
       const submitButton = screen.getByText("Submit Transfer");
       await user.click(submitButton);
 
@@ -671,18 +727,28 @@ describe("DidPkhVerification", () => {
     });
 
     it("handles network error during transfer verification", async () => {
-      // Test network error handling during transfer verification
+      // Test network error during transfer verification
       const user = userEvent.setup();
+      
       const discoverFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
           ok: true,
-          controllingWallet: "0xControllingWallet",
+          controllingWallet: "0xDifferentWallet",
         }),
       });
+      
       const verifyFetch = vi.fn().mockRejectedValue(new Error("Connection failed"));
 
-      global.fetch = discoverFetch;
+      global.fetch = vi.fn().mockImplementation((url: string | Request | URL) => {
+        const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+        if (urlString.includes('/api/discover-controlling-wallet')) {
+          return discoverFetch(url);
+        } else if (urlString.includes('/api/verify-and-attest')) {
+          return verifyFetch(url);
+        }
+        return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
+      });
 
       render(
         <DidPkhVerification
@@ -692,16 +758,12 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      // First discover the controlling wallet
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
-
+      // Wait for auto-discovery and transfer instructions
       await waitFor(() => {
         expect(screen.getByTestId("transfer-instructions")).toBeInTheDocument();
       });
 
-      // Now submit the transfer
-      global.fetch = verifyFetch;
+      // Submit the transfer
       const submitButton = screen.getByText("Submit Transfer");
       await user.click(submitButton);
 
@@ -713,18 +775,28 @@ describe("DidPkhVerification", () => {
     });
 
     it("handles non-Error exceptions during transfer verification", async () => {
-      // Test non-Error exception handling during transfer verification
+      // Test non-Error exception during transfer verification
       const user = userEvent.setup();
+      
       const discoverFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
           ok: true,
-          controllingWallet: "0xControllingWallet",
+          controllingWallet: "0xDifferentWallet",
         }),
       });
+      
       const verifyFetch = vi.fn().mockRejectedValue("Unknown failure");
 
-      global.fetch = discoverFetch;
+      global.fetch = vi.fn().mockImplementation((url: string | Request | URL) => {
+        const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+        if (urlString.includes('/api/discover-controlling-wallet')) {
+          return discoverFetch(url);
+        } else if (urlString.includes('/api/verify-and-attest')) {
+          return verifyFetch(url);
+        }
+        return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
+      });
 
       render(
         <DidPkhVerification
@@ -734,16 +806,12 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      // First discover the controlling wallet
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
-
+      // Wait for auto-discovery and transfer instructions
       await waitFor(() => {
         expect(screen.getByTestId("transfer-instructions")).toBeInTheDocument();
       });
 
-      // Now submit the transfer
-      global.fetch = verifyFetch;
+      // Submit the transfer
       const submitButton = screen.getByText("Submit Transfer");
       await user.click(submitButton);
 
@@ -762,67 +830,27 @@ describe("DidPkhVerification", () => {
       } as any);
     });
 
-    it("allows retry after failed automated verification", async () => {
+    it("allows retry after failed verification", async () => {
       // Test that user can retry after failure
       const user = userEvent.setup();
-      const failFetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({
+      
+      const mockFetch = vi.fn()
+        .mockRejectedValueOnce(new Error("Auto-discovery failed")) // Auto-discovery fails
+        .mockResolvedValueOnce({ // First retry fails
           ok: false,
-          error: "First attempt failed",
-        }),
-      });
-      const successFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
+          json: async () => ({
+            ok: false,
+            error: "First attempt failed",
+          }),
+        })
+        .mockResolvedValueOnce({ // Second retry succeeds
           ok: true,
-          status: "ready",
-        }),
-      });
-
-      global.fetch = failFetch;
-
-      render(
-        <DidPkhVerification
-          did={mockDid}
-          onVerificationComplete={mockOnVerificationComplete}
-          isVerified={false}
-        />
-      );
-
-      // First attempt fails
-      const verifyButton = screen.getByRole("button", { name: /Verify Wallet Ownership/i });
-      await user.click(verifyButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/❌ Verification Failed/i)).toBeInTheDocument();
-        expect(screen.getByText("First attempt failed")).toBeInTheDocument();
-      });
-
-      // Button should still be available for retry
-      expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
-
-      // Second attempt succeeds
-      global.fetch = successFetch;
-      await user.click(screen.getByRole("button", { name: /Verify Wallet Ownership/i }));
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(/✅ Contract Ownership Verified/i)
-        ).toBeInTheDocument();
-      });
-    });
-
-    it("shows both buttons after failed discovery", async () => {
-      // Test that both options remain available after discovery fails
-      const user = userEvent.setup();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({
-          ok: false,
-          error: "Discovery failed",
-        }),
-      });
+          json: async () => ({
+            ok: true,
+            status: "ready",
+          }),
+        });
+      
       global.fetch = mockFetch;
 
       render(
@@ -833,15 +861,51 @@ describe("DidPkhVerification", () => {
         />
       );
 
-      const discoverButton = screen.getByRole("button", { name: /Discover Controlling Wallet/i });
-      await user.click(discoverButton);
+      // Wait for auto-discovery to fail and retry button to appear
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+      });
+      
+      const verifyButton = screen.getByRole("button", { name: /Verify Wallet Ownership/i });
+      await user.click(verifyButton);
 
+      // First retry attempt fails
+      await waitFor(() => {
+        expect(screen.getByText(/❌ Verification Failed/i)).toBeInTheDocument();
+        expect(screen.getByText("First attempt failed")).toBeInTheDocument();
+      });
+
+      // Button should still be available for retry
+      expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
+
+      // Second retry attempt succeeds
+      await user.click(screen.getByRole("button", { name: /Verify Wallet Ownership/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/✅ Contract Ownership Verified/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows retry button after failed auto-discovery", async () => {
+      // Test that retry button appears after auto-discovery fails
+      global.fetch = vi.fn().mockRejectedValue(new Error("Discovery failed"));
+
+      render(
+        <DidPkhVerification
+          did={mockDid}
+          onVerificationComplete={mockOnVerificationComplete}
+          isVerified={false}
+        />
+      );
+
+      // Wait for auto-discovery to fail
       await waitFor(() => {
         expect(screen.getByText(/❌ Verification Failed/i)).toBeInTheDocument();
       });
 
-      // Both options should still be available
-      expect(screen.getByRole("button", { name: /Discover Controlling Wallet/i })).toBeInTheDocument();
+      // Retry button should be available
       expect(screen.getByRole("button", { name: /Verify Wallet Ownership/i })).toBeInTheDocument();
     });
   });
