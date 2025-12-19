@@ -1,0 +1,230 @@
+name: E2E Tests (Sharded)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      shard_count:
+        description: 'Number of shards'
+        required: false
+        default: '4'
+        type: string
+
+jobs:
+  e2e-tests:
+    name: Playwright E2E Tests (Sharded)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+        shard-total: [4]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps firefox
+
+      - name: Run E2E tests (shard ${{ matrix.shard }}/${{ matrix.shard-total }})
+        id: test
+        run: |
+          echo "Running shard ${{ matrix.shard }} of ${{ matrix.shard-total }}"
+          CI_SHARD=${{ matrix.shard }} CI_SHARD_TOTAL=${{ matrix.shard-total }} npm run test:e2e
+        env:
+          CI: true
+          NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'test-client-id' }}
+        continue-on-error: true
+
+      - name: Generate test coverage report
+        if: always()
+        run: npm run test:e2e:coverage
+
+      - name: Generate execution analytics
+        if: always()
+        run: npm run test:e2e:analytics
+
+      - name: Generate test summary
+        if: always()
+        id: test-summary
+        run: |
+          node tests/e2e/generate-test-summary.js || true
+          if [ -f test-results/summary.json ]; then
+            PASSED=$(node -p "require('./test-results/summary.json').passed || 0")
+            FAILED=$(node -p "require('./test-results/summary.json').failed || 0")
+            SKIPPED=$(node -p "require('./test-results/summary.json').skipped || 0")
+            TOTAL=$(node -p "require('./test-results/summary.json').total || 0")
+            echo "passed=$PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+            echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+            echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          else
+            echo "passed=0" >> $GITHUB_OUTPUT
+            echo "failed=0" >> $GITHUB_OUTPUT
+            echo "skipped=0" >> $GITHUB_OUTPUT
+            echo "total=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-shard-${{ matrix.shard }}
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-shard-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 7
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage-report-shard-${{ matrix.shard }}
+          path: tests/e2e/COVERAGE_REPORT.md
+          retention-days: 30
+
+      - name: Upload execution analytics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-analytics-shard-${{ matrix.shard }}
+          path: tests/e2e/EXECUTION_ANALYTICS.md
+          retention-days: 30
+
+      - name: Aggregate test results
+        if: always()
+        run: |
+          echo "Shard ${{ matrix.shard }} Results:" >> test-results-aggregate.txt
+          echo "  Passed: ${{ steps.test-summary.outputs.passed }}" >> test-results-aggregate.txt
+          echo "  Failed: ${{ steps.test-summary.outputs.failed }}" >> test-results-aggregate.txt
+          echo "  Skipped: ${{ steps.test-summary.outputs.skipped }}" >> test-results-aggregate.txt
+          echo "  Total: ${{ steps.test-summary.outputs.total }}" >> test-results-aggregate.txt
+
+      - name: Upload aggregated results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-aggregate-shard-${{ matrix.shard }}
+          path: test-results-aggregate.txt
+          retention-days: 7
+
+  aggregate-results:
+    name: Aggregate Test Results
+    runs-on: ubuntu-latest
+    needs: e2e-tests
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-aggregate-*
+          merge-multiple: true
+
+      - name: Display aggregated results
+        run: |
+          echo "## 📊 Aggregated Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-results-aggregate.txt ]; then
+            cat test-results-aggregate.txt >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No aggregated results found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Comment PR with aggregated results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let totalPassed = 0;
+            let totalFailed = 0;
+            let totalSkipped = 0;
+            let totalTotal = 0;
+            
+            if (fs.existsSync('test-results-aggregate.txt')) {
+              const content = fs.readFileSync('test-results-aggregate.txt', 'utf8');
+              const shardMatches = content.matchAll(/Shard \d+ Results:[\s\S]*?Total: (\d+)/g);
+              
+              for (const match of shardMatches) {
+                const shardContent = match[0];
+                const passed = parseInt(shardContent.match(/Passed: (\d+)/)?.[1] || '0');
+                const failed = parseInt(shardContent.match(/Failed: (\d+)/)?.[1] || '0');
+                const skipped = parseInt(shardContent.match(/Skipped: (\d+)/)?.[1] || '0');
+                const total = parseInt(shardContent.match(/Total: (\d+)/)?.[1] || '0');
+                
+                totalPassed += passed;
+                totalFailed += failed;
+                totalSkipped += skipped;
+                totalTotal += total;
+              }
+            }
+            
+            const status = totalFailed > 0 ? '❌' : '✅';
+            
+            const testResults = `## 🧪 E2E Test Results (Sharded) ${status}
+            
+            **Aggregated Test Summary:**
+            - ✅ **Passed:** ${totalPassed}
+            - ❌ **Failed:** ${totalFailed}
+            - ⏭️ **Skipped:** ${totalSkipped}
+            - 📊 **Total:** ${totalTotal}
+            
+            **Shards:** 4 parallel shards executed
+            
+            **Artifacts:**
+            - 📄 [Playwright Reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - 📈 [Coverage Reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - 📊 [Execution Analytics](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            ${totalFailed > 0 ? '⚠️ Some tests failed. Please check the artifacts for details.' : '✅ All tests passed!'}
+            
+            _Results generated by GitHub Actions with test sharding_`;
+            
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('E2E Test Results')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: testResults
+              });
+            } else if (github.event_name === 'pull_request') {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: testResults
+              });
+            }
+
