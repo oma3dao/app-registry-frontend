@@ -166,3 +166,272 @@ describe('dataurl utilities', () => {
   });
 });
 
+
+
+// Mock fetch for testing computeDataHashFromDataUrl and verifyDataUrlHash
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
+
+describe('computeDataHashFromDataUrl', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+  });
+
+  it('computes hash from valid JSON response', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    const mockJson = { name: 'Test', version: '1.0.0' };
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: (key: string) => key === 'content-type' ? 'application/json' : null,
+      },
+      body: {
+        getReader: () => ({
+          read: vi.fn()
+            .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(JSON.stringify(mockJson)) })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+        }),
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    const result = await computeDataHashFromDataUrl('https://example.com/metadata.json');
+    
+    expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(result.jcsJson).toBeDefined();
+  });
+
+  it('throws error for non-OK HTTP response', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+    });
+    
+    await expect(computeDataHashFromDataUrl('https://example.com/notfound.json'))
+      .rejects.toThrow('HTTP 404');
+  });
+
+  it('throws error for invalid content-type', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'text/html',
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    await expect(computeDataHashFromDataUrl('https://example.com/page.html'))
+      .rejects.toThrow('Invalid content-type');
+  });
+
+  it('throws error when content-type header is missing', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => null, // Missing content-type header
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    await expect(computeDataHashFromDataUrl('https://example.com/metadata.json'))
+      .rejects.toThrow('Invalid content-type');
+  });
+
+  it('throws error when response body is missing', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'application/json',
+      },
+      body: null,
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    await expect(computeDataHashFromDataUrl('https://example.com/metadata.json'))
+      .rejects.toThrow('No response body');
+  });
+
+  it('throws error when response is too large', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    // Create a large chunk that exceeds the limit
+    const largeChunk = new Uint8Array(1000);
+    
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'application/json',
+      },
+      body: {
+        getReader: () => ({
+          read: vi.fn()
+            .mockResolvedValueOnce({ done: false, value: largeChunk })
+            .mockResolvedValueOnce({ done: false, value: largeChunk })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+        }),
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    // Set a very small maxBytes limit
+    await expect(computeDataHashFromDataUrl('https://example.com/large.json', 0, { maxBytes: 100 }))
+      .rejects.toThrow('Response too large');
+  });
+
+  it('uses sha256 algorithm when specified', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    const mockJson = { name: 'Test' };
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'application/json',
+      },
+      body: {
+        getReader: () => ({
+          read: vi.fn()
+            .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(JSON.stringify(mockJson)) })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+        }),
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    const result = await computeDataHashFromDataUrl('https://example.com/metadata.json', 1);
+    
+    expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+
+  it('handles empty chunks gracefully', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    const mockJson = { name: 'Test' };
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'application/json',
+      },
+      body: {
+        getReader: () => ({
+          read: vi.fn()
+            .mockResolvedValueOnce({ done: false, value: undefined }) // Empty chunk
+            .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(JSON.stringify(mockJson)) })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+        }),
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    const result = await computeDataHashFromDataUrl('https://example.com/metadata.json');
+    
+    expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+});
+
+describe('verifyDataUrlHash', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+  });
+
+  it('returns ok=true when hash matches', async () => {
+    const { verifyDataUrlHash, canonicalizeForHash } = await import('@/lib/utils/dataurl');
+    
+    const mockJson = { name: 'Test', version: '1.0.0' };
+    const { hash: expectedHash } = canonicalizeForHash(mockJson);
+    
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'application/json',
+      },
+      body: {
+        getReader: () => ({
+          read: vi.fn()
+            .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(JSON.stringify(mockJson)) })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+        }),
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    const result = await verifyDataUrlHash('https://example.com/metadata.json', expectedHash);
+    
+    expect(result.ok).toBe(true);
+    expect(result.computedHash.toLowerCase()).toBe(expectedHash.toLowerCase());
+  });
+
+  it('returns ok=false when hash does not match', async () => {
+    const { verifyDataUrlHash } = await import('@/lib/utils/dataurl');
+    
+    const mockJson = { name: 'Test' };
+    const wrongHash = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
+    
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'application/json',
+      },
+      body: {
+        getReader: () => ({
+          read: vi.fn()
+            .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(JSON.stringify(mockJson)) })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+        }),
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    const result = await verifyDataUrlHash('https://example.com/metadata.json', wrongHash);
+    
+    expect(result.ok).toBe(false);
+    expect(result.computedHash).not.toBe(wrongHash);
+  });
+
+  it('handles case-insensitive hash comparison', async () => {
+    const { verifyDataUrlHash, canonicalizeForHash } = await import('@/lib/utils/dataurl');
+    
+    const mockJson = { name: 'Test' };
+    const { hash } = canonicalizeForHash(mockJson);
+    const upperCaseHash = hash.toUpperCase() as `0x${string}`;
+    
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'application/json',
+      },
+      body: {
+        getReader: () => ({
+          read: vi.fn()
+            .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(JSON.stringify(mockJson)) })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+        }),
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    const result = await verifyDataUrlHash('https://example.com/metadata.json', upperCaseHash);
+    
+    expect(result.ok).toBe(true);
+  });
+});

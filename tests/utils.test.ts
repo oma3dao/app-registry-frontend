@@ -19,6 +19,63 @@ describe('utils', () => {
     it('returns false in test environment', () => {
       expect(isMobile()).toBe(false);
     });
+
+    it('returns true for mobile user agents', () => {
+      // Save original navigator
+      const originalNavigator = window.navigator;
+      
+      // Mock mobile user agent
+      Object.defineProperty(window, 'navigator', {
+        value: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)' },
+        writable: true,
+        configurable: true
+      });
+      
+      expect(isMobile()).toBe(true);
+      
+      // Restore original navigator
+      Object.defineProperty(window, 'navigator', {
+        value: originalNavigator,
+        writable: true,
+        configurable: true
+      });
+    });
+
+    it('returns true for Android user agents', () => {
+      const originalNavigator = window.navigator;
+      
+      Object.defineProperty(window, 'navigator', {
+        value: { userAgent: 'Mozilla/5.0 (Linux; Android 10; SM-G975F)' },
+        writable: true,
+        configurable: true
+      });
+      
+      expect(isMobile()).toBe(true);
+      
+      Object.defineProperty(window, 'navigator', {
+        value: originalNavigator,
+        writable: true,
+        configurable: true
+      });
+    });
+
+    it('returns false for desktop user agents', () => {
+      const originalNavigator = window.navigator;
+      
+      Object.defineProperty(window, 'navigator', {
+        value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        writable: true,
+        configurable: true
+      });
+      
+      expect(isMobile()).toBe(false);
+      
+      Object.defineProperty(window, 'navigator', {
+        value: originalNavigator,
+        writable: true,
+        configurable: true
+      });
+    });
   });
 
   // Test debounce function
@@ -91,6 +148,30 @@ describe('utils', () => {
     it('handles undefined input', () => {
       expect(normalizeMetadata(undefined)).toEqual({});
     });
+
+    it('preserves all provided fields', () => {
+      const input = {
+        name: 'Test App',
+        description: 'A test application',
+        publisher: 'Test Publisher',
+        external_url: 'https://example.com',
+        image: 'https://example.com/image.png',
+        screenshotUrls: ['https://example.com/shot1.png'],
+        platforms: { web: { launchUrl: 'https://app.example.com' } }
+      };
+      const result = normalizeMetadata(input);
+      expect(result).toEqual(input);
+    });
+
+    it('handles non-array screenshotUrls', () => {
+      const result = normalizeMetadata({ screenshotUrls: 'not-an-array' });
+      expect(result.screenshotUrls).toEqual([]);
+    });
+
+    it('handles null screenshotUrls', () => {
+      const result = normalizeMetadata({ screenshotUrls: null });
+      expect(result.screenshotUrls).toEqual([]);
+    });
   });
 }); 
 
@@ -115,6 +196,36 @@ describe('fetchMetadataImage', () => {
     expect(result).toBeNull();
   });
 
+  // This test checks that fetchMetadataImage returns null if image is empty string
+  it('returns null if image is empty string', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ image: '' })
+    });
+    const result = await fetchMetadataImage('https://data.com');
+    expect(result).toBeNull();
+  });
+
+  // This test checks that fetchMetadataImage returns null if image is whitespace only
+  it('returns null if image is whitespace only', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ image: '   ' })
+    });
+    const result = await fetchMetadataImage('https://data.com');
+    expect(result).toBeNull();
+  });
+
+  // This test checks that fetchMetadataImage returns null if image is not a string
+  it('returns null if image is not a string', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ image: 12345 })
+    });
+    const result = await fetchMetadataImage('https://data.com');
+    expect(result).toBeNull();
+  });
+
   // This test checks that fetchMetadataImage returns null on API error
   it('returns null on API error', async () => {
     global.fetch = vi.fn().mockResolvedValue({
@@ -122,6 +233,16 @@ describe('fetchMetadataImage', () => {
       status: 500,
       statusText: 'Internal Server Error',
       json: async () => ({ error: 'fail' })
+    });
+    const result = await fetchMetadataImage('https://data.com');
+    expect(result).toBeNull();
+  });
+
+  // This test checks that fetchMetadataImage returns null when API returns error in response body
+  it('returns null when API response contains error field', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ error: 'Failed to fetch metadata' })
     });
     const result = await fetchMetadataImage('https://data.com');
     expect(result).toBeNull();

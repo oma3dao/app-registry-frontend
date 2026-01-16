@@ -5,51 +5,196 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:
 
 jobs:
   e2e-tests:
+    name: Playwright E2E Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    # Use matrix strategy for test sharding (optional - uncomment to enable)
+    # strategy:
+    #   fail-fast: false
+    #   matrix:
+    #     shard: [1, 2, 3, 4]
+    #     shard-total: [4]
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Install Playwright browsers
-      run: npx playwright install --with-deps firefox
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps firefox
 
-    - name: Build application
-      run: npm run build
-      env:
-        NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'test-client-id' }}
+      - name: Run test health check
+        run: npm run test:e2e:health
+        continue-on-error: true
 
-    - name: Run E2E tests
-      run: npm run test:e2e
-      env:
-        NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'test-client-id' }}
-        CI: true
+      - name: Run E2E tests
+        id: test
+        run: |
+          # Use sharding if matrix is enabled
+          if [ -n "${{ matrix.shard }}" ]; then
+            CI_SHARD=${{ matrix.shard }} CI_SHARD_TOTAL=${{ matrix.shard-total }} npm run test:e2e
+          else
+            npm run test:e2e
+          fi
+        env:
+          CI: true
+          NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'test-client-id' }}
+        continue-on-error: true
 
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+      - name: Generate test coverage report
+        if: always()
+        run: npm run test:e2e:coverage
 
-    - name: Upload test videos
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-videos
-        path: test-results/
-        retention-days: 7
+      - name: Generate execution analytics
+        if: always()
+        run: npm run test:e2e:analytics
 
+      - name: Generate test summary
+        if: always()
+        id: test-summary
+        run: |
+          node tests/e2e/generate-test-summary.js
+          if [ -f test-results/summary.json ]; then
+            PASSED=$(node -p "require('./test-results/summary.json').passed")
+            FAILED=$(node -p "require('./test-results/summary.json').failed")
+            SKIPPED=$(node -p "require('./test-results/summary.json').skipped")
+            TOTAL=$(node -p "require('./test-results/summary.json').total")
+            echo "passed=$PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+            echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+            echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          else
+            echo "passed=0" >> $GITHUB_OUTPUT
+            echo "failed=0" >> $GITHUB_OUTPUT
+            echo "skipped=0" >> $GITHUB_OUTPUT
+            echo "total=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+
+      - name: Upload visual regression snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots
+          path: tests/e2e/visual-regression.spec.ts-snapshots/
+          retention-days: 30
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage-report${{ matrix.shard != '' && format('-shard-{0}', matrix.shard) || '' }}
+          path: |
+            tests/e2e/COVERAGE_REPORT.md
+          retention-days: 30
+
+      - name: Upload execution analytics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-analytics${{ matrix.shard != '' && format('-shard-{0}', matrix.shard) || '' }}
+          path: |
+            tests/e2e/EXECUTION_ANALYTICS.md
+          retention-days: 30
+
+      - name: Upload health check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-health-check
+          path: tests/e2e/TEST_HEALTH_CHECK.md
+          retention-days: 90
+
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('E2E Test Results')
+            );
+            
+            const passed = '${{ steps.test-summary.outputs.passed }}';
+            const failed = '${{ steps.test-summary.outputs.failed }}';
+            const skipped = '${{ steps.test-summary.outputs.skipped }}';
+            const total = '${{ steps.test-summary.outputs.total }}';
+            const status = failed > 0 ? '❌' : '✅';
+            
+            const testResults = `## 🧪 E2E Test Results ${status}
+            
+            **Test Summary:**
+            - ✅ **Passed:** ${passed}
+            - ❌ **Failed:** ${failed}
+            - ⏭️ **Skipped:** ${skipped}
+            - 📊 **Total:** ${total}
+            
+            **Artifacts:**
+            - 📄 [Playwright Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - 📈 [Coverage Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - 📊 [Execution Analytics](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - 🎬 [Test Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            ${failed > 0 ? '⚠️ Some tests failed. Please check the artifacts for details.' : '✅ All tests passed!'}
+            
+            _Results generated by GitHub Actions_`;
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: testResults
+              });
+            } else if (github.event_name === 'pull_request') {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: testResults
+              });
+            }
+
+      - name: Set test status
+        if: always()
+        run: |
+          if [ "${{ steps.test-summary.outputs.failed }}" -gt 0 ]; then
+            echo "❌ E2E Tests Failed: ${{ steps.test-summary.outputs.failed }} test(s) failed"
+            exit 1
+          else
+            echo "✅ E2E Tests Passed: ${{ steps.test-summary.outputs.passed }} test(s) passed"
+          fi
