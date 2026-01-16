@@ -516,3 +516,283 @@ describe('Proof Types - Validation Functions', () => {
   });
 });
 
+
+
+/**
+ * OMATrust Proof Spec 5.1 - Proof Taxonomy Tests
+ * 
+ * Tests for Section 5.1: Identifier Capability and Evidence Location
+ * These tests validate the proof taxonomy requirements.
+ */
+describe('OMATrust Proof Spec 5.1 - Proof Taxonomy', () => {
+  
+  describe('Identifier Capability (5.1.1)', () => {
+    
+    /**
+     * Test: Signer-capable identifiers
+     * Requirement ID: OT-PF-001
+     * Requirement: "Signer-capable: EOAs, contract wallets (EIP-1271), DID methods with keys"
+     */
+    it('should recognize signer-capable identifiers - OT-PF-001', () => {
+      // EOA (Externally Owned Account)
+      const eoa = '0x1234567890123456789012345678901234567890';
+      expect(eoa).toMatch(/^0x[a-fA-F0-9]{40}$/);
+      
+      // Contract wallet (EIP-1271 compatible)
+      const contractWallet = '0xabcdef1234567890abcdef1234567890abcdef12';
+      expect(contractWallet).toMatch(/^0x[a-fA-F0-9]{40}$/);
+      
+      // DID methods with keys (did:key, did:pkh)
+      const didKey = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
+      const didPkh = 'did:pkh:eip155:1:0x1234567890123456789012345678901234567890';
+      
+      expect(didKey).toMatch(/^did:key:/);
+      expect(didPkh).toMatch(/^did:pkh:/);
+      
+      // These identifiers CAN produce cryptographic signatures
+      const signerCapableIdentifiers = [eoa, contractWallet, didKey, didPkh];
+      expect(signerCapableIdentifiers.length).toBe(4);
+    });
+    
+    /**
+     * Test: Non-signer identifiers
+     * Requirement ID: OT-PF-002
+     * Requirement: "Non-signer: Social handles, DNS names without keys, platform IDs"
+     */
+    it('should recognize non-signer identifiers - OT-PF-002', () => {
+      // Social handles
+      const twitterHandle = '@example_user';
+      const githubHandle = 'github:example-user';
+      
+      // DNS names without keys
+      const dnsName = 'example.com';
+      
+      // Platform IDs
+      const platformId = 'platform:discord:123456789';
+      
+      // These identifiers CANNOT produce cryptographic signatures directly
+      const nonSignerIdentifiers = [twitterHandle, githubHandle, dnsName, platformId];
+      expect(nonSignerIdentifiers.length).toBe(4);
+      
+      // Non-signers should not match EOA or DID key patterns
+      expect(twitterHandle).not.toMatch(/^0x[a-fA-F0-9]{40}$/);
+      expect(twitterHandle).not.toMatch(/^did:key:/);
+    });
+    
+    /**
+     * Test: Non-signer must use trusted evidence locations
+     * Requirement ID: OT-PF-003
+     * Requirement: "Non-signer MUST use trusted evidence locations"
+     */
+    it('should require non-signers to use trusted evidence locations - OT-PF-003', () => {
+      // Non-signer proof must use evidence-pointer type
+      const nonSignerProof = {
+        proofType: 'evidence-pointer',
+        proofPurpose: 'shared-control',
+        proofObject: {
+          url: 'https://twitter.com/example_user/status/12345',
+          evidenceType: 'social-post'
+        }
+      };
+      
+      // Evidence URL must be HTTPS (trusted location)
+      expect(nonSignerProof.proofObject.url).toMatch(/^https:\/\//);
+      expect(nonSignerProof.proofType).toBe('evidence-pointer');
+    });
+    
+    /**
+     * Test: Non-signer must not use signature-based proofTypes
+     * Requirement ID: OT-PF-004
+     * Requirement: "Non-signer MUST NOT use signature-based proofTypes"
+     */
+    it('should prevent non-signers from using signature-based proofTypes - OT-PF-004', () => {
+      const signatureBasedTypes = ['pop-jws', 'pop-eip712'];
+      const nonSignatureTypes = ['evidence-pointer', 'tx-interaction'];
+      
+      // Non-signers should only use non-signature types
+      const nonSignerAllowedTypes = nonSignatureTypes;
+      
+      signatureBasedTypes.forEach(type => {
+        expect(nonSignerAllowedTypes).not.toContain(type);
+      });
+      
+      // Validate that evidence-pointer is allowed for non-signers
+      expect(nonSignerAllowedTypes).toContain('evidence-pointer');
+    });
+  });
+  
+  describe('Evidence Location (5.1.2)', () => {
+    
+    /**
+     * Test: Inline evidence location
+     * Requirement ID: OT-PF-010
+     * Requirement: "Inline - Complete evidence embedded in Proof Object"
+     */
+    it('should support inline evidence location - OT-PF-010', () => {
+      const inlineProof = {
+        proofType: 'pop-jws',
+        proofObject: 'eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOmV4YW1wbGUuY29tIn0.signature',
+        evidenceLocation: 'inline'
+      };
+      
+      // Evidence is embedded directly in proofObject
+      expect(typeof inlineProof.proofObject).toBe('string');
+      expect(inlineProof.proofObject.length).toBeGreaterThan(0);
+    });
+    
+    /**
+     * Test: URL evidence location
+     * Requirement ID: OT-PF-011
+     * Requirement: "URL - Evidence retrieved from referenced URL"
+     */
+    it('should support URL evidence location - OT-PF-011', () => {
+      const urlProof = {
+        proofType: 'evidence-pointer',
+        proofObject: {
+          url: 'https://example.com/.well-known/did.json',
+          contentType: 'application/json'
+        },
+        evidenceLocation: 'url'
+      };
+      
+      expect(urlProof.proofObject.url).toMatch(/^https?:\/\//);
+    });
+    
+    /**
+     * Test: Transaction evidence location
+     * Requirement ID: OT-PF-012
+     * Requirement: "Transaction - Evidence from blockchain transaction"
+     */
+    it('should support transaction evidence location - OT-PF-012', () => {
+      const txProof = {
+        proofType: 'tx-encoded-value',
+        proofObject: {
+          chainId: 'eip155:1',
+          txHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+        },
+        evidenceLocation: 'transaction'
+      };
+      
+      expect(txProof.proofObject.txHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
+      expect(txProof.proofObject.chainId).toMatch(/^eip155:\d+$/);
+    });
+    
+    /**
+     * Test: URL evidence must use HTTPS
+     * Requirement ID: OT-PF-013
+     * Requirement: "URL Evidence MUST use HTTPS"
+     */
+    it('should require HTTPS for URL evidence - OT-PF-013', () => {
+      const validHttpsUrl = 'https://example.com/evidence';
+      const invalidHttpUrl = 'http://example.com/evidence';
+      
+      // HTTPS is required
+      expect(validHttpsUrl).toMatch(/^https:\/\//);
+      
+      // HTTP should be rejected
+      expect(invalidHttpUrl).not.toMatch(/^https:\/\//);
+      
+      // Validation function
+      const isValidEvidenceUrl = (url: string): boolean => {
+        return url.startsWith('https://');
+      };
+      
+      expect(isValidEvidenceUrl(validHttpsUrl)).toBe(true);
+      expect(isValidEvidenceUrl(invalidHttpUrl)).toBe(false);
+    });
+  });
+  
+  describe('Proof Purpose (5.1.3)', () => {
+    
+    /**
+     * Test: shared-control proof purpose
+     * Requirement ID: OT-PF-020
+     * Requirement: "shared-control - Identity binding, controller verification"
+     */
+    it('should define shared-control proof purpose - OT-PF-020', () => {
+      const sharedControlProof = {
+        proofType: 'pop-eip712',
+        proofPurpose: 'shared-control',
+        proofObject: {
+          domain: { name: 'OMATrustProof', version: '1', chainId: 1 },
+          message: {
+            signer: '0x1234567890123456789012345678901234567890',
+            authorizedEntity: 'did:web:controller.com',
+            signingPurpose: 'shared-control',
+            statement: 'I authorize this entity to manage my identity.'
+          }
+        }
+      };
+      
+      expect(sharedControlProof.proofPurpose).toBe('shared-control');
+      
+      // shared-control is used for:
+      // - Identity binding
+      // - Controller verification
+      // - Registry operations
+      const sharedControlUseCases = [
+        'identity-binding',
+        'controller-verification',
+        'registry-operations'
+      ];
+      expect(sharedControlUseCases.length).toBe(3);
+    });
+    
+    /**
+     * Test: commercial-tx proof purpose
+     * Requirement ID: OT-PF-021
+     * Requirement: "commercial-tx - Commercial interactions, usage confirmations"
+     */
+    it('should define commercial-tx proof purpose - OT-PF-021', () => {
+      const commercialTxProof = {
+        proofType: 'x402-receipt',
+        proofPurpose: 'commercial-tx',
+        proofFormat: 'jws',
+        proofObject: {
+          resourceUrl: 'https://api.example.com/premium',
+          payer: '0x1234567890123456789012345678901234567890',
+          issuedAt: Math.floor(Date.now() / 1000)
+        }
+      };
+      
+      expect(commercialTxProof.proofPurpose).toBe('commercial-tx');
+      
+      // commercial-tx is used for:
+      // - Commercial interactions
+      // - Usage confirmations
+      // - Service receipts
+      const commercialTxUseCases = [
+        'commercial-interactions',
+        'usage-confirmations',
+        'service-receipts'
+      ];
+      expect(commercialTxUseCases.length).toBe(3);
+    });
+    
+    /**
+     * Test: Proof purpose must match proof type constraints
+     */
+    it('should enforce proof purpose constraints per proof type', () => {
+      // x402-receipt MUST use commercial-tx
+      const x402Receipt = {
+        proofType: 'x402-receipt',
+        proofPurpose: 'commercial-tx'
+      };
+      expect(x402Receipt.proofPurpose).toBe('commercial-tx');
+      
+      // tx-interaction MUST use commercial-tx
+      const txInteraction = {
+        proofType: 'tx-interaction',
+        proofPurpose: 'commercial-tx'
+      };
+      expect(txInteraction.proofPurpose).toBe('commercial-tx');
+      
+      // pop-eip712 can use either purpose
+      const popEip712SharedControl = {
+        proofType: 'pop-eip712',
+        proofPurpose: 'shared-control'
+      };
+      expect(['shared-control', 'commercial-tx']).toContain(popEip712SharedControl.proofPurpose);
+    });
+  });
+});

@@ -244,12 +244,191 @@ describe('Contract Errors', () => {
     });
 
     /**
+     * Test: covers line 92 branch - errorData is an empty string
+     */
+    it('handles error data that is an empty string', () => {
+      const error: any = new Error('execution reverted');
+      error.data = ''; // Empty string
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 92 branch - errorData starts with 0X (uppercase)
+     */
+    it('handles error data with uppercase 0X prefix', () => {
+      const error: any = new Error('execution reverted');
+      error.data = '0Xdeadbeef0000000000000000000000000000000000000000000000000000000000000000'; // Uppercase 0X
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      // startsWith('0x') is case-sensitive, so this won't match
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 96 branch - data.data is null, falls back to data
+     */
+    it('handles error with data.data as null', () => {
+      const error: any = new Error('execution reverted');
+      error.data = {
+        data: null, // null data.data
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 96 branch - data.data is undefined, data is object with valid nested data
+     */
+    it('handles error with data.data undefined but error.data is valid', () => {
+      const error: any = new Error('execution reverted');
+      error.data = {
+        // no data.data property, so this object itself becomes errorData (not a string)
+        someOther: 'value',
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 96 branch - fallback to error.data when data.data is falsy
+     */
+    it('handles error with fallback to error.data', () => {
+      const error: any = {
+        message: 'execution reverted',
+        data: {
+          data: '', // empty string is falsy, but data object itself is truthy
+        },
+        error: {
+          data: '0xccdf6bd50000000000000000000000000000000000000000000000000000000000000000', // DIDCannotBeEmpty
+        },
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      // The empty string from data.data is falsy, so errorData = errorObj.data (the object)
+      // Since the object is not a string, it goes to the else branch
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 96 branch - fallback chain when data is undefined
+     */
+    it('handles error with fallback chain to cause.data', () => {
+      const error: any = {
+        message: 'execution reverted',
+        // no data property
+        // no error property
+        cause: {
+          data: '0xa32712b80000000000000000000000000000000000000000000000000000000000000000', // InterfacesCannotBeEmpty
+        },
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Contract error: InterfacesCannotBeEmpty');
+    });
+
+    /**
+     * Test: covers line 92 branch - errorData is undefined (all fallbacks fail)
+     */
+    it('handles error when all data fallbacks are undefined', () => {
+      const error: any = {
+        message: 'execution reverted',
+        // no data, error, or cause properties
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 92 branch - errorData is 0 (falsy number)
+     */
+    it('handles error when data is 0', () => {
+      const error: any = new Error('execution reverted');
+      error.data = 0; // falsy number
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 92 branch - errorData is false
+     */
+    it('handles error when data is false', () => {
+      const error: any = new Error('execution reverted');
+      error.data = false; // falsy boolean
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
      * Test: covers lines 110-139 - error selector matching logic
      * Tests error with non-string data
      */
     it('handles error data that is not a string', () => {
       const error: any = new Error('execution reverted');
       error.data = { someProperty: 'value' }; // Non-string data
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 92 branch - errorData is a number
+     */
+    it('handles error data that is a number', () => {
+      const error: any = new Error('execution reverted');
+      error.data = 12345; // Number data
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 92 branch - errorData is an array
+     */
+    it('handles error data that is an array', () => {
+      const error: any = new Error('execution reverted');
+      error.data = ['0xdeadbeef']; // Array data
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 92 branch - errorData is a boolean
+     */
+    it('handles error data that is a boolean', () => {
+      const error: any = new Error('execution reverted');
+      error.data = true; // Boolean data
 
       const result = normalizeEvmError(error);
 

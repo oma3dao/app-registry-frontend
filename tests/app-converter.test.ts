@@ -96,6 +96,18 @@ describe('app-converter utilities', () => {
       const nft = appSummaryToNFT(mockAppSummary);
       expect(nft.iwpsPortalUrl).toBe('');
     });
+
+    it('converts tokenId when present in AppSummary', () => {
+      const appWithTokenId = { ...mockAppSummary, tokenId: 42 } as any;
+      const nft = appSummaryToNFT(appWithTokenId);
+      expect(nft.tokenId).toBe(42);
+    });
+
+    it('converts string tokenId to number', () => {
+      const appWithStringTokenId = { ...mockAppSummary, tokenId: '123' } as any;
+      const nft = appSummaryToNFT(appWithStringTokenId);
+      expect(nft.tokenId).toBe(123);
+    });
   });
 
   describe('appSummariesToNFTs', () => {
@@ -295,3 +307,287 @@ describe('app-converter utilities', () => {
   });
 });
 
+
+
+// Additional tests for async functions
+import { vi, beforeEach, afterEach } from 'vitest';
+import { hydrateNFTWithMetadata, appSummariesToNFTsWithMetadata } from '@/lib/utils/app-converter';
+
+describe('app-converter async utilities', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('hydrateNFTWithMetadata', () => {
+    const mockNFT = {
+      did: 'did:web:example.com',
+      version: '1.0.0',
+      interfaces: 1,
+      dataUrl: 'https://example.com/metadata.json',
+      status: 0,
+      minter: '0x123',
+      currentOwner: '0x456',
+      name: '',
+      description: '',
+      publisher: '',
+      image: '',
+      screenshotUrls: [],
+      videoUrls: [],
+      threeDAssetUrls: [],
+      traits: [],
+    };
+
+    it('returns original NFT when dataUrl is empty', async () => {
+      const nftWithoutDataUrl = { ...mockNFT, dataUrl: '' };
+      const result = await hydrateNFTWithMetadata(nftWithoutDataUrl as any);
+      expect(result).toEqual(nftWithoutDataUrl);
+    });
+
+    it('returns original NFT when fetch fails', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      const result = await hydrateNFTWithMetadata(mockNFT as any);
+      expect(result).toEqual(mockNFT);
+    });
+
+    it('returns original NFT when fetch throws error', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      const result = await hydrateNFTWithMetadata(mockNFT as any);
+      expect(result).toEqual(mockNFT);
+    });
+
+    it('merges metadata into NFT on successful fetch', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'A test application',
+        publisher: 'Test Publisher',
+        image: 'https://example.com/image.png',
+        external_url: 'https://example.com',
+        summary: 'Test summary',
+        owner: 'eip155:1:0x456',
+        screenshotUrls: ['https://example.com/shot1.png'],
+        videoUrls: ['https://example.com/video.mp4'],
+        threeDAssetUrls: [],
+        traits: ['trait1', 'trait2'],
+        platforms: { web: { launchUrl: 'https://app.example.com' } },
+        endpoints: [{ name: 'REST', endpoint: 'https://api.example.com' }],
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const result = await hydrateNFTWithMetadata(mockNFT as any);
+
+      expect(result.name).toBe('Test App');
+      expect(result.description).toBe('A test application');
+      expect(result.publisher).toBe('Test Publisher');
+      expect(result.image).toBe('https://example.com/image.png');
+      expect(result.traits).toEqual(['trait1', 'trait2']);
+      expect(result.endpointName).toBe('REST');
+      expect(result.endpointUrl).toBe('https://api.example.com');
+    });
+
+    it('extracts tokenId from registrations array', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'Test',
+        publisher: 'Test',
+        image: 'https://example.com/image.png',
+        registrations: [{ did: 'did:web:example.com', agentRegistry: '0x123', agentId: 42 }],
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const nftWithoutTokenId = { ...mockNFT, tokenId: undefined };
+      const result = await hydrateNFTWithMetadata(nftWithoutTokenId as any);
+
+      expect(result.tokenId).toBe(42);
+    });
+
+    it('prefers NFT tokenId over registrations', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'Test',
+        publisher: 'Test',
+        image: 'https://example.com/image.png',
+        registrations: [{ did: 'did:web:example.com', agentRegistry: '0x123', agentId: 99 }],
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const nftWithTokenId = { ...mockNFT, tokenId: 42 };
+      const result = await hydrateNFTWithMetadata(nftWithTokenId as any);
+
+      expect(result.tokenId).toBe(42); // Should keep original, not 99
+    });
+
+    it('handles 3dAssetUrls field name variation', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'Test',
+        publisher: 'Test',
+        image: 'https://example.com/image.png',
+        '3dAssetUrls': ['https://example.com/model.glb'],
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const result = await hydrateNFTWithMetadata(mockNFT as any);
+
+      expect(result.threeDAssetUrls).toEqual(['https://example.com/model.glb']);
+    });
+
+    it('extracts MCP config from endpoint with name MCP', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'Test',
+        publisher: 'Test',
+        image: 'https://example.com/image.png',
+        endpoints: [{
+          name: 'MCP',
+          endpoint: 'https://mcp.example.com',
+          tools: [{ name: 'tool1' }],
+          resources: [{ name: 'resource1' }],
+        }],
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const result = await hydrateNFTWithMetadata(mockNFT as any);
+
+      expect(result.mcp).toBeDefined();
+      expect(result.mcp.tools).toEqual([{ name: 'tool1' }]);
+    });
+
+    it('returns undefined mcp when endpoint has no MCP fields', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'Test',
+        publisher: 'Test',
+        image: 'https://example.com/image.png',
+        endpoints: [{
+          name: 'MCP',  // Name is MCP but no MCP-specific fields
+          endpoint: 'https://api.example.com',
+          schemaUrl: 'https://api.example.com/schema',
+          // No MCP-specific fields like tools, resources, prompts
+        }],
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const result = await hydrateNFTWithMetadata(mockNFT as any);
+
+      // MCP should be undefined because there are no MCP-specific fields
+      expect(result.mcp).toBeUndefined();
+    });
+
+    it('returns undefined mcp when endpoints array is empty', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'Test',
+        publisher: 'Test',
+        image: 'https://example.com/image.png',
+        endpoints: [],
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const result = await hydrateNFTWithMetadata(mockNFT as any);
+
+      expect(result.mcp).toBeUndefined();
+    });
+  });
+
+  describe('appSummariesToNFTsWithMetadata', () => {
+    const mockAppSummary = {
+      did: 'did:web:example.com',
+      currentVersion: { major: 1, minor: 0, patch: 0 },
+      interfaces: 1,
+      dataUrl: 'https://example.com/metadata.json',
+      status: 'Active' as const,
+      minter: '0x123',
+      contractId: null,
+      fungibleTokenId: null,
+    };
+
+    it('converts and hydrates multiple apps', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'Test description',
+        publisher: 'Test Publisher',
+        image: 'https://example.com/image.png',
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const apps = [
+        mockAppSummary,
+        { ...mockAppSummary, did: 'did:web:example2.com' },
+      ];
+
+      const result = await appSummariesToNFTsWithMetadata(apps);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Test App');
+      expect(result[1].name).toBe('Test App');
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns empty array for empty input', async () => {
+      const result = await appSummariesToNFTsWithMetadata([]);
+      expect(result).toEqual([]);
+    });
+
+    it('passes fallback address to conversions', async () => {
+      const mockMetadata = {
+        name: 'Test App',
+        description: 'Test',
+        publisher: 'Test',
+        image: 'https://example.com/image.png',
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockMetadata,
+      });
+
+      const apps = [{ ...mockAppSummary, minter: null }];
+      const fallback = '0xfallback';
+
+      const result = await appSummariesToNFTsWithMetadata(apps, fallback);
+
+      expect(result[0].minter).toBe(fallback);
+    });
+  });
+});

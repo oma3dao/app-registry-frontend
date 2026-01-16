@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   normalizeDidWeb,
   isValidDid,
@@ -6,7 +6,17 @@ import {
   extractDidIdentifier,
   normalizeDomain,
   getDidHashSync,
+  getDidHash,
 } from '@/lib/utils/did';
+
+// Mock thirdweb and contract client for getDidHash tests
+vi.mock('thirdweb', () => ({
+  readContract: vi.fn(),
+}));
+
+vi.mock('@/lib/contracts/client', () => ({
+  getAppRegistryContract: vi.fn(() => ({ address: '0x123' })),
+}));
 
 describe('DID utilities', () => {
   describe('normalizeDidWeb', () => {
@@ -209,6 +219,48 @@ describe('DID utilities', () => {
   describe('getDidHashSync', () => {
     it('throws error (not implemented)', () => {
       expect(() => getDidHashSync('did:web:example.com')).toThrow('not implemented');
+    });
+  });
+
+  describe('getDidHash', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('calls contract to get DID hash', async () => {
+      const { readContract } = await import('thirdweb');
+      const mockHash = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+      
+      vi.mocked(readContract).mockResolvedValue(mockHash);
+      
+      const result = await getDidHash('did:web:example.com');
+      
+      expect(result).toBe(mockHash);
+      expect(readContract).toHaveBeenCalledWith({
+        contract: { address: '0x123' },
+        method: 'function getDidHash(string) pure returns (bytes32)',
+        params: ['did:web:example.com'],
+      });
+    });
+
+    it('handles different DID formats', async () => {
+      const { readContract } = await import('thirdweb');
+      const mockHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+      
+      vi.mocked(readContract).mockResolvedValue(mockHash);
+      
+      const result = await getDidHash('did:pkh:eip155:1:0x123');
+      
+      expect(result).toBe(mockHash);
+      expect(readContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: ['did:pkh:eip155:1:0x123'],
+        })
+      );
     });
   });
 

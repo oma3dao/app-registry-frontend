@@ -411,7 +411,7 @@ describe('schema/data-model functions', () => {
         smartContract: false,
       };
 
-      const fields = getVisibleFields('basic', interfaceFlags);
+      const fields = getVisibleFields('common', interfaceFlags);
       expect(Array.isArray(fields)).toBe(true);
       // Each field should have at least one matching interface
       fields.forEach(field => {
@@ -430,7 +430,7 @@ describe('schema/data-model functions', () => {
         smartContract: false,
       };
 
-      const fields = getVisibleFields('basic', interfaceFlags);
+      const fields = getVisibleFields('common', interfaceFlags);
       expect(fields).toEqual([]);
     });
 
@@ -446,11 +446,11 @@ describe('schema/data-model functions', () => {
 
       // Get all fields for a step that has human interface fields
       // The function should return fields that match ANY of the enabled interfaces
-      const allFieldsForStep = getFieldsForStep('basic');
+      const allFieldsForStep = getFieldsForStep('common');
       
       if (allFieldsForStep.length > 0) {
         // Test that getVisibleFields filters correctly
-        const visibleFields = getVisibleFields('basic', interfaceFlags);
+        const visibleFields = getVisibleFields('common', interfaceFlags);
         
         // Each visible field should match at least one enabled interface
         visibleFields.forEach(field => {
@@ -467,10 +467,10 @@ describe('schema/data-model functions', () => {
           expect(visibleFields.length).toBeGreaterThan(0);
         }
       } else {
-        // If basic step has no fields, test with a step that likely has fields
-        const metadataFields = getVisibleFields('metadata', interfaceFlags);
+        // If common step has no fields, test with a step that likely has fields
+        const verificationFields = getVisibleFields('verification', interfaceFlags);
         // Just verify the function works correctly
-        expect(Array.isArray(metadataFields)).toBe(true);
+        expect(Array.isArray(verificationFields)).toBe(true);
       }
     });
 
@@ -486,7 +486,7 @@ describe('schema/data-model functions', () => {
       };
 
       // Get all fields and find one that has multiple interfaces
-      const allFields = getFieldsForStep('basic');
+      const allFields = getFieldsForStep('common');
       
       // Test with a field that has multiple interfaces (if any exist)
       // The .some() callback should return true if ANY interface matches
@@ -915,3 +915,36 @@ describe('schema/data-model functions', () => {
   });
 });
 
+
+
+describe('getFieldsByStorage', () => {
+  it('returns on-chain fields when onChain=true', () => {
+    const fields = getFieldsByStorage(true);
+    expect(Array.isArray(fields)).toBe(true);
+    fields.forEach(field => {
+      expect(field.onChain).toBe(true);
+    });
+  });
+
+  it('returns off-chain fields when onChain=false', () => {
+    const fields = getFieldsByStorage(false);
+    expect(Array.isArray(fields)).toBe(true);
+    fields.forEach(field => {
+      expect(field.onChain).toBe(false);
+    });
+  });
+
+  it('returns same result as getOnChainFields when onChain=true', () => {
+    const byStorage = getFieldsByStorage(true);
+    const onChain = getOnChainFields();
+    expect(byStorage.length).toBe(onChain.length);
+    expect(byStorage.map(f => f.id).sort()).toEqual(onChain.map(f => f.id).sort());
+  });
+
+  it('returns same result as getOffChainFields when onChain=false', () => {
+    const byStorage = getFieldsByStorage(false);
+    const offChain = getOffChainFields();
+    expect(byStorage.length).toBe(offChain.length);
+    expect(byStorage.map(f => f.id).sort()).toEqual(offChain.map(f => f.id).sort());
+  });
+});

@@ -1,7 +1,60 @@
 import { describe, it, expect, vi } from 'vitest';
 import { validateSolana, isBase58 } from '@/lib/utils/caip10/validators/solana';
 
+// Import the module to access decodeBase58 indirectly through validateSolana
+// We'll test edge cases that exercise the internal decodeBase58 function
+
 describe('Solana CAIP-10 validator', () => {
+  describe('decodeBase58 edge cases (via validateSolana)', () => {
+    it('handles address with leading 1s (zeros in base58)', () => {
+      // Leading 1s in base58 represent leading zeros in the decoded bytes
+      // This tests the "Handle leading zeros" loop at lines 47-49
+      const result = validateSolana('mainnet', '1111111111111111111111111111111111111111111');
+      expect(result.valid).toBe(false); // Will fail length check
+      expect(result.error).toBeDefined();
+    });
+
+    it('handles very long address that triggers carry overflow', () => {
+      // A very long valid base58 string will exercise the carry loop at lines 38-42
+      const longAddress = 'A'.repeat(100);
+      const result = validateSolana('mainnet', longAddress);
+      expect(result.valid).toBe(false); // Will fail length check (decoded != 32 bytes)
+      expect(result.error).toContain('32 bytes');
+    });
+
+    it('handles address that decodes to exactly 32 bytes', () => {
+      // A valid 32-byte Solana address
+      const result = validateSolana('mainnet', '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
+      expect(result.valid).toBe(true);
+    });
+
+    it('handles single character address', () => {
+      // Single character will decode but won't be 32 bytes
+      const result = validateSolana('mainnet', 'A');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('32 bytes');
+    });
+
+    it('handles address with all same characters (valid 32 bytes)', () => {
+      // Tests the multiplication and carry logic - this happens to decode to 32 bytes
+      const result = validateSolana('mainnet', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+      expect(result.valid).toBe(true);
+    });
+
+    it('handles address with mixed high and low base58 values (valid 32 bytes)', () => {
+      // Mix of high (z=57) and low (1=0) values to test carry propagation
+      const result = validateSolana('mainnet', '1z1z1z1z1z1z1z1z1z1z1z1z1z1z1z1z1z1z1z1z1z1');
+      expect(result.valid).toBe(true);
+    });
+
+    it('handles short address that decodes to less than 32 bytes', () => {
+      // Short address - will fail length check
+      const result = validateSolana('mainnet', 'AAAA');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('32 bytes');
+    });
+  });
+
   describe('validateSolana', () => {
     it('validates correct Solana mainnet address', () => {
       const result = validateSolana('mainnet', '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
