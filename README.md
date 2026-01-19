@@ -165,7 +165,10 @@ The application is deployed on Vercel and accessible at [registry.omatrust.org](
 
 **Optional:**
 - `NEXT_PUBLIC_DEBUG_ADAPTER` - Set to `true` for debug logging
-- `NEXT_PUBLIC_APP_BASE_URL` - Override base URL (auto-detected by default)
+- `NEXT_PUBLIC_APP_BASE_URL` - Canonical URL for on-chain storage (defaults to `https://registry.omatrust.org`)
+
+**Vercel-specific (automatic):**
+- `NEXT_PUBLIC_VERCEL_URL` - Used for runtime API calls in preview deployments (never for on-chain storage)
 
 See `.env.example` for complete list and descriptions.
 
