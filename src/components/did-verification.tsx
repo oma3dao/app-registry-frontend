@@ -10,7 +10,7 @@ import {
   Loader2Icon
 } from "lucide-react"
 import { useActiveAccount } from "thirdweb/react"
-import { normalizeDidWeb } from "@/lib/utils/did"
+import { normalizeDid, buildEvmDidPkh } from "@/lib/utils/did"
 import { env } from "@/config/env"
 
 interface DidVerificationProps {
@@ -43,7 +43,7 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
     setVerificationError(null);
 
     // Normalize the DID (declare outside try so it's available in catch)
-    const normalizedDid = did.startsWith("did:") ? did : normalizeDidWeb(did);
+    const normalizedDid = normalizeDid(did);
 
     try {
       console.log("[DidVerification] Normalized DID:", normalizedDid);
@@ -118,7 +118,7 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
     const chainId = env.activeChain.chainId;
 
     // Format controller as full DID
-    const controllerDid = `did:pkh:eip155:${chainId}:${walletAddress}`;
+    const controllerDid = buildEvmDidPkh(chainId, walletAddress);
 
     return (
       <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">

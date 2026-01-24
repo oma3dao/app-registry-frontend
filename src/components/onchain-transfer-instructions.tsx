@@ -10,12 +10,14 @@ import { Copy, CheckCircle, ExternalLink, Info } from "lucide-react";
 import {
   calculateTransferAmount,
   formatTransferAmount,
-  getChainIdFromDid,
   getExplorerAddressUrl,
   getExplorerTxUrl,
-  buildPkhDid,
   PROOF_PURPOSE,
 } from "@/lib/verification/onchain-transfer";
+import {
+  getChainIdFromDidPkh,
+  buildEvmDidPkh,
+} from "@/lib/utils/did";
 
 interface OnchainTransferInstructionsProps {
   did: string;
@@ -39,7 +41,7 @@ export function OnchainTransferInstructions({
   useEffect(() => {
     if (!mintingWallet) return;
 
-    const extractedChainId = getChainIdFromDid(did);
+    const extractedChainId = getChainIdFromDidPkh(did);
     if (!extractedChainId) return;
 
     setChainId(extractedChainId);
@@ -47,7 +49,7 @@ export function OnchainTransferInstructions({
     // Calculate the exact amount using the new spec
     // Subject = the DID being proven (controlling wallet owns this)
     // Counterparty = the minting wallet (recipient of the transfer)
-    const counterpartyDid = buildPkhDid(extractedChainId, mintingWallet);
+    const counterpartyDid = buildEvmDidPkh(extractedChainId, mintingWallet);
     const amount = calculateTransferAmount(
       did,
       counterpartyDid,
