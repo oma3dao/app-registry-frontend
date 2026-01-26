@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { prepareMintApp } from '@/lib/contracts/registry.write';
 import { getAppByDid, isDidRegistered, getLatestMajor } from '@/lib/contracts/registry.read';
-import { normalizeDidWeb } from '@/lib/utils/did';
+import { normalizeDid } from '@/lib/utils/did';
 import type { MintAppInput, AppSummary } from '@/lib/contracts/types';
 
 // Mock thirdweb
@@ -33,14 +33,21 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID utilities
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => {
-    if (did.startsWith('did:web:')) return did;
-    return `did:web:${did}`;
-  }),
-  getDidHash: vi.fn(async (did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0')}`),
-}));
+// Mock DID utilities (importOriginal pattern, remove getDidHash; use computeDidHash from actual)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((did: string) => {
+      if (did.startsWith('did:web:')) return did;
+      return `did:web:${did}`;
+    }),
+    normalizeDid: vi.fn((did: string) => {
+      if (did.startsWith('did:web:')) return did;
+      return `did:web:${did}`;
+    }),
+  };
+});
 
 // Mock error normalizer
 vi.mock('@/lib/contracts/errors', () => ({
@@ -62,7 +69,7 @@ describe('App Registration Flow Integration', () => {
      */
     it('normalizes domain input to did:web format', () => {
       const userInput = 'myapp.example.com';
-      const normalized = normalizeDidWeb(userInput);
+      const normalized = normalizeDid(userInput);
       
       expect(normalized).toBe('did:web:myapp.example.com');
     });
@@ -73,7 +80,7 @@ describe('App Registration Flow Integration', () => {
      */
     it('preserves already-normalized DID', () => {
       const userInput = 'did:web:myapp.example.com';
-      const normalized = normalizeDidWeb(userInput);
+      const normalized = normalizeDid(userInput);
       
       expect(normalized).toBe('did:web:myapp.example.com');
     });
@@ -83,7 +90,7 @@ describe('App Registration Flow Integration', () => {
      */
     it('handles subdomain DIDs', () => {
       const userInput = 'app.api.example.com';
-      const normalized = normalizeDidWeb(userInput);
+      const normalized = normalizeDid(userInput);
       
       expect(normalized).toBe('did:web:app.api.example.com');
     });
@@ -93,7 +100,7 @@ describe('App Registration Flow Integration', () => {
      */
     it('handles path-based DIDs', () => {
       const userInput = 'did:web:example.com:apps:myapp';
-      const normalized = normalizeDidWeb(userInput);
+      const normalized = normalizeDid(userInput);
       
       expect(normalized).toBe('did:web:example.com:apps:myapp');
     });
@@ -292,7 +299,7 @@ describe('App Registration Flow Integration', () => {
     it('completes full registration journey', async () => {
       // Step 1: User enters domain
       const userDomain = 'myawesomeapp.example.com';
-      const did = normalizeDidWeb(userDomain);
+      const did = normalizeDid(userDomain);
       expect(did).toBe('did:web:myawesomeapp.example.com');
 
       // Step 2: Check availability
@@ -447,7 +454,7 @@ describe('App Registration Flow Integration', () => {
      * Test: Empty DID handling
      */
     it('normalizes empty domain gracefully', () => {
-      const normalized = normalizeDidWeb('');
+      const normalized = normalizeDid('');
       expect(normalized).toBe('did:web:');
     });
   });

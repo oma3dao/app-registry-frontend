@@ -1,22 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   normalizeDidWeb,
   isValidDid,
   extractDidMethod,
   extractDidIdentifier,
   normalizeDomain,
-  getDidHashSync,
-  getDidHash,
+  computeDidHash,
 } from '@/lib/utils/did';
-
-// Mock thirdweb and contract client for getDidHash tests
-vi.mock('thirdweb', () => ({
-  readContract: vi.fn(),
-}));
-
-vi.mock('@/lib/contracts/client', () => ({
-  getAppRegistryContract: vi.fn(() => ({ address: '0x123' })),
-}));
 
 describe('DID utilities', () => {
   describe('normalizeDidWeb', () => {
@@ -216,51 +206,35 @@ describe('DID utilities', () => {
     });
   });
 
-  describe('getDidHashSync', () => {
-    it('throws error (not implemented)', () => {
-      expect(() => getDidHashSync('did:web:example.com')).toThrow('not implemented');
-    });
-  });
-
-  describe('getDidHash', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
+  describe('computeDidHash (replaces getDidHash)', () => {
+    it('computes hash for did:web (sync, no RPC call)', () => {
+      const hash = computeDidHash('did:web:example.com');
+      
+      expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(hash.length).toBe(66); // 0x + 64 hex chars
     });
 
-    afterEach(() => {
-      vi.restoreAllMocks();
+    it('produces consistent hash for same DID', () => {
+      const hash1 = computeDidHash('did:web:example.com');
+      const hash2 = computeDidHash('did:web:example.com');
+      
+      expect(hash1).toBe(hash2);
     });
 
-    it('calls contract to get DID hash', async () => {
-      const { readContract } = await import('thirdweb');
-      const mockHash = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+    it('produces same hash for case-variant DIDs (normalizes first)', () => {
+      const hash1 = computeDidHash('did:web:Example.COM');
+      const hash2 = computeDidHash('did:web:example.com');
       
-      vi.mocked(readContract).mockResolvedValue(mockHash);
-      
-      const result = await getDidHash('did:web:example.com');
-      
-      expect(result).toBe(mockHash);
-      expect(readContract).toHaveBeenCalledWith({
-        contract: { address: '0x123' },
-        method: 'function getDidHash(string) pure returns (bytes32)',
-        params: ['did:web:example.com'],
-      });
+      expect(hash1).toBe(hash2);
     });
 
-    it('handles different DID formats', async () => {
-      const { readContract } = await import('thirdweb');
-      const mockHash = '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+    it('handles different DID formats', () => {
+      const webHash = computeDidHash('did:web:example.com');
+      const pkhHash = computeDidHash('did:pkh:eip155:1:0x123');
       
-      vi.mocked(readContract).mockResolvedValue(mockHash);
-      
-      const result = await getDidHash('did:pkh:eip155:1:0x123');
-      
-      expect(result).toBe(mockHash);
-      expect(readContract).toHaveBeenCalledWith(
-        expect.objectContaining({
-          params: ['did:pkh:eip155:1:0x123'],
-        })
-      );
+      expect(webHash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(pkhHash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(webHash).not.toBe(pkhHash);
     });
   });
 

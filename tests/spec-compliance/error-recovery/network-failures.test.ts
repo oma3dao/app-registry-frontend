@@ -22,11 +22,15 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID utilities
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did),
-  getDidHash: vi.fn(async (did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0')}`),
-}));
+// Mock DID utilities (importOriginal pattern, remove getDidHash; use computeDidHash from actual)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((did: string) => did),
+    normalizeDid: vi.fn((did: string) => did),
+  };
+});
 
 // Mock error normalizer
 vi.mock('@/lib/contracts/errors', () => ({

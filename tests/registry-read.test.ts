@@ -17,23 +17,28 @@ vi.mock('thirdweb', () => ({
   readContract: vi.fn(),
 }));
 
-// Mock ethers
+// Mock ethers (use importOriginal so keccak256/toUtf8Bytes exist for did.ts computeDidHash)
 const mockGetLogs = vi.fn();
 const mockParseLog = vi.fn();
 const mockGetEvent = vi.fn();
 
-vi.mock('ethers', () => ({
-  ethers: {
-    JsonRpcProvider: vi.fn().mockImplementation(() => ({
-      getLogs: mockGetLogs,
-    })),
-    Interface: vi.fn().mockImplementation(() => ({
-      getEvent: mockGetEvent,
-      parseLog: mockParseLog,
-    })),
-    id: vi.fn((str: string) => `0x${Buffer.from(str).toString('hex').padEnd(64, '0')}`),
-  },
-}));
+vi.mock('ethers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ethers')>();
+  return {
+    ...actual,
+    ethers: {
+      ...(typeof actual.ethers === 'object' ? actual.ethers : {}),
+      JsonRpcProvider: vi.fn().mockImplementation(() => ({
+        getLogs: mockGetLogs,
+      })),
+      Interface: vi.fn().mockImplementation(() => ({
+        getEvent: mockGetEvent,
+        parseLog: mockParseLog,
+      })),
+      id: vi.fn((str: string) => `0x${Buffer.from(str).toString('hex').padEnd(64, '0')}`),
+    },
+  };
+});
 
 // Mock contract client
 vi.mock('@/lib/contracts/client', () => ({
@@ -47,11 +52,15 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID utils
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did),
-  getDidHash: vi.fn(async (did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0')}`),
-}));
+// Mock DID utils (importOriginal pattern, remove getDidHash; use computeDidHash from actual)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((did: string) => did),
+    normalizeDid: vi.fn((did: string) => did),
+  };
+});
 
 // Mock env
 vi.mock('@/config/env', () => ({
@@ -571,14 +580,14 @@ describe('Registry Read Operations', () => {
 
     // Tests DID normalization
     it('normalizes DID before searching', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       
       (readContract as any).mockResolvedValueOnce(1);
       (readContract as any).mockResolvedValueOnce(null);
 
       await searchByDid('DID:WEB:EXAMPLE.COM');
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 
@@ -626,13 +635,13 @@ describe('Registry Read Operations', () => {
     // This test verifies that hasAnyTraits normalizes DID before checking
     it('normalizes DID before checking traits', async () => {
       const { hasAnyTraits } = await import('@/lib/contracts/registry.read');
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       
       (readContract as any).mockResolvedValueOnce(false);
 
       await hasAnyTraits('DID:WEB:EXAMPLE.COM', 1, ['0xtrait1']);
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 
@@ -680,13 +689,13 @@ describe('Registry Read Operations', () => {
     // This test verifies that hasAllTraits normalizes DID before checking
     it('normalizes DID before checking traits', async () => {
       const { hasAllTraits } = await import('@/lib/contracts/registry.read');
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       
       (readContract as any).mockResolvedValueOnce(false);
 
       await hasAllTraits('DID:WEB:EXAMPLE.COM', 1, ['0xtrait1']);
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 });

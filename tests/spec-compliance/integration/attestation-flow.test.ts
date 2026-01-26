@@ -18,11 +18,6 @@ vi.mock('@/lib/contracts/registry.write', () => ({
 }));
 
 vi.mock('@/lib/attestation-queries', () => ({
-  didToIndexAddress: vi.fn((did: string) => {
-    // Simple deterministic mock
-    const hash = did.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-    return '0x' + hash.toString(16).padStart(40, '0');
-  }),
   getAttestationsForDID: vi.fn(() => Promise.resolve([])),
   calculateAverageRating: vi.fn(() => ({ average: 0, count: 0 })),
   deduplicateReviews: vi.fn((reviews) => reviews),
@@ -71,15 +66,15 @@ describe('Integration: App Registration to Attestation Flow', () => {
       /**
        * Flow: Generate index address for the registered app
        */
-      const { didToIndexAddress } = await import('@/lib/attestation-queries');
+      const { didToAddress } = await import('@/lib/utils/did');
       
       const did = 'did:web:myapp.example.com';
-      const indexAddress = didToIndexAddress(did);
+      const indexAddress = didToAddress(did);
       
       expect(indexAddress).toMatch(/^0x[a-f0-9]{40}$/);
       
       // Same DID should produce same address
-      const indexAddress2 = didToIndexAddress(did);
+      const indexAddress2 = didToAddress(did);
       expect(indexAddress).toBe(indexAddress2);
     });
   });
@@ -187,7 +182,7 @@ describe('Integration: App Registration to Attestation Flow', () => {
       /**
        * Flow: Query all attestations for an app
        */
-      const { getAttestationsForDID, didToIndexAddress } = await import('@/lib/attestation-queries');
+      const { getAttestationsForDID } = await import('@/lib/attestation-queries');
       
       const did = 'did:web:myapp.example.com';
       const attestations = await getAttestationsForDID(did, 10);

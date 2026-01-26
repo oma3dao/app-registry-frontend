@@ -84,13 +84,17 @@ vi.mock('@/config/attestation-services', () => ({
   getContractAddress: vi.fn(() => '0x1234567890123456789012345678901234567890'),
 }));
 
-// Mock DID index
-vi.mock('@/lib/did-index', () => ({
-  didToIndexAddress: vi.fn((did: string) => {
-    // Simple deterministic mock
-    return '0x' + 'a'.repeat(40);
-  }),
-}));
+// Mock DID utils (migrated from @/lib/did-index to @/lib/utils/did)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    didToAddress: vi.fn((did: string) => {
+      // Simple deterministic mock
+      return '0x' + 'a'.repeat(40);
+    }),
+  };
+});
 
 // Mock log
 vi.mock('@/lib/log', () => ({
@@ -628,12 +632,12 @@ describe('EAS Attestation Mock Tests', () => {
      */
     it('uses DID index address for attestation queries', async () => {
       // Get the mock from the module mock we defined above
-      const didIndex = await import('@/lib/did-index');
+      const didUtils = await import('@/lib/utils/did');
       
-      // Calling getAttestationsForDID should invoke didToIndexAddress
+      // Calling getAttestationsForDID should invoke didToAddress
       await getAttestationsForDID('did:web:example.com', 5);
       
-      expect(didIndex.didToIndexAddress).toHaveBeenCalledWith('did:web:example.com');
+      expect(didUtils.didToAddress).toHaveBeenCalledWith('did:web:example.com');
     });
   });
 

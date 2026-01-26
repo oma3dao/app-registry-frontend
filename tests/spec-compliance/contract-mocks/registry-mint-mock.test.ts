@@ -36,18 +36,30 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID normalization
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => {
-    // Simulate the normalization logic
-    if (did.startsWith('did:web:')) return did;
-    if (did.startsWith('did:pkh:')) {
-      // Known bug: incorrectly converts did:pkh to did:web
+// Mock DID normalization (importOriginal pattern per TEST-MIGRATION-GUIDE)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((did: string) => {
+      // Simulate the normalization logic
+      if (did.startsWith('did:web:')) return did;
+      if (did.startsWith('did:pkh:')) {
+        // Known bug: incorrectly converts did:pkh to did:web
+        return `did:web:${did}`;
+      }
       return `did:web:${did}`;
-    }
-    return `did:web:${did}`;
-  }),
-}));
+    }),
+    normalizeDid: vi.fn((did: string) => {
+      // Primary API - dispatch to normalizeDidWeb for web DIDs
+      if (did.startsWith('did:web:')) return did;
+      if (did.startsWith('did:pkh:')) {
+        return `did:web:${did}`; // Same bug simulation
+      }
+      return `did:web:${did}`;
+    }),
+  };
+});
 
 // Mock error normalizer
 vi.mock('@/lib/contracts/errors', () => ({
@@ -55,7 +67,7 @@ vi.mock('@/lib/contracts/errors', () => ({
 }));
 
 import { prepareContractCall } from 'thirdweb';
-import { normalizeDidWeb } from '@/lib/utils/did';
+import { normalizeDid } from '@/lib/utils/did';
 
 describe('Registry Mint Mock Tests', () => {
   beforeEach(() => {
@@ -119,7 +131,7 @@ describe('Registry Mint Mock Tests', () => {
 
       prepareMintApp(input);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('example.com');
     });
 
     /**
@@ -320,7 +332,7 @@ describe('Registry Mint Mock Tests', () => {
         prepareRegisterApp8004(input);
       } catch (e: any) {
         // May fail due to viem mock, but we can still verify the setup
-        expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+        expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
       }
     });
 
@@ -349,7 +361,7 @@ describe('Registry Mint Mock Tests', () => {
         // Expected - viem not properly mocked
       }
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 
@@ -358,8 +370,8 @@ describe('Registry Mint Mock Tests', () => {
      * Test: Invalid DID throws descriptive error
      */
     it('propagates normalization errors', () => {
-      // Override the mock to throw
-      vi.mocked(normalizeDidWeb).mockImplementationOnce(() => {
+      // Override the mock to throw (per TEST-MIGRATION-GUIDE: use normalizeDid)
+      vi.mocked(normalizeDid).mockImplementationOnce(() => {
         throw new Error('Invalid DID format');
       });
 

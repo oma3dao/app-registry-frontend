@@ -19,13 +19,21 @@ vi.mock('thirdweb/react', () => ({
   })),
 }));
 
-// Mock DID utilities
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((input: string) => {
-    if (input.startsWith('did:')) return input;
-    return `did:web:${input}`;
-  }),
-}));
+// Mock DID utilities (importOriginal pattern per TEST-MIGRATION-GUIDE)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((input: string) => {
+      if (input.startsWith('did:')) return input;
+      return `did:web:${input}`;
+    }),
+    normalizeDid: vi.fn((input: string) => {
+      if (input.startsWith('did:')) return input;
+      return `did:web:${input}`;
+    }),
+  };
+});
 
 // Mock environment config
 vi.mock('@/config/env', () => ({

@@ -1,50 +1,51 @@
 /**
- * Tests for DID Index Address Utilities
- * Tests the OMATrust specification section 5.3.2 implementation
+ * Tests for DID Address Utilities (EAS attestation indexing)
+ * Migrated from @/lib/did-index to @/lib/utils/did per TEST-MIGRATION-GUIDE.
+ * Tests OMATrust specification section 5.3.2 implementation.
  */
 
 import { describe, it, expect } from 'vitest';
 import {
-  canonicalizeDID,
   computeDidHash,
-  computeDidIndex,
-  didToIndexAddress,
-  validateDidIndex,
+  computeDidAddress,
+  didToAddress,
+  validateDidAddress,
   normalizeDomain,
   isValidDid,
   extractDidMethod,
   extractDidIdentifier,
   normalizeDidWeb,
-} from '@/lib/did-index';
+  normalizeDid,
+  normalizeDidPkh,
+} from '@/lib/utils/did';
 
-describe('DID Index Utilities', () => {
-  describe('canonicalizeDID', () => {
-    it('canonicalizes did:web with uppercase host', () => {
-      expect(canonicalizeDID('did:web:Example.COM')).toBe('did:web:example.com');
+describe('DID Address Utilities', () => {
+  describe('normalizeDid / normalizeDidWeb / normalizeDidPkh (replaces canonicalizeDID)', () => {
+    it('normalizes did:web with uppercase host', () => {
+      expect(normalizeDidWeb('did:web:Example.COM')).toBe('did:web:example.com');
+      expect(normalizeDid('did:web:Example.COM')).toBe('did:web:example.com');
     });
 
-    it('canonicalizes did:web with path', () => {
-      expect(canonicalizeDID('did:web:Example.COM/path/to/resource')).toBe('did:web:example.com/path/to/resource');
+    it('normalizes did:web with path', () => {
+      expect(normalizeDidWeb('did:web:Example.COM/path/to/resource')).toBe('did:web:example.com/path/to/resource');
+      expect(normalizeDid('did:web:Example.COM/path/to/resource')).toBe('did:web:example.com/path/to/resource');
     });
 
-    it('canonicalizes did:pkh with uppercase address', () => {
-      expect(canonicalizeDID('did:pkh:eip155:1:0xABCDEF')).toBe('did:pkh:eip155:1:0xabcdef');
+    it('normalizes did:pkh with uppercase address', () => {
+      expect(normalizeDidPkh('did:pkh:eip155:1:0xABCDEF')).toBe('did:pkh:eip155:1:0xabcdef');
+      expect(normalizeDid('did:pkh:eip155:1:0xABCDEF')).toBe('did:pkh:eip155:1:0xabcdef');
     });
 
-    it('throws error for invalid DID format (no did: prefix)', () => {
-      expect(() => canonicalizeDID('invalid:web:example.com')).toThrow('Invalid DID format: must start with "did:"');
+    it('normalizeDidWeb throws for non-web DID', () => {
+      expect(() => normalizeDidWeb('did:pkh:eip155:1:0xabc')).toThrow(/normalizeDidWeb received non-web DID/);
     });
 
-    it('throws error for DID with insufficient parts', () => {
-      expect(() => canonicalizeDID('did:web')).toThrow('Invalid DID format: insufficient parts');
+    it('normalizeDidPkh throws for invalid did:pkh format', () => {
+      expect(() => normalizeDidPkh('did:pkh:eip155:1')).toThrow(/Invalid did:pkh format/);
     });
 
-    it('throws error for invalid did:pkh format', () => {
-      expect(() => canonicalizeDID('did:pkh:eip155:1')).toThrow('Invalid did:pkh format: must have 5 parts');
-    });
-
-    it('handles unknown DID methods by lowercasing', () => {
-      expect(canonicalizeDID('did:unknown:IDENTIFIER')).toBe('did:unknown:identifier');
+    it('handles unknown DID methods via normalizeDid (returns as-is)', () => {
+      expect(normalizeDid('did:unknown:IDENTIFIER')).toBe('did:unknown:IDENTIFIER');
     });
   });
 
@@ -67,61 +68,61 @@ describe('DID Index Utilities', () => {
     });
   });
 
-  describe('computeDidIndex', () => {
+  describe('computeDidAddress (replaces computeDidIndex)', () => {
     it('computes index address from hash', () => {
       const hash = '0x' + '1234567890abcdef'.repeat(4);
-      const address = computeDidIndex(hash);
+      const address = computeDidAddress(hash);
       expect(address).toMatch(/^0x[0-9a-f]{40}$/);
     });
 
     it('produces consistent address for same hash', () => {
       const hash = '0x' + 'abcdef1234567890'.repeat(4);
-      const addr1 = computeDidIndex(hash);
-      const addr2 = computeDidIndex(hash);
+      const addr1 = computeDidAddress(hash);
+      const addr2 = computeDidAddress(hash);
       expect(addr1).toBe(addr2);
     });
   });
 
-  describe('didToIndexAddress', () => {
+  describe('didToAddress (replaces didToIndexAddress)', () => {
     it('converts DID to index address', () => {
-      const address = didToIndexAddress('did:web:example.com');
+      const address = didToAddress('did:web:example.com');
       expect(address).toMatch(/^0x[0-9a-f]{40}$/);
     });
 
     it('produces consistent address for same DID', () => {
-      const addr1 = didToIndexAddress('did:web:example.com');
-      const addr2 = didToIndexAddress('did:web:example.com');
+      const addr1 = didToAddress('did:web:example.com');
+      const addr2 = didToAddress('did:web:example.com');
       expect(addr1).toBe(addr2);
     });
 
     it('produces same address for different case DIDs', () => {
-      const addr1 = didToIndexAddress('did:web:Example.COM');
-      const addr2 = didToIndexAddress('did:web:example.com');
+      const addr1 = didToAddress('did:web:Example.COM');
+      const addr2 = didToAddress('did:web:example.com');
       expect(addr1).toBe(addr2);
     });
   });
 
-  describe('validateDidIndex', () => {
+  describe('validateDidAddress (replaces validateDidIndex)', () => {
     it('returns true for valid DID and matching index', () => {
       const did = 'did:web:example.com';
-      const indexAddress = didToIndexAddress(did);
-      expect(validateDidIndex(did, indexAddress)).toBe(true);
+      const indexAddress = didToAddress(did);
+      expect(validateDidAddress(did, indexAddress)).toBe(true);
     });
 
     it('returns true for case-insensitive address comparison', () => {
       const did = 'did:web:example.com';
-      const indexAddress = didToIndexAddress(did).toUpperCase();
-      expect(validateDidIndex(did, indexAddress)).toBe(true);
+      const indexAddress = didToAddress(did).toUpperCase();
+      expect(validateDidAddress(did, indexAddress)).toBe(true);
     });
 
     it('returns false for mismatched index', () => {
       const did = 'did:web:example.com';
       const wrongAddress = '0x' + '0'.repeat(40);
-      expect(validateDidIndex(did, wrongAddress)).toBe(false);
+      expect(validateDidAddress(did, wrongAddress)).toBe(false);
     });
 
     it('returns false for invalid DID', () => {
-      expect(validateDidIndex('invalid', '0x' + '0'.repeat(40))).toBe(false);
+      expect(validateDidAddress('invalid', '0x' + '0'.repeat(40))).toBe(false);
     });
   });
 

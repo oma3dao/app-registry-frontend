@@ -35,10 +35,15 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID normalization
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did),
-}));
+// Mock DID normalization (importOriginal pattern per TEST-MIGRATION-GUIDE)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((did: string) => did),
+    normalizeDid: vi.fn((did: string) => did),
+  };
+});
 
 // Mock error normalizer
 vi.mock('@/lib/contracts/errors', () => ({
@@ -471,12 +476,12 @@ describe('Registry Update Mock Tests', () => {
   describe('Error Handling', () => {
     /**
      * Test: Update propagates DID normalization errors
-     * Uses the vi.mocked normalizeDidWeb from the module mock
+     * Uses the vi.mocked normalizeDid from the module mock (per TEST-MIGRATION-GUIDE)
      */
     it('propagates DID normalization errors in updates', async () => {
       // Import the mocked module
       const didUtils = await import('@/lib/utils/did');
-      vi.mocked(didUtils.normalizeDidWeb).mockImplementationOnce(() => {
+      vi.mocked(didUtils.normalizeDid).mockImplementationOnce(() => {
         throw new Error('Invalid DID format');
       });
 

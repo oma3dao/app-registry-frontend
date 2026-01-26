@@ -55,9 +55,13 @@ vi.mock('@/lib/rpc', () => ({
   withRetry: vi.fn((fn) => fn()),
 }))
 
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDomain: vi.fn((domain) => domain.toLowerCase()),
-}))
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDomain: vi.fn((domain) => domain.toLowerCase()),
+  };
+});
 
 describe('API Routes - Error Handling and Edge Cases', () => {
   beforeEach(() => {
