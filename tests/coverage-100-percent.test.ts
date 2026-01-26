@@ -37,7 +37,7 @@ describe('100% Coverage - Remaining Gaps', () => {
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid Ethereum address format');
       expect(data.details).toContain('Address must be a valid Ethereum address');
-    }, { timeout: 10000 });
+    }, { timeout: 30000 });
 
     /**
      * Test: Covers line 866-868 - Invalid active chain

@@ -37,6 +37,12 @@ vi.mock('thirdweb/wallets', () => ({
 // Mock ethers
 vi.mock('ethers', async () => {
   const real = await vi.importActual('ethers') as any;
+  // Mock ContractFactory for EAS SDK compatibility
+  const MockContractFactory = vi.fn().mockImplementation(() => ({
+    connect: vi.fn(),
+    deploy: vi.fn(),
+    attach: vi.fn(),
+  }));
   return {
     ...real,
     ethers: {
@@ -48,6 +54,7 @@ vi.mock('ethers', async () => {
         getTransactionReceipt: vi.fn(),
       })),
       Contract: vi.fn(),
+      ContractFactory: MockContractFactory,
       getAddress: vi.fn((addr: string) => addr),
       solidityPacked: vi.fn((types: string[], values: any[]) => {
         const parts = values.map((val, i) => {
@@ -61,6 +68,7 @@ vi.mock('ethers', async () => {
       keccak256: real.ethers.keccak256,
       ZeroAddress: '0x0000000000000000000000000000000000000000',
     },
+    ContractFactory: MockContractFactory,
   };
 });
 
