@@ -9,6 +9,10 @@
 
 import { ethers } from 'ethers';
 import canonicalize from 'canonicalize';
+import { 
+  computeDidHash, 
+  buildEvmDidPkh,
+} from '@/lib/utils/did';
 
 // ============================================================================
 // Proof Purpose Constants
@@ -187,30 +191,6 @@ export function getChainConstants(
   return { base, range };
 }
 
-/**
- * Canonicalize a DID string per OMATrust Identity Specification
- * - Lowercase
- * - Trim whitespace
- */
-export function canonicalizeDid(did: string): string {
-  return did.toLowerCase().trim();
-}
-
-/**
- * Compute didHash = keccak256(canonicalizeDID(did))
- */
-export function computeDidHash(did: string): string {
-  const canonical = canonicalizeDid(did);
-  return ethers.keccak256(ethers.toUtf8Bytes(canonical));
-}
-
-/**
- * Build a did:pkh DID from chain ID and address
- */
-export function buildPkhDid(chainId: number, address: string): string {
-  return `did:pkh:eip155:${chainId}:${address.toLowerCase()}`;
-}
-
 // ============================================================================
 // Core Amount Calculation
 // ============================================================================
@@ -309,8 +289,8 @@ export function calculateTransferAmountFromAddresses(
   chainId: number,
   proofPurpose: ProofPurpose
 ): bigint {
-  const subjectDid = buildPkhDid(chainId, subjectAddress);
-  const counterpartyDid = buildPkhDid(chainId, counterpartyAddress);
+  const subjectDid = buildEvmDidPkh(chainId, subjectAddress);
+  const counterpartyDid = buildEvmDidPkh(chainId, counterpartyAddress);
   
   return calculateTransferAmount(subjectDid, counterpartyDid, chainId, proofPurpose);
 }
@@ -358,94 +338,6 @@ export function getExplorerAddressUrl(chainId: number, address: string): string 
 export function estimateBlocksToSearch(chainId: number, validityWindowSeconds: number): number {
   const config = getChainConfig(chainId);
   return Math.ceil(validityWindowSeconds / config.blockTime);
-}
-
-// ============================================================================
-// DID and CAIP Parsing
-// ============================================================================
-
-/**
- * Parse CAIP-10 to extract chain ID and address
- */
-export function parseCaip10(caip10: string): { chainId: number; address: string } | null {
-  // Format: namespace:reference:address
-  // Example: eip155:1:0x1234567890123456789012345678901234567890
-  const parts = caip10.split(':');
-  
-  if (parts.length !== 3) {
-    return null;
-  }
-  
-  const [namespace, reference, address] = parts;
-  
-  if (namespace !== 'eip155') {
-    return null; // Only EVM supported for now
-  }
-  
-  const chainId = parseInt(reference, 10);
-  if (isNaN(chainId)) {
-    return null;
-  }
-  
-  return { chainId, address };
-}
-
-/**
- * Extract chain ID from did:pkh DID
- * Returns null for non-EVM DIDs (only eip155 namespace supported)
- */
-export function getChainIdFromDid(did: string): number | null {
-  if (!did.startsWith('did:pkh:')) {
-    return null;
-  }
-
-  const caip10 = did.replace('did:pkh:', '');
-  const parsed = parseCaip10(caip10);
-
-  return parsed?.chainId || null;
-}
-
-/**
- * Check if a did:pkh DID is an EVM chain (eip155 namespace)
- * Non-EVM DIDs (solana, cosmos, etc.) are not yet supported for tx-encoded-value proofs
- */
-export function isEvmDid(did: string): boolean {
-  if (!did.startsWith('did:pkh:')) {
-    return false;
-  }
-
-  const caip10 = did.replace('did:pkh:', '');
-  const parts = caip10.split(':');
-
-  return parts.length >= 1 && parts[0] === 'eip155';
-}
-
-/**
- * Get the namespace from a did:pkh DID (e.g., "eip155", "solana", "cosmos")
- */
-export function getDidNamespace(did: string): string | null {
-  if (!did.startsWith('did:pkh:')) {
-    return null;
-  }
-
-  const caip10 = did.replace('did:pkh:', '');
-  const parts = caip10.split(':');
-
-  return parts.length >= 1 ? parts[0] : null;
-}
-
-/**
- * Extract address from did:pkh DID
- */
-export function getAddressFromDid(did: string): string | null {
-  if (!did.startsWith('did:pkh:')) {
-    return null;
-  }
-  
-  const caip10 = did.replace('did:pkh:', '');
-  const parsed = parseCaip10(caip10);
-  
-  return parsed?.address || null;
 }
 
 // ============================================================================

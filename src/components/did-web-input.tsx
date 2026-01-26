@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CheckIcon, AlertCircleIcon, InfoIcon } from "lucide-react"
-import { normalizeDomain } from "@/lib/utils/did"
+import { normalizeDomain, buildDidWeb } from "@/lib/utils/did"
 
 interface DidWebInputProps {
   value?: string;
@@ -57,11 +57,11 @@ export function DidWebInput({
       return;
     }
 
-    const did = `did:web:${normalized}`;
+    const did = buildDidWeb(normalized);
     onChange(did);
   };
 
-  const completeDid = domain ? `did:web:${normalizeDomain(domain)}` : "";
+  const completeDid = domain ? buildDidWeb(domain) : "";
   const showError = externalError || internalError;
   const errorMessage = externalError || internalError;
 

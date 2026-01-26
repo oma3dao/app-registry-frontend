@@ -25,7 +25,10 @@ export const OnChainApp = z.object({
   initialVersionMinor: z.number().int().min(0),
   initialVersionPatch: z.number().int().min(0),
   interfaces: z.number().int().nonnegative(),
-  dataUrl: z.string().url(),
+  dataUrl: z.string().url().refine(
+    (url) => url.startsWith('http://') || url.startsWith('https://'),
+    { message: 'dataUrl must use HTTP or HTTPS protocol' }
+  ),
   dataHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   dataHashAlgorithm: z.literal(0).or(z.literal(1)),
   fungibleTokenId: z.string().optional().default(""),
@@ -56,9 +59,10 @@ export const McpEndpointFields = z.object({
  * When name === "MCP", additional MCP fields are embedded in this object
  */
 export const EndpointConfig = z.object({
-  name: z.string().optional(),        // Endpoint name: "MCP", "A2A", etc.
-  endpoint: z.string().url().optional(), // Endpoint URL
-  schemaUrl: z.string().url().optional(), // OpenAPI/GraphQL schema URL
+  name: z.string().min(1, 'Endpoint name cannot be empty').optional(),
+  type: z.enum(['openapi', 'graphql', 'jsonrpc', 'mcp', 'a2a']).optional(),
+  endpoint: z.string().url(),  // Required per OMATrust spec
+  schemaUrl: z.string().url().optional(),
 }).merge(McpEndpointFields); // Allow MCP fields to be embedded
 
 export type TEndpointConfig = z.infer<typeof EndpointConfig>;
@@ -69,13 +73,13 @@ export type TEndpointConfig = z.infer<typeof EndpointConfig>;
 export const OffChainMetadata = z.object({
   // Core identity
   name: z.string().min(2).max(80),
-  description: z.string().min(10),
+  description: z.string().min(10).max(4000),
   publisher: z.string().min(1),
 
   // URLs
   image: z.string().url(),
   external_url: z.string().url().optional(),
-  summary: z.string().optional(),
+  summary: z.string().max(80).optional(),
   legalUrl: z.string().url().optional(),
   supportUrl: z.string().url().optional(),
 

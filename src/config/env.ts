@@ -13,6 +13,7 @@ const Env = z.object({
   NEXT_PUBLIC_RESOLVER_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   NEXT_PUBLIC_DEBUG_ADAPTER: z.enum(['true', 'false']).optional(),
   NEXT_PUBLIC_USE_ERC8004_REGISTER: z.enum(['true', 'false']).default('true'),
+  NEXT_PUBLIC_APP_BASE_URL: z.string().url().optional(),
 });
 
 const parsed = Env.parse({
@@ -22,45 +23,65 @@ const parsed = Env.parse({
   NEXT_PUBLIC_RESOLVER_ADDRESS: process.env.NEXT_PUBLIC_RESOLVER_ADDRESS,
   NEXT_PUBLIC_DEBUG_ADAPTER: process.env.NEXT_PUBLIC_DEBUG_ADAPTER,
   NEXT_PUBLIC_USE_ERC8004_REGISTER: process.env.NEXT_PUBLIC_USE_ERC8004_REGISTER || 'true',
+  NEXT_PUBLIC_APP_BASE_URL: process.env.NEXT_PUBLIC_APP_BASE_URL,
 });
 
 // Get the active chain configuration from the preset
 const activeChain = CHAIN_PRESETS[parsed.NEXT_PUBLIC_ACTIVE_CHAIN];
 
 /**
- * Get the base URL for the application (for storing on-chain)
+ * Get the canonical base URL for on-chain storage (dataUrl, iwpsPortalUri)
  * 
- * The URL is DETERMINISTICALLY derived from the active chain:
- * - Localhost chain (31337) → http://localhost:3000
- * - Testnet/Mainnet → https://registry.omatrust.org (ALWAYS, even in dev mode)
- * 
- * CRITICAL: The dataUrl is stored IMMUTABLY on-chain. This function ensures:
+ * CRITICAL: These URLs are stored IMMUTABLY on-chain. This function ensures:
  * 1. Local chain apps use localhost (safe, won't leak to production)
- * 2. Testnet/mainnet apps ALWAYS use production URLs (even during local dev)
- * 3. No manual override allowed (prevents misconfiguration)
+ * 2. Testnet/mainnet apps use the configured APP_BASE_URL or production fallback
+ * 3. NEVER uses VERCEL_URL (preview URLs are ephemeral and would break on-chain data)
  * 
- * For custom domains: Modify the chain configuration in chains.ts
+ * Priority:
+ * 1. Localhost chain → http://localhost:3000
+ * 2. NEXT_PUBLIC_APP_BASE_URL (explicit config)
+ * 3. Fallback → https://registry.omatrust.org
  */
 function getAppBaseUrl(): string {
   console.log(`[ENV] NODE_ENV: "${process.env.NODE_ENV}", activeChain.id: ${activeChain.id}`);
   
-  // Chain-aware: Only use localhost for actual localhost chain
+  // Local Hardhat chain - use localhost for development
   if (activeChain.id === 31337) {
-    // Local Hardhat chain - use localhost for development
-    console.log('[ENV] Localhost chain - using localhost for dataUrl');
+    console.log('[ENV] Localhost chain - using localhost for appBaseUrl');
     return 'http://localhost:3000';
   }
 
-  // Testnet/Mainnet: ALWAYS use production URL (even in development)
-  // This ensures dataUrls stored on-chain are accessible from anywhere
-  // Local dev will rewrite these URLs when fetching (see getMetadataFetchUrl)
+  // Use explicit config if provided
+  if (parsed.NEXT_PUBLIC_APP_BASE_URL) {
+    console.log(`[ENV] Using configured APP_BASE_URL: ${parsed.NEXT_PUBLIC_APP_BASE_URL}`);
+    return parsed.NEXT_PUBLIC_APP_BASE_URL;
+  }
+
+  // Fallback to canonical production domain
+  console.log('[ENV] No APP_BASE_URL configured - using production fallback');
+  return 'https://registry.omatrust.org';
+}
+
+/**
+ * Get the current deployment URL for runtime operations (API calls, redirects, etc.)
+ * 
+ * This URL represents where the app is CURRENTLY running, which may differ from
+ * the canonical appBaseUrl. Safe to use for:
+ * - API route calls within the app
+ * - OAuth redirects
+ * - Preview deployment testing
+ * 
+ * NOT safe for on-chain storage (use appBaseUrl instead).
+ * 
+ * Priority:
+ * 1. NEXT_PUBLIC_VERCEL_URL (for Vercel preview deployments)
+ * 2. appBaseUrl (canonical URL)
+ */
+function getCurrentDeploymentUrl(): string {
   if (process.env.NEXT_PUBLIC_VERCEL_URL) {
     return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
   }
-
-  // Canonical production domain for testnet/mainnet
-  console.log('[ENV] Testnet/Mainnet - using production URL for dataUrl');
-  return 'https://registry.omatrust.org';
+  return getAppBaseUrl();
 }
 
 /**
@@ -68,29 +89,28 @@ function getAppBaseUrl(): string {
  * 
  * Handles URL rewriting for different environments:
  * - Local development (NODE_ENV=development): Rewrites production URLs to localhost for testing
- * - Deployed environments (production/test): Rewrites localhost URLs to production (fixes accidental localhost URLs on-chain)
+ * - Deployed environments (production/test): Rewrites localhost URLs to current deployment
  */
 function getMetadataFetchUrl(dataUrl: string): string {
   const isLocalDev = process.env.NODE_ENV === 'development';
   const isLocalhostChain = activeChain.id === 31337;
+  const currentUrl = getCurrentDeploymentUrl();
   
   // Local development (not localhost chain): Rewrite production URLs to localhost for testing
   if (isLocalDev && !isLocalhostChain) {
-    if (dataUrl.includes('registry.omatrust.org') || dataUrl.includes(process.env.NEXT_PUBLIC_VERCEL_URL || '')) {
-      const rewritten = dataUrl.replace(/https:\/\/[^/]+/, 'http://localhost:3000');
+    const appBase = getAppBaseUrl();
+    if (dataUrl.startsWith(appBase)) {
+      const rewritten = dataUrl.replace(appBase, 'http://localhost:3000');
       console.log(`[ENV] Local dev - rewriting production URL to localhost: ${dataUrl} → ${rewritten}`);
       return rewritten;
     }
   }
   
-  // Deployed environments (production/test): Rewrite localhost URLs to production
+  // Deployed environments (production/test): Rewrite localhost URLs to current deployment
   // This fixes accidental localhost URLs that were stored on-chain during development
   if (!isLocalDev && dataUrl.includes('localhost')) {
-    const productionUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : 'https://registry.omatrust.org';
-    const rewritten = dataUrl.replace(/http:\/\/localhost:\d+/, productionUrl);
-    console.warn(`[ENV] Deployed environment - rewriting localhost URL to production: ${dataUrl} → ${rewritten}`);
+    const rewritten = dataUrl.replace(/http:\/\/localhost:\d+/, currentUrl);
+    console.warn(`[ENV] Deployed environment - rewriting localhost URL: ${dataUrl} → ${rewritten}`);
     return rewritten;
   }
   
@@ -102,7 +122,8 @@ function getMetadataFetchUrl(dataUrl: string): string {
  * - Chain is selected via NEXT_PUBLIC_ACTIVE_CHAIN env var (localhost, omachain-testnet, omachain-mainnet)
  * - Contract addresses can be overridden via NEXT_PUBLIC_REGISTRY_ADDRESS, NEXT_PUBLIC_METADATA_ADDRESS, NEXT_PUBLIC_RESOLVER_ADDRESS
  * - Contract versions are managed via Git branches (not env vars)
- * - App base URL is DETERMINISTICALLY derived from active chain (no manual override to prevent misconfiguration)
+ * - appBaseUrl: Canonical URL for on-chain storage (NEXT_PUBLIC_APP_BASE_URL or production fallback)
+ * - currentDeploymentUrl: Where the app is currently running (may be a Vercel preview URL)
  */
 export const env = {
   // Active chain (from preset)
@@ -115,8 +136,11 @@ export const env = {
   metadataAddress: parsed.NEXT_PUBLIC_METADATA_ADDRESS || activeChain.contracts.metadata,
   resolverAddress: parsed.NEXT_PUBLIC_RESOLVER_ADDRESS || activeChain.contracts.resolver || "0x0000000000000000000000000000000000000000",
 
-  // Application base URL (for API routes and storing on-chain)
+  // Application URLs
+  // appBaseUrl: For on-chain storage (dataUrl, iwpsPortalUri) - NEVER ephemeral
   appBaseUrl: getAppBaseUrl(),
+  // currentDeploymentUrl: For runtime API calls, redirects - may be preview URL
+  currentDeploymentUrl: getCurrentDeploymentUrl(),
   
   // Metadata fetch URL rewriter (for local development)
   getMetadataFetchUrl,

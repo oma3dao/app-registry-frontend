@@ -17,8 +17,9 @@ import { privateKeyToAccount } from 'thirdweb/wallets';
 import { ethers } from 'ethers';
 import { localhost, omachainTestnet, omachainMainnet } from '@/config/chains';
 import { getRpcUrl, withRetry } from '@/lib/rpc';
-import { normalizeDomain } from '@/lib/utils/did';
+import { normalizeDomain, buildEvmDidPkh } from '@/lib/utils/did';
 import { loadIssuerPrivateKey, getThirdwebManagedWallet } from '@/lib/server/issuer-key';
+import { calculateTransferAmount, PROOF_PURPOSE } from '@/lib/verification/onchain-transfer';
 import resolverAbi from '@/abi/resolver.json';
 import dns from 'dns';
 import { promisify } from 'util';
@@ -440,10 +441,8 @@ async function verifyViaTransfer(
     }
 
     // 6. Calculate expected amount using spec formula (OMATrust Proof Spec §5.3.6)
-    // Import the calculation function
-    const { calculateTransferAmount, buildPkhDid, PROOF_PURPOSE } = await import('@/lib/verification/onchain-transfer');
     // Subject = the DID being proven, Counterparty = minting wallet (recipient)
-    const counterpartyDid = buildPkhDid(chainId, mintingWallet);
+    const counterpartyDid = buildEvmDidPkh(chainId, mintingWallet);
     const expectedAmount = calculateTransferAmount(did, counterpartyDid, chainId, PROOF_PURPOSE.SHARED_CONTROL);
 
     debug('verify-transfer', `Verifying amount:`);

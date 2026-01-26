@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle, XCircle, AlertCircle, Info } from "lucide-react";
 
 import { OnchainTransferInstructions } from "@/components/onchain-transfer-instructions";
-import { isEvmDid, getDidNamespace } from "@/lib/verification/onchain-transfer";
+import { isEvmDidPkh, getNamespaceFromDidPkh } from "@/lib/utils/did";
 
 interface DidPkhVerificationProps {
   did: string;
@@ -31,8 +31,8 @@ export function DidPkhVerification({
   const [controllingWallet, setControllingWallet] = useState<string | null>(null);
 
   // Check if DID is a supported EVM chain
-  const isEvm = isEvmDid(did);
-  const namespace = getDidNamespace(did);
+  const isEvm = isEvmDidPkh(did);
+  const namespace = getNamespaceFromDidPkh(did);
 
   // Auto-discover controlling wallet when DID changes
   useEffect(() => {

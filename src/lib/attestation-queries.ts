@@ -8,7 +8,7 @@ import { EAS, SchemaEncoder } from '@ethereum-attestation-service/eas-sdk'
 import { ethers } from 'ethers'
 import { getAllSchemas, type AttestationSchema } from '@/config/schemas'
 import { getContractAddress } from '@/config/attestation-services'
-import { didToIndexAddress } from '@/lib/did-index'
+import { didToAddress } from '@/lib/utils/did';
 import { log } from '@/lib/log'
 
 const OMACHAIN_TESTNET_RPC = 'https://rpc.testnet.chain.oma3.org/'
@@ -83,11 +83,11 @@ export async function getAttestationsForDID(
         const eas = new EAS(easContractAddress)
         eas.connect(provider as any)
 
-        // Compute DID index address for querying
-        const didIndexAddress = didToIndexAddress(did)
+        // Compute DID address for querying attestations
+        const didAddress = didToAddress(did)
         
         log(`[AttestationQuery] Querying attestations for DID: ${did}`)
-        log(`[AttestationQuery] DID Index Address: ${didIndexAddress}`)
+        log(`[AttestationQuery] DID Address: ${didAddress}`)
 
         // Setup contract for querying
         const contract = new ethers.Contract(
@@ -101,8 +101,8 @@ export async function getAttestationsForDID(
 
         log(`[AttestationQuery] Querying blocks ${startBlock} to ${currentBlock}`)
         
-        // Query events where recipient = didIndexAddress
-        const filter = contract.filters.Attested(didIndexAddress)
+        // Query events where recipient = didAddress
+        const filter = contract.filters.Attested(didAddress)
         const events = await contract.queryFilter(filter, startBlock, currentBlock)
 
         log(`[AttestationQuery] Found ${events.length} events for DID`)

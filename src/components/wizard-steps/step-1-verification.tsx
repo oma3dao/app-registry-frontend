@@ -23,6 +23,7 @@ import { Caip10Input } from "@/components/caip10-input";
 import { DidVerification } from "@/components/did-verification";
 import { DidPkhVerification } from "@/components/did-pkh-verification";
 import { InterfacesSelector } from "@/components/interfaces-selector";
+import { buildDidPkhFromCaip10 } from "@/lib/utils/did";
 import {
   NAME_PLACEHOLDER,
   VERSION_PLACEHOLDER,
@@ -167,7 +168,7 @@ export default function Step1_Verification({
         <Caip10Input
           value={state.did?.startsWith("did:pkh:") ? state.did.replace("did:pkh:", "") : ""}
           onChange={(caip10) => {
-            const newDid = caip10 ? `did:pkh:${caip10}` : "";
+            const newDid = caip10 ? buildDidPkhFromCaip10(caip10) : "";
             updateField("did", newDid);
             updateField("ui.verificationStatus", "idle"); // Reset verification when DID changes
           }}

@@ -12,7 +12,7 @@ import { prepareContractCall } from 'thirdweb';
 import { getAppRegistryContract } from './client';
 import { normalizeEvmError } from './errors';
 import type { Status, MintAppInput, UpdateAppInput, UpdateStatusInput } from './types';
-import { normalizeDidWeb } from '../utils/did';
+import { normalizeDid } from '../utils/did';
 
 /**
  * Convert Status to number
@@ -52,7 +52,7 @@ export function prepareMintApp(input: MintAppInput) {
   try {
     console.log('⚡ [prepareMintApp] Preparing native mint() transaction with 12 parameters');
     const contract = getAppRegistryContract();
-    const normalizedDid = normalizeDidWeb(input.did);
+    const normalizedDid = normalizeDid(input.did);
 
     return prepareContractCall({
       contract,
@@ -96,7 +96,7 @@ export function prepareRegisterApp8004(input: MintAppInput) {
   try {
     console.log('🔵 [prepareRegisterApp8004] Preparing ERC-8004 register() transaction with metadata array');
     const contract = getAppRegistryContract();
-    const normalizedDid = normalizeDidWeb(input.did);
+    const normalizedDid = normalizeDid(input.did);
 
     // Import viem's encodeAbiParameters for proper ABI encoding
     // The contract uses abi.decode(), so we must use abi.encode() format
@@ -199,7 +199,7 @@ export function prepareRegisterApp8004(input: MintAppInput) {
 export function prepareUpdateStatus(input: UpdateStatusInput) {
   try {
     const contract = getAppRegistryContract();
-    const normalizedDid = normalizeDidWeb(input.did);
+    const normalizedDid = normalizeDid(input.did);
     const statusNum = statusToNumber(input.status);
 
     return prepareContractCall({
@@ -236,7 +236,7 @@ export function prepareUpdateStatus(input: UpdateStatusInput) {
 export function prepareUpdateApp(input: UpdateAppInput) {
   try {
     const contract = getAppRegistryContract();
-    const normalizedDid = normalizeDidWeb(input.did);
+    const normalizedDid = normalizeDid(input.did);
 
     return prepareContractCall({
       contract,

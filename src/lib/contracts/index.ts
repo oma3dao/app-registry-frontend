@@ -55,10 +55,38 @@ export {
 
 // Utilities
 export {
-  normalizeDidWeb,
+  // Validation
   isValidDid,
   extractDidMethod,
   extractDidIdentifier,
+  
+  // Normalization
+  normalizeDid,
+  normalizeDidWeb,
+  normalizeDidPkh,
+  normalizeDomain,
+  
+  // Hashing
+  computeDidHash,
+  
+  // DID Address (for attestation indexing)
+  computeDidAddress,
+  didToAddress,
+  validateDidAddress,
+  
+  // DID Creation
+  buildDidWeb,
+  buildDidPkh,
+  buildEvmDidPkh,
+  buildDidPkhFromCaip10,
+  
+  // DID Parsing
+  parseCaip10,
+  getChainIdFromDidPkh,
+  getAddressFromDidPkh,
+  getNamespaceFromDidPkh,
+  isEvmDidPkh,
+  getDomainFromDidWeb,
 } from '../utils/did';
 
 export {

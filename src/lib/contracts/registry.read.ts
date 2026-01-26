@@ -11,7 +11,7 @@
 import { readContract } from 'thirdweb';
 import { getAppRegistryContract } from './client';
 import type { AppSummary, Paginated, Status, Version } from './types';
-import { normalizeDidWeb } from '../utils/did';
+import { normalizeDid, computeDidHash } from '../utils/did';
 import { normalizeEvmError } from './errors';
 import { getCurrentVersion } from '../utils/version';
 import type { AbiFunction } from 'abitype';
@@ -78,14 +78,12 @@ function parseAppStruct(appData: any): AppSummary {
 export async function getAppByDid(did: string, major?: number): Promise<AppSummary | null> {
   try {
     const contract = getAppRegistryContract();
-    const normalizedDid = normalizeDidWeb(did);
+    const normalizedDid = normalizeDid(did);
     
     // If no major specified, get the latest
     let majorVersion = major;
     if (majorVersion === undefined || majorVersion === 0) {
-      // Import here to avoid circular dependency
-      const { getDidHash } = await import('../utils/did');
-      const didHash = await getDidHash(normalizedDid);
+      const didHash = computeDidHash(normalizedDid);
       
       // Get latest major version for this DID
       majorVersion = await readContract({
@@ -253,7 +251,7 @@ export async function getTotalActiveApps(): Promise<number> {
  * @returns Array of matching apps
  */
 export async function searchByDid(query: string): Promise<AppSummary[]> {
-  const normalizedDid = normalizeDidWeb(query);
+  const normalizedDid = normalizeDid(query);
   const app = await getAppByDid(normalizedDid);
   return app ? [app] : [];
 }
@@ -265,9 +263,7 @@ export async function searchByDid(query: string): Promise<AppSummary[]> {
  */
 export async function isDidRegistered(did: string): Promise<boolean> {
   try {
-    const normalizedDid = normalizeDidWeb(did);
-    const { getDidHash } = await import('../utils/did');
-    const didHash = await getDidHash(normalizedDid);
+    const didHash = computeDidHash(did);
     
     const contract = getAppRegistryContract();
     
@@ -292,9 +288,7 @@ export async function isDidRegistered(did: string): Promise<boolean> {
  */
 export async function getLatestMajor(did: string): Promise<number> {
   try {
-    const normalizedDid = normalizeDidWeb(did);
-    const { getDidHash } = await import('../utils/did');
-    const didHash = await getDidHash(normalizedDid);
+    const didHash = computeDidHash(did);
     
     const contract = getAppRegistryContract();
     
@@ -324,7 +318,7 @@ export async function hasAnyTraits(
 ): Promise<boolean> {
   try {
     const contract = getAppRegistryContract();
-    const normalizedDid = normalizeDidWeb(did);
+    const normalizedDid = normalizeDid(did);
     
     const result = await readContract({
       contract,
@@ -352,7 +346,7 @@ export async function hasAllTraits(
 ): Promise<boolean> {
   try {
     const contract = getAppRegistryContract();
-    const normalizedDid = normalizeDidWeb(did);
+    const normalizedDid = normalizeDid(did);
     
     const result = await readContract({
       contract,
@@ -380,13 +374,12 @@ export async function hasAllTraits(
  */
 export async function getTokenIdFromEvents(did: string, major: number): Promise<number | undefined> {
   try {
-    const { getDidHash } = await import('../utils/did');
     const { getActiveChain } = await import('./client');
     const { ethers } = await import('ethers');
     const { env } = await import('@/config/env');
     
-    const normalizedDid = normalizeDidWeb(did);
-    const didHash = await getDidHash(normalizedDid);
+    const normalizedDid = normalizeDid(did);
+    const didHash = computeDidHash(normalizedDid);
     
     console.log('[getTokenIdFromEvents] Searching for tokenId:', { did: normalizedDid, major, didHash });
     
