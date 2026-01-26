@@ -162,6 +162,61 @@ describe('DataURL Async Functions', () => {
       expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
     });
 
+    // Tests null content-type header (line 28 branch)
+    it('handles null content-type header gracefully', async () => {
+      const mockJson = { test: true };
+      
+      global.fetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        headers: {
+          get: () => null, // Returns null for all headers
+        },
+        body: {
+          getReader: () => ({
+            read: vi.fn()
+              .mockResolvedValueOnce({
+                done: false,
+                value: new TextEncoder().encode(JSON.stringify(mockJson)),
+              })
+              .mockResolvedValueOnce({ done: true }),
+          }),
+        },
+      });
+
+      // Should throw because content-type doesn't include 'application/json'
+      await expect(
+        computeDataHashFromDataUrl('https://example.com/data.json')
+      ).rejects.toThrow('Invalid content-type');
+    });
+
+    // Tests undefined value in read stream (line 39 branch)
+    it('handles undefined value in read stream', async () => {
+      const mockJson = { test: true };
+      
+      global.fetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        headers: {
+          get: (name: string) => name === 'content-type' ? 'application/json' : null,
+        },
+        body: {
+          getReader: () => ({
+            read: vi.fn()
+              .mockResolvedValueOnce({ done: false, value: undefined }) // undefined value
+              .mockResolvedValueOnce({
+                done: false,
+                value: new TextEncoder().encode(JSON.stringify(mockJson)),
+              })
+              .mockResolvedValueOnce({ done: true }),
+          }),
+        },
+      });
+
+      const result = await computeDataHashFromDataUrl('https://example.com/data.json');
+      
+      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(result.jcsJson).toBeDefined();
+    });
+
     // Tests sha256 algorithm (line 52)
     it('supports sha256 algorithm parameter (algorithm = 1)', async () => {
       const mockJson = { test: true };

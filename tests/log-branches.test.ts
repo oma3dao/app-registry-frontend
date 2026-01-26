@@ -174,6 +174,29 @@ describe('log utility - Branch Coverage', () => {
     vi.restoreAllMocks();
   });
 
+  // This test covers the || 'anonymous' fallback in line 21
+  // When functionName.trim().split('.').pop() returns undefined
+  it('uses anonymous fallback when function name split returns empty', () => {
+    const originalError = Error;
+    
+    // Mock a stack trace where function name is just dots
+    vi.spyOn(global, 'Error').mockImplementation(() => ({
+      stack: `Error
+    at . (test.ts:10:15)
+    at log (log.ts:5:10)`
+    } as Error));
+
+    log('empty split test');
+
+    // Should use 'anonymous' as fallback
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/\[.*test\.ts:anonymous\]/),
+      'empty split test'
+    );
+
+    vi.restoreAllMocks();
+  });
+
   // This test covers edge case where stack trace has unusual formatting
   it('handles stack trace with extra whitespace', () => {
     const originalError = Error;

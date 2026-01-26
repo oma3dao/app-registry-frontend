@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   normalizeDidWeb,
   isValidDid,
   extractDidMethod,
   extractDidIdentifier,
   normalizeDomain,
-  getDidHashSync,
+  computeDidHash,
 } from '@/lib/utils/did';
 
 describe('DID utilities', () => {
@@ -206,9 +206,35 @@ describe('DID utilities', () => {
     });
   });
 
-  describe('getDidHashSync', () => {
-    it('throws error (not implemented)', () => {
-      expect(() => getDidHashSync('did:web:example.com')).toThrow('not implemented');
+  describe('computeDidHash (replaces getDidHash)', () => {
+    it('computes hash for did:web (sync, no RPC call)', () => {
+      const hash = computeDidHash('did:web:example.com');
+      
+      expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(hash.length).toBe(66); // 0x + 64 hex chars
+    });
+
+    it('produces consistent hash for same DID', () => {
+      const hash1 = computeDidHash('did:web:example.com');
+      const hash2 = computeDidHash('did:web:example.com');
+      
+      expect(hash1).toBe(hash2);
+    });
+
+    it('produces same hash for case-variant DIDs (normalizes first)', () => {
+      const hash1 = computeDidHash('did:web:Example.COM');
+      const hash2 = computeDidHash('did:web:example.com');
+      
+      expect(hash1).toBe(hash2);
+    });
+
+    it('handles different DID formats', () => {
+      const webHash = computeDidHash('did:web:example.com');
+      const pkhHash = computeDidHash('did:pkh:eip155:1:0x123');
+      
+      expect(webHash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(pkhHash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(webHash).not.toBe(pkhHash);
     });
   });
 

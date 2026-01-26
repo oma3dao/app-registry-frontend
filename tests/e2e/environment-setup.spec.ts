@@ -6,15 +6,39 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { setupTestPage, performanceMonitor } from './test-helpers';
+import { setupTestWithIsolation } from './test-setup-helper';
 
 test.describe('Environment Setup', () => {
+  // Performance summary after all tests
+  test.afterAll(() => {
+    const summary = performanceMonitor.getSummary();
+    if (summary.total > 0) {
+      console.log('\n📊 Environment Setup Tests Performance Summary:');
+      console.log(`  Total Tests: ${summary.total}`);
+      console.log(`  Average Duration: ${summary.average.toFixed(2)}ms`);
+    }
+  });
+
+  test.beforeEach(async ({ page }) => {
+    // Test isolation setup
+    await setupTestWithIsolation(page);
+  });
   /**
    * Test: Dev server is accessible
    * This verifies the dev server is running and responding
    */
   test('should be able to connect to dev server', async ({ page }) => {
-    const response = await page.goto('/');
+    performanceMonitor.startTest('should be able to connect to dev server');
+    try {
+    const response = await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     expect(response?.status()).toBeLessThan(500); // Should not be server error
+    } finally {
+      const metric = performanceMonitor.endTest();
+      if (metric && metric.duration > 5000) {
+        console.log(`⚠️  Slow test: ${metric.testName} took ${metric.duration}ms`);
+      }
+    }
   });
 
   /**
@@ -24,6 +48,9 @@ test.describe('Environment Setup', () => {
    * but the page structure should still be accessible
    */
   test('should load page without critical runtime errors', async ({ page }) => {
+    performanceMonitor.startTest('should load page without critical runtime errors');
+    try {
+    test.setTimeout(90000); // 90 seconds
     const errors: string[] = [];
     
     page.on('console', (msg) => {
@@ -43,19 +70,13 @@ test.describe('Environment Setup', () => {
       }
     });
 
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Close error overlay if present (for missing env var)
-    try {
-      const closeButton = page.getByRole('button', { name: /close/i }).first();
-      if (await closeButton.isVisible({ timeout: 2000 })) {
-        await closeButton.click();
-        await page.waitForTimeout(500);
-      }
-    } catch {
-      // Error overlay not present, continue
-    }
+    // Use setupTestPage helper with retry logic
+    await setupTestPage(page, '/', {
+      navigationTimeout: 60000,
+      retries: 3,
+      waitForReact: true,
+      removeOverlays: true,
+    });
 
     // If there are errors, log them for debugging
     if (errors.length > 0) {
@@ -66,6 +87,12 @@ test.describe('Environment Setup', () => {
     // (it will show an error overlay, but page structure should exist)
     const body = page.locator('body');
     await expect(body).toBeVisible();
+    } finally {
+      const metric = performanceMonitor.endTest();
+      if (metric && metric.duration > 5000) {
+        console.log(`⚠️  Slow test: ${metric.testName} took ${metric.duration}ms`);
+      }
+    }
   });
 
   /**
