@@ -90,10 +90,16 @@ function getCurrentDeploymentUrl(): string {
  * Handles URL rewriting for different environments:
  * - Local development (NODE_ENV=development): Rewrites production URLs to localhost for testing
  * - Deployed environments (production/test): Rewrites localhost URLs to current deployment
+ * - Preview mode (ISSUER_PRIVATE_KEY set): Rewrites registry.omatrust.org to current deployment
+ *   to avoid CORS issues (production domain 302-redirects to preview)
+ * 
+ * Preview mode detection: ISSUER_PRIVATE_KEY exists = preview phase (using raw key)
+ * When we move to real testnet, we remove ISSUER_PRIVATE_KEY and use Thirdweb Server Wallet
  */
 function getMetadataFetchUrl(dataUrl: string): string {
   const isLocalDev = process.env.NODE_ENV === 'development';
   const isLocalhostChain = activeChain.id === 31337;
+  const isPreviewMode = !!process.env.ISSUER_PRIVATE_KEY;
   const currentUrl = getCurrentDeploymentUrl();
   
   // Local development (not localhost chain): Rewrite production URLs to localhost for testing
@@ -112,6 +118,23 @@ function getMetadataFetchUrl(dataUrl: string): string {
     const rewritten = dataUrl.replace(/http:\/\/localhost:\d+/, currentUrl);
     console.warn(`[ENV] Deployed environment - rewriting localhost URL: ${dataUrl} → ${rewritten}`);
     return rewritten;
+  }
+  
+  // Preview mode: Rewrite production domains to current deployment URL
+  // This avoids CORS issues when registry.omatrust.org 302-redirects to preview.registry.omatrust.org
+  // Only active when ISSUER_PRIVATE_KEY is set (preview phase uses raw key, real testnet uses Server Wallet)
+  if (!isLocalDev && isPreviewMode) {
+    const productionDomains = [
+      'https://registry.omatrust.org',
+      'https://test.registry.omatrust.org'
+    ];
+    for (const domain of productionDomains) {
+      if (dataUrl.startsWith(domain)) {
+        const rewritten = dataUrl.replace(domain, currentUrl);
+        console.log(`[ENV] Preview mode - rewriting ${domain} to current deployment: ${dataUrl} → ${rewritten}`);
+        return rewritten;
+      }
+    }
   }
   
   return dataUrl;
