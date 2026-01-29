@@ -165,6 +165,13 @@ vi.mock('ethers', () => {
     return '0x' + Array.from(value).map(b => b.toString(16).padStart(2, '0')).join('');
   };
 
+  // Mock ContractFactory for EAS SDK compatibility
+  const MockContractFactory = vi.fn().mockImplementation(() => ({
+    connect: vi.fn(),
+    deploy: vi.fn(),
+    attach: vi.fn(),
+  }));
+
   return {
     ethers: {
       isAddress: isValidAddress,
@@ -174,6 +181,7 @@ vi.mock('ethers', () => {
       toUtf8Bytes: mockToUtf8Bytes,
       hexlify: mockHexlify,
       Contract: vi.fn(),
+      ContractFactory: MockContractFactory,
       providers: {
         JsonRpcProvider: vi.fn(),
       },
@@ -184,8 +192,24 @@ vi.mock('ethers', () => {
     sha256: mockSha256,
     toUtf8Bytes: mockToUtf8Bytes,
     hexlify: mockHexlify,
+    Contract: vi.fn(),
+    ContractFactory: MockContractFactory,
+    ZeroAddress: '0x0000000000000000000000000000000000000000',
   };
 });
+
+// Mock EAS SDK to prevent ContractFactory issues
+vi.mock('@ethereum-attestation-service/eas-sdk', () => ({
+  EAS: vi.fn().mockImplementation(() => ({
+    connect: vi.fn(),
+    getAttestation: vi.fn(),
+    getSchemaRegistry: vi.fn(),
+  })),
+  SchemaEncoder: vi.fn().mockImplementation(() => ({
+    encode: vi.fn(),
+    decode: vi.fn(),
+  })),
+}));
 
 // Mock thirdweb client to prevent initialization errors
 vi.mock('thirdweb', () => ({

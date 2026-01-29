@@ -35,14 +35,22 @@ vi.mock('thirdweb', () => ({
 // Mock ethers
 vi.mock('ethers', async () => {
   const realEthers = await vi.importActual('ethers') as any;
+  // Mock ContractFactory for EAS SDK compatibility
+  const MockContractFactory = vi.fn().mockImplementation(() => ({
+    connect: vi.fn(),
+    deploy: vi.fn(),
+    attach: vi.fn(),
+  }));
   return {
     ...realEthers,
     ethers: {
       ...realEthers.ethers,
       id: vi.fn((input: string) => `0x${input.length.toString().padStart(64, '0')}`),
       zeroPadValue: vi.fn((address: string) => `${address.padEnd(66, '0')}`),
+      ContractFactory: MockContractFactory,
       ZeroAddress: '0x0000000000000000000000000000000000000000',
     },
+    ContractFactory: MockContractFactory,
   };
 });
 
