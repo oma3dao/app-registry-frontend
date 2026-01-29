@@ -244,12 +244,106 @@ describe('Contract Errors', () => {
     });
 
     /**
-     * Test: covers lines 110-139 - error selector matching logic
-     * Tests error with non-string data
+     * Test: covers line 92 branch - errorData is falsy, non-string, or invalid format.
+     * All yield CONTRACT_REVERT with "Transaction reverted".
      */
-    it('handles error data that is not a string', () => {
+    it.each([
+      { label: 'empty string', data: '' },
+      { label: 'uppercase 0X prefix', data: '0Xdeadbeef0000000000000000000000000000000000000000000000000000000000000000' },
+      { label: '0', data: 0 },
+      { label: 'false', data: false },
+      { label: 'number', data: 12345 },
+      { label: 'array', data: ['0xdeadbeef'] },
+      { label: 'boolean true', data: true },
+      { label: 'object', data: { someProperty: 'value' } },
+    ])('handles error when data is $label', ({ data }) => {
       const error: any = new Error('execution reverted');
-      error.data = { someProperty: 'value' }; // Non-string data
+      error.data = data;
+      const result = normalizeEvmError(error);
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 96 branch - data.data is null, falls back to data
+     */
+    it('handles error with data.data as null', () => {
+      const error: any = new Error('execution reverted');
+      error.data = {
+        data: null, // null data.data
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 96 branch - data.data is undefined, data is object with valid nested data
+     */
+    it('handles error with data.data undefined but error.data is valid', () => {
+      const error: any = new Error('execution reverted');
+      error.data = {
+        // no data.data property, so this object itself becomes errorData (not a string)
+        someOther: 'value',
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 96 branch - fallback to error.data when data.data is falsy
+     */
+    it('handles error with fallback to error.data', () => {
+      const error: any = {
+        message: 'execution reverted',
+        data: {
+          data: '', // empty string is falsy, but data object itself is truthy
+        },
+        error: {
+          data: '0xccdf6bd50000000000000000000000000000000000000000000000000000000000000000', // DIDCannotBeEmpty
+        },
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      // The empty string from data.data is falsy, so errorData = errorObj.data (the object)
+      // Since the object is not a string, it goes to the else branch
+      expect(result.message).toBe('Transaction reverted');
+    });
+
+    /**
+     * Test: covers line 96 branch - fallback chain when data is undefined
+     */
+    it('handles error with fallback chain to cause.data', () => {
+      const error: any = {
+        message: 'execution reverted',
+        // no data property
+        // no error property
+        cause: {
+          data: '0xa32712b80000000000000000000000000000000000000000000000000000000000000000', // InterfacesCannotBeEmpty
+        },
+      };
+
+      const result = normalizeEvmError(error);
+
+      expect(result.code).toBe('CONTRACT_REVERT');
+      expect(result.message).toBe('Contract error: InterfacesCannotBeEmpty');
+    });
+
+    /**
+     * Test: covers line 92 branch - errorData is undefined (all fallbacks fail)
+     */
+    it('handles error when all data fallbacks are undefined', () => {
+      const error: any = {
+        message: 'execution reverted',
+        // no data, error, or cause properties
+      };
 
       const result = normalizeEvmError(error);
 

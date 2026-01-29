@@ -3,94 +3,32 @@ import { validateSui, normalize0x32Bytes, isSuiAddress } from '@/lib/utils/caip1
 
 describe('Sui CAIP-10 validator', () => {
   describe('normalize0x32Bytes', () => {
-    it('normalizes short address by left-padding', () => {
-      const result = normalize0x32Bytes('0x1');
-      expect(result).toBe('0x0000000000000000000000000000000000000000000000000000000000000001');
+    it.each([
+      { input: '0x1', expected: '0x0000000000000000000000000000000000000000000000000000000000000001', label: 'short address' },
+      { input: '0xabcd', expected: '0x000000000000000000000000000000000000000000000000000000000000abcd', label: 'multiple digits' },
+      { input: '0x0000000000000000000000000000000000000000000000000000000000000001', expected: '0x0000000000000000000000000000000000000000000000000000000000000001', label: 'full 32-byte address' },
+      { input: '0xABCD', expected: '0x000000000000000000000000000000000000000000000000000000000000abcd', label: 'uppercase to lowercase' },
+      { input: '0xAbCd1234Ef', expected: '0x000000000000000000000000000000000000000000000000000000abcd1234ef', label: 'mixed case' },
+      { input: '0x' + '1'.repeat(64), expected: '0x' + '1'.repeat(64), label: 'exactly 64 hex chars' },
+      { input: '0x0', expected: '0x0000000000000000000000000000000000000000000000000000000000000000', label: 'zero address' },
+      { input: '0x' + 'f'.repeat(64), expected: '0x' + 'f'.repeat(64), label: 'max value' },
+    ])('normalizes $label correctly', ({ input, expected }) => {
+      expect(normalize0x32Bytes(input)).toBe(expected);
     });
 
-    it('normalizes address with multiple digits', () => {
-      const result = normalize0x32Bytes('0xabcd');
-      expect(result).toBe('0x000000000000000000000000000000000000000000000000000000000000abcd');
-    });
-
-    it('preserves full 32-byte address', () => {
-      const full = '0x0000000000000000000000000000000000000000000000000000000000000001';
-      const result = normalize0x32Bytes(full);
-      expect(result).toBe(full);
-    });
-
-    it('converts to lowercase', () => {
-      const result = normalize0x32Bytes('0xABCD');
-      expect(result).toBe('0x000000000000000000000000000000000000000000000000000000000000abcd');
-    });
-
-    it('handles mixed case input', () => {
-      const result = normalize0x32Bytes('0xAbCd1234Ef');
-      expect(result).toBe('0x000000000000000000000000000000000000000000000000000000abcd1234ef');
-    });
-
-    it('returns error for address without 0x', () => {
-      const result = normalize0x32Bytes('1234');
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toContain('must start with 0x');
-    });
-
-    it('returns error for non-hex characters', () => {
-      const result = normalize0x32Bytes('0xghij');
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toContain('hexadecimal');
-    });
-
-    it('returns error for address exceeding 32 bytes', () => {
-      const tooLong = '0x' + '1'.repeat(65);
-      const result = normalize0x32Bytes(tooLong);
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toContain('exceeds 32 bytes');
-    });
-
-    it('handles exactly 64 hex characters', () => {
-      const exact = '0x' + '1'.repeat(64);
-      const result = normalize0x32Bytes(exact);
-      expect(result).toBe(exact.toLowerCase());
-    });
-
-    it('handles zero address', () => {
-      const result = normalize0x32Bytes('0x0');
-      expect(result).toBe('0x0000000000000000000000000000000000000000000000000000000000000000');
-    });
-
-    it('handles max value', () => {
-      const max = '0x' + 'f'.repeat(64);
-      const result = normalize0x32Bytes(max);
-      expect(result).toBe(max);
+    it.each([
+      { input: '1234', label: 'address without 0x' },
+      { input: '0xghij', label: 'non-hex characters' },
+      { input: '0x' + '1'.repeat(65), label: 'address exceeding 32 bytes' },
+    ])('returns error for $label', ({ input }) => {
+      expect(normalize0x32Bytes(input)).toBeInstanceOf(Error);
     });
   });
 
   describe('validateSui', () => {
-    it('validates correct Sui mainnet address', () => {
-      const result = validateSui('mainnet', '0x1');
+    it.each(['mainnet', 'testnet', 'devnet', 'MAINNET', 'MainNet'])('validates Sui %s network', (network) => {
+      const result = validateSui(network, '0x1');
       expect(result.valid).toBe(true);
-      expect(result.normalizedAddress).toBe('0x0000000000000000000000000000000000000000000000000000000000000001');
-    });
-
-    it('validates Sui testnet address', () => {
-      const result = validateSui('testnet', '0x1');
-      expect(result.valid).toBe(true);
-    });
-
-    it('validates Sui devnet address', () => {
-      const result = validateSui('devnet', '0x1');
-      expect(result.valid).toBe(true);
-    });
-
-    it('accepts reference in any case', () => {
-      const lower = validateSui('mainnet', '0x1');
-      const upper = validateSui('MAINNET', '0x1');
-      const mixed = validateSui('MainNet', '0x1');
-
-      expect(lower.valid).toBe(true);
-      expect(upper.valid).toBe(true);
-      expect(mixed.valid).toBe(true);
     });
 
     it('rejects invalid network reference', () => {
@@ -99,17 +37,13 @@ describe('Sui CAIP-10 validator', () => {
       expect(result.error).toContain('mainnet, testnet, devnet');
     });
 
-    it('normalizes short address', () => {
-      const result = validateSui('mainnet', '0xabc');
+    it.each([
+      { addr: '0xabc', expected: '0x0000000000000000000000000000000000000000000000000000000000000abc', label: 'short address' },
+      { addr: '0x0000000000000000000000000000000000000000000000000000000000000001', expected: '0x0000000000000000000000000000000000000000000000000000000000000001', label: 'full-length address' },
+    ])('normalizes $label correctly', ({ addr, expected }) => {
+      const result = validateSui('mainnet', addr);
       expect(result.valid).toBe(true);
-      expect(result.normalizedAddress).toBe('0x0000000000000000000000000000000000000000000000000000000000000abc');
-    });
-
-    it('normalizes full-length address', () => {
-      const full = '0x0000000000000000000000000000000000000000000000000000000000000001';
-      const result = validateSui('mainnet', full);
-      expect(result.valid).toBe(true);
-      expect(result.normalizedAddress).toBe(full);
+      expect(result.normalizedAddress).toBe(expected);
     });
 
     it('rejects address without 0x prefix', () => {

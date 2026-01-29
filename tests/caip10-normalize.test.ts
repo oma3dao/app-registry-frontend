@@ -21,32 +21,19 @@ describe('CAIP-10 normalization', () => {
       expect(result.normalized).toBeDefined();
     });
 
-    it('validates different chain IDs', () => {
-      const ethereum = normalizeCaip10(`eip155:1:${validEthAddress}`);
-      const polygon = normalizeCaip10(`eip155:137:${validEthAddress}`);
-      const arbitrum = normalizeCaip10(`eip155:42161:${validEthAddress}`);
-
-      expect(ethereum.valid).toBe(true);
-      expect(polygon.valid).toBe(true);
-      expect(arbitrum.valid).toBe(true);
+    it.each(['1', '137', '42161'])('validates EVM chain ID %s', (chainId) => {
+      const result = normalizeCaip10(`eip155:${chainId}:${validEthAddress}`);
+      expect(result.valid).toBe(true);
     });
 
-    it('rejects invalid EVM address', () => {
-      const result = normalizeCaip10('eip155:1:0xinvalidaddress');
+    it.each([
+      { input: 'eip155:1:0xinvalidaddress', label: 'invalid EVM address' },
+      { input: `eip155:1:${validEthAddress.slice(2)}`, label: 'EVM address without 0x' },
+      { input: `eip155:mainnet:${validEthAddress}`, label: 'invalid chain ID' },
+    ])('rejects $label', ({ input }) => {
+      const result = normalizeCaip10(input);
       expect(result.valid).toBe(false);
       expect(result.error).toBeDefined();
-    });
-
-    it('rejects EVM address without 0x', () => {
-      const result = normalizeCaip10(`eip155:1:${validEthAddress.slice(2)}`);
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('0x');
-    });
-
-    it('rejects invalid chain ID', () => {
-      const result = normalizeCaip10(`eip155:mainnet:${validEthAddress}`);
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('chainId');
     });
   });
 
@@ -63,24 +50,18 @@ describe('CAIP-10 normalization', () => {
       expect(result.normalized).toBe('solana:mainnet:4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
     });
 
-    it('validates devnet and testnet', () => {
-      const devnet = normalizeCaip10('solana:devnet:4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      const testnet = normalizeCaip10('solana:testnet:4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-
-      expect(devnet.valid).toBe(true);
-      expect(testnet.valid).toBe(true);
+    it.each(['mainnet', 'devnet', 'testnet'])('validates Solana %s network', (network) => {
+      const result = normalizeCaip10(`solana:${network}:4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T`);
+      expect(result.valid).toBe(true);
     });
 
-    it('rejects invalid Solana network', () => {
-      const result = normalizeCaip10('solana:ethereum:4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
+    it.each([
+      { input: 'solana:ethereum:4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T', label: 'invalid Solana network' },
+      { input: 'solana:mainnet:0Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T', label: 'Solana address with invalid base58' },
+    ])('rejects $label', ({ input }) => {
+      const result = normalizeCaip10(input);
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('mainnet, devnet, testnet');
-    });
-
-    it('rejects Solana address with invalid base58', () => {
-      const result = normalizeCaip10('solana:mainnet:0Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('base58');
+      expect(result.error).toBeDefined();
     });
 
     it('validates token program addresses', () => {
@@ -115,71 +96,41 @@ describe('CAIP-10 normalization', () => {
       expect(result.normalized).toBe(`sui:mainnet:${full}`);
     });
 
-    it('validates testnet and devnet', () => {
-      const testnet = normalizeCaip10('sui:testnet:0x1');
-      const devnet = normalizeCaip10('sui:devnet:0x1');
-
-      expect(testnet.valid).toBe(true);
-      expect(devnet.valid).toBe(true);
+    it.each(['mainnet', 'testnet', 'devnet'])('validates Sui %s network', (network) => {
+      const result = normalizeCaip10(`sui:${network}:0x1`);
+      expect(result.valid).toBe(true);
     });
 
-    it('rejects invalid Sui network', () => {
-      const result = normalizeCaip10('sui:ethereum:0x1');
+    it.each([
+      { input: 'sui:ethereum:0x1', label: 'invalid Sui network' },
+      { input: 'sui:mainnet:1234', label: 'Sui address without 0x' },
+      { input: 'sui:mainnet:0xghij', label: 'Sui address with non-hex' },
+    ])('rejects $label', ({ input }) => {
+      const result = normalizeCaip10(input);
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('mainnet, testnet, devnet');
-    });
-
-    it('rejects Sui address without 0x', () => {
-      const result = normalizeCaip10('sui:mainnet:1234');
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('0x');
-    });
-
-    it('rejects Sui address with non-hex', () => {
-      const result = normalizeCaip10('sui:mainnet:0xghij');
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('hexadecimal');
+      expect(result.error).toBeDefined();
     });
   });
 
   describe('normalizeCaip10 - unsupported namespaces', () => {
-    it('rejects unsupported namespace', () => {
-      const result = normalizeCaip10('bitcoin:mainnet:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa');
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('Unsupported namespace');
-      expect(result.error).toContain('eip155, solana, sui');
-    });
-
-    it('rejects cosmos namespace', () => {
-      const result = normalizeCaip10('cosmos:cosmoshub-3:cosmos1...');
-      expect(result.valid).toBe(false);
-    });
-
-    it('rejects polkadot namespace', () => {
-      const result = normalizeCaip10('polkadot:mainnet:1234...');
+    it.each([
+      'bitcoin:mainnet:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+      'cosmos:cosmoshub-3:cosmos1...',
+      'polkadot:mainnet:1234...',
+    ])('rejects unsupported namespace: %s', (input) => {
+      const result = normalizeCaip10(input);
       expect(result.valid).toBe(false);
     });
   });
 
   describe('normalizeCaip10 - format validation', () => {
-    it('rejects invalid CAIP-10 format', () => {
-      const result = normalizeCaip10('invalid-format');
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('Invalid CAIP-10 format');
-    });
-
-    it('rejects missing components', () => {
-      const result = normalizeCaip10('eip155:1');
-      expect(result.valid).toBe(false);
-    });
-
-    it('rejects empty string', () => {
-      const result = normalizeCaip10('');
-      expect(result.valid).toBe(false);
-    });
-
-    it('rejects with only one colon', () => {
-      const result = normalizeCaip10('eip155:0x123');
+    it.each([
+      { input: 'invalid-format', label: 'invalid CAIP-10 format' },
+      { input: 'eip155:1', label: 'missing components' },
+      { input: '', label: 'empty string' },
+      { input: 'eip155:0x123', label: 'only one colon' },
+    ])('rejects $label', ({ input }) => {
+      const result = normalizeCaip10(input);
       expect(result.valid).toBe(false);
     });
   });

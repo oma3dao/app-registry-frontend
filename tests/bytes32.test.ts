@@ -100,54 +100,35 @@ describe('bytes32 utilities', () => {
 
   describe('isBytes32Hex', () => {
     it('returns true for valid bytes32 hex string', () => {
-      const validHex = '0x0000000000000000000000000000000000000000000000000000000000000000';
-      expect(isBytes32Hex(validHex)).toBe(true);
+      expect(isBytes32Hex('0x0000000000000000000000000000000000000000000000000000000000000000')).toBe(true);
     });
 
-    it('returns false for hex string without 0x prefix', () => {
-      const noPrefix = '0000000000000000000000000000000000000000000000000000000000000000';
-      expect(isBytes32Hex(noPrefix)).toBe(false);
-    });
-
-    it('returns false for hex string with wrong length', () => {
-      expect(isBytes32Hex('0x1234')).toBe(false);
-      expect(isBytes32Hex('0x' + 'a'.repeat(63))).toBe(false);
-      expect(isBytes32Hex('0x' + 'a'.repeat(65))).toBe(false);
-    });
-
-    it('returns false for non-string values', () => {
-      expect(isBytes32Hex(123)).toBe(false);
-      expect(isBytes32Hex(null)).toBe(false);
-      expect(isBytes32Hex(undefined)).toBe(false);
-      expect(isBytes32Hex({})).toBe(false);
-    });
-
-    it('returns false for regular strings', () => {
-      expect(isBytes32Hex('hello world')).toBe(false);
+    it.each([
+      { val: '0000000000000000000000000000000000000000000000000000000000000000', label: 'no 0x prefix' },
+      { val: '0x1234', label: 'too short' },
+      { val: '0x' + 'a'.repeat(63), label: '63 chars' },
+      { val: '0x' + 'a'.repeat(65), label: '65 chars' },
+      { val: 123, label: 'number' },
+      { val: null, label: 'null' },
+      { val: undefined, label: 'undefined' },
+      { val: {}, label: 'object' },
+      { val: 'hello world', label: 'regular string' },
+    ])('returns false for $label', ({ val }) => {
+      expect(isBytes32Hex(val)).toBe(false);
     });
   });
 
   describe('safeDecodeBytes32', () => {
-    it('returns empty string for null or undefined', () => {
-      expect(safeDecodeBytes32(null)).toBe('');
-      expect(safeDecodeBytes32(undefined)).toBe('');
-      expect(safeDecodeBytes32('')).toBe('');
+    it.each([null, undefined, ''])('returns empty string for %s', (val) => {
+      expect(safeDecodeBytes32(val)).toBe('');
     });
 
-    it('returns plain strings without decoding', () => {
-      expect(safeDecodeBytes32('plain text')).toBe('plain text');
-    });
-
-    it('decodes hex strings', () => {
-      const hex = '0x68656c6c6f000000000000000000000000000000000000000000000000000000';
-      expect(safeDecodeBytes32(hex)).toBe('hello');
-    });
-
-    it('handles objects with _hex property', () => {
-      const hexObj = {
-        _hex: '0x68656c6c6f000000000000000000000000000000000000000000000000000000',
-      };
-      expect(safeDecodeBytes32(hexObj)).toBe('hello');
+    it.each([
+      { input: 'plain text', expected: 'plain text', label: 'plain string' },
+      { input: '0x68656c6c6f000000000000000000000000000000000000000000000000000000', expected: 'hello', label: 'hex string' },
+      { input: { _hex: '0x68656c6c6f000000000000000000000000000000000000000000000000000000' }, expected: 'hello', label: 'object with _hex property' },
+    ])('decodes $label correctly', ({ input, expected }) => {
+      expect(safeDecodeBytes32(input)).toBe(expected);
     });
   });
 });

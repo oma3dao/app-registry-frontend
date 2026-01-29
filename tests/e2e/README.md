@@ -1,67 +1,102 @@
-# E2E Test Setup
+# E2E Testing Documentation
 
-## Prerequisites
+**Last Updated:** December 19, 2025  
+**Status:** 29 essential documentation files (cleaned from 131)
 
-Before running E2E tests, ensure your development environment is properly configured:
+---
 
-### 1. Environment Variables
+## 📚 Documentation Index
 
-Create a `.env.local` file in the project root with:
+### Quick Start
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Start here for setup
+- **[RUNNING_TESTS.md](RUNNING_TESTS.md)** - How to run tests (includes quick commands)
 
-```env
-NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your-thirdweb-client-id
-```
+### Testing Guides
+- **[ACCESSIBILITY_TESTING_GUIDE.md](ACCESSIBILITY_TESTING_GUIDE.md)** - Accessibility testing
+- **[VISUAL_REGRESSION_GUIDE.md](VISUAL_REGRESSION_GUIDE.md)** - Visual regression testing
+- **[TEST_TAGS_GUIDE.md](TEST_TAGS_GUIDE.md)** - Test tagging and organization
+- **[TEST_PATTERNS.md](TEST_PATTERNS.md)** - Common test patterns
+- **[TEST_ANTI_PATTERNS.md](TEST_ANTI_PATTERNS.md)** - What to avoid
+- **[TEST_BEST_PRACTICES.md](TEST_BEST_PRACTICES.md)** - Best practices
 
-**Note:** For testing purposes, you can use a test/dummy client ID. The tests will still run, but wallet connections won't work without a valid ID.
+### Implementation Guides
+- **[AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md)** - Authentication in tests
+- **[BROWSER_TOOLS_GUIDE.md](BROWSER_TOOLS_GUIDE.md)** - Browser automation tools
+- **[EXECUTION_GUIDE.md](EXECUTION_GUIDE.md)** - Test execution strategies
 
-### 2. Start Dev Server
+### Advanced Topics
+- **[CI_CD_INTEGRATION_GUIDE.md](CI_CD_INTEGRATION_GUIDE.md)** - CI/CD setup
+- **[MAINTENANCE_AUTOMATION_GUIDE.md](MAINTENANCE_AUTOMATION_GUIDE.md)** - Test maintenance
+- **[METRICS_DASHBOARD_GUIDE.md](METRICS_DASHBOARD_GUIDE.md)** - Test metrics
+- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Migration strategies
 
-```bash
-npm run dev
-```
+### Reference
+- **[TEST_MATRIX.md](TEST_MATRIX.md)** - Test coverage matrix
+- **[TEST_METRICS.md](TEST_METRICS.md)** - Metrics and KPIs
+- **[TEST_UTILITIES_EXPANSION.md](TEST_UTILITIES_EXPANSION.md)** - Utility functions
 
-The Playwright config is set to automatically start the dev server, but you can also start it manually.
+### Setup & Configuration
+- **[SETUP_VISUAL_BASELINES.md](SETUP_VISUAL_BASELINES.md)** - Visual baseline setup
+- **[run-against-existing-server.md](run-against-existing-server.md)** - Run with existing server
+- **[TIMEOUT_OPTIMIZATIONS.md](TIMEOUT_OPTIMIZATIONS.md)** - Timeout configurations
 
-### 3. Run Tests
+### Troubleshooting & Help
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[TEST_HEALTH_CHECK.md](TEST_HEALTH_CHECK.md)** - Test suite health checks
+- **[HANDOFF_GUIDE.md](HANDOFF_GUIDE.md)** - Project handoff information
+
+### Planning
+- **[NEXT_STEPS.md](NEXT_STEPS.md)** - Immediate next steps
+- **[NEXT_STEPS_GUIDE.md](NEXT_STEPS_GUIDE.md)** - Long-term planning
+
+---
+
+## 🎯 Quick Commands
 
 ```bash
 # Run all E2E tests
 npm run test:e2e
 
-# Run with UI (recommended)
-npm run test:e2e:ui
+# Run specific test file
+npx playwright test tests/e2e/visual-regression.spec.ts
 
-# Run in visible browser
-npm run test:e2e:headed
+# Run with UI
+npx playwright test --ui
+
+# Update visual baselines
+npx playwright test --update-snapshots
+
+# Debug specific test
+npx playwright test --debug tests/e2e/landing-page.spec.ts
 ```
 
-## Test Structure
+---
 
-- `landing-page.spec.ts` - Tests for the landing page
-- `dashboard.spec.ts` - Tests for the dashboard (requires auth)
-- `wizard-flow.spec.ts` - Tests for the registration wizard
+## 📊 Current Status
 
-## Troubleshooting
+- **E2E Tests:** 166 tests (127 passing, 77%)
+- **Test Files:** 26 spec files
+- **Documentation:** 29 essential guides
+- **Visual Baselines:** 7 screenshots
 
-### Error: "No client ID provided"
+---
 
-**Solution:** Create `.env.local` with `NEXT_PUBLIC_THIRDWEB_CLIENT_ID` set.
+## 🚀 Getting Started
 
-### Tests fail to connect to dev server
+1. Read [GETTING_STARTED.md](GETTING_STARTED.md)
+2. Run `npm run test:e2e`
+3. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) if issues arise
+4. Review [TEST_BEST_PRACTICES.md](TEST_BEST_PRACTICES.md) before writing tests
 
-**Solution:** 
-1. Ensure dev server is running on port 3000
-2. Check `playwright.config.ts` webServer configuration
-3. Try starting dev server manually: `npm run dev`
+---
 
-### Tests timeout
+## 📖 Documentation History
 
-**Solution:**
-- Increase timeout in `playwright.config.ts`
-- Check network connectivity
-- Verify dev server is responding
+**December 19, 2025:** Major cleanup - reduced from 131 files to 29 essential guides
+- Removed 102 duplicate/status/summary files
+- Consolidated redundant documentation
+- Organized remaining guides by category
 
-## Using Cursor Browser Tools
+---
 
-See `docs/USING_CURSOR_BROWSER_EXAMPLE.md` for examples of using Cursor's browser capabilities to explore and generate tests.
-
+For the latest test results and coverage, see **[README-TESTING.md](../../README-TESTING.md)** in the project root.

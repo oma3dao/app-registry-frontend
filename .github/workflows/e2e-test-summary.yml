@@ -1,0 +1,41 @@
+name: E2E Test Summary
+
+on:
+  workflow_run:
+    workflows: ["E2E Tests"]
+    types:
+      - completed
+
+jobs:
+  test-summary:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Generate test summary
+        run: |
+          if [ -f test-results/results.json ]; then
+            echo "## 📊 E2E Test Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Status | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            PASSED=$(jq '[.suites[].specs[] | select(.tests[].results[].status == "passed")] | length' test-results/results.json || echo "0")
+            FAILED=$(jq '[.suites[].specs[] | select(.tests[].results[].status == "failed")] | length' test-results/results.json || echo "0")
+            SKIPPED=$(jq '[.suites[].specs[] | select(.tests[].results[].status == "skipped")] | length' test-results/results.json || echo "0")
+            TOTAL=$(jq '[.suites[].specs[]] | length' test-results/results.json || echo "0")
+            echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+            echo "| ❌ Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⏭️ Skipped | $SKIPPED |" >> $GITHUB_STEP_SUMMARY
+            echo "| 📊 Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Test results not found" >> $GITHUB_STEP_SUMMARY
+          fi
+

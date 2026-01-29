@@ -14,22 +14,15 @@ describe('GET /api/fetch-metadata', () => {
     global.fetch = vi.fn();
   });
 
-  it('returns error when URL parameter is missing', async () => {
-    const request = new NextRequest('http://localhost:3000/api/fetch-metadata');
+  it.each([
+    { label: 'URL parameter missing', url: 'http://localhost:3000/api/fetch-metadata', error: 'URL parameter is required' },
+    { label: 'invalid URL format', url: 'http://localhost:3000/api/fetch-metadata?url=not-a-valid-url', error: 'Invalid URL format provided' },
+  ])('returns 400 when $label', async ({ url, error }) => {
+    const request = new NextRequest(url);
     const response = await GET(request);
     const data = await response.json();
-
     expect(response.status).toBe(400);
-    expect(data).toEqual({ error: 'URL parameter is required' });
-  });
-
-  it('returns error for invalid URL format', async () => {
-    const request = new NextRequest('http://localhost:3000/api/fetch-metadata?url=not-a-valid-url');
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data).toEqual({ error: 'Invalid URL format provided' });
+    expect(data).toEqual({ error });
   });
 
   it('fetches and returns image URL from valid metadata', async () => {
@@ -60,39 +53,14 @@ describe('GET /api/fetch-metadata', () => {
     );
   });
 
-  it('returns null image when image field is missing', async () => {
-    const mockMetadata = {
-      name: 'Test NFT',
-      description: 'No image here',
-    };
-
+  it.each([
+    { label: 'image field is missing', metadata: { name: 'Test NFT', description: 'No image here' } },
+    { label: 'image is empty string', metadata: { image: '   ', name: 'Test NFT' } },
+  ])('returns null image when $label', async ({ metadata }) => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => mockMetadata,
-    });
-
-    const request = new NextRequest('http://localhost:3000/api/fetch-metadata?url=https://example.com/metadata.json');
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toEqual({ 
-      image: null, 
-      error: 'Image URL not found in metadata' 
-    });
-  });
-
-  it('returns null image when image is empty string', async () => {
-    const mockMetadata = {
-      image: '   ',
-      name: 'Test NFT',
-    };
-
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => mockMetadata,
+      json: async () => metadata,
     });
 
     const request = new NextRequest('http://localhost:3000/api/fetch-metadata?url=https://example.com/metadata.json');

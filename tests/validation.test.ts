@@ -49,52 +49,50 @@ describe('validation', () => {
     expect(validateCaipAddress('eip155:1:0x123')).toBe(true);
   });
 
-  /**
-   * Test: covers lines 95-112 - validateCaip19Token function
-   */
   describe('validateCaip19Token', () => {
-    // Test: covers line 95 - empty tokenId returns true (optional field)
-    it('returns true for empty tokenId (optional field)', () => {
-      expect(validateCaip19Token('')).toBe(true);
-      expect(validateCaip19Token(null as any)).toBe(true);
-      expect(validateCaip19Token(undefined as any)).toBe(true);
+    it.each(['', null, undefined] as const)('returns true for empty tokenId (optional): %s', (input) => {
+      expect(validateCaip19Token(input as any)).toBe(true);
     });
 
-    // Test: covers line 100 - missing chainPart or assetPart
-    it('returns false when tokenId is missing chain or asset part', () => {
-      expect(validateCaip19Token('eip155:1')).toBe(false); // Missing asset part
-      expect(validateCaip19Token('erc20:0x123')).toBe(false); // Missing chain part
-      expect(validateCaip19Token('invalid')).toBe(false); // No separator
+    it.each([
+      { tokenId: 'eip155:1', label: 'missing asset part' },
+      { tokenId: 'erc20:0x123', label: 'missing chain part' },
+      { tokenId: 'invalid', label: 'no separator' },
+    ])('returns false when $label', ({ tokenId }) => {
+      expect(validateCaip19Token(tokenId)).toBe(false);
     });
 
-    // Test: covers line 106 - invalid chain part format
-    it('returns false for invalid chain part format', () => {
-      expect(validateCaip19Token('eip155/erc20:0x123')).toBe(false); // Missing reference
-      expect(validateCaip19Token(':1/erc20:0x123')).toBe(false); // Empty namespace
-      expect(validateCaip19Token('eip155:/erc20:0x123')).toBe(false); // Empty reference
-      expect(validateCaip19Token('eip155:1:extra/erc20:0x123')).toBe(false); // Too many parts
+    it.each([
+      'eip155/erc20:0x123',
+      ':1/erc20:0x123',
+      'eip155:/erc20:0x123',
+      'eip155:1:extra/erc20:0x123',
+    ])('returns false for invalid chain part format: %s', (tokenId) => {
+      expect(validateCaip19Token(tokenId)).toBe(false);
     });
 
-    // Test: covers line 109 - invalid asset part format
-    it('returns false for invalid asset part format', () => {
-      expect(validateCaip19Token('eip155:1/erc20')).toBe(false); // Missing asset reference
-      expect(validateCaip19Token('eip155:1/:0x123')).toBe(false); // Empty asset namespace
-      expect(validateCaip19Token('eip155:1/erc20:')).toBe(false); // Empty asset reference
-      expect(validateCaip19Token('eip155:1/erc20:0x123:extra')).toBe(false); // Too many parts
+    it.each([
+      'eip155:1/erc20',
+      'eip155:1/:0x123',
+      'eip155:1/erc20:',
+      'eip155:1/erc20:0x123:extra',
+    ])('returns false for invalid asset part format: %s', (tokenId) => {
+      expect(validateCaip19Token(tokenId)).toBe(false);
     });
 
-    // Test: covers line 111 - valid CAIP-19 token IDs
-    it('returns true for valid CAIP-19 token IDs', () => {
-      expect(validateCaip19Token('eip155:1/erc20:0x1234567890123456789012345678901234567890')).toBe(true);
-      expect(validateCaip19Token('eip155:137/erc1155:0x1234.../123')).toBe(true); // Note: actual format may vary
-      expect(validateCaip19Token('eip155:1/erc721:0xabcdefabcdefabcdefabcdefabcdefabcdefabcd')).toBe(true);
+    it.each([
+      'eip155:1/erc20:0x1234567890123456789012345678901234567890',
+      'eip155:137/erc1155:0x1234.../123',
+      'eip155:1/erc721:0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+    ])('returns true for valid CAIP-19 token ID: %s', (tokenId) => {
+      expect(validateCaip19Token(tokenId)).toBe(true);
     });
 
-    // Test: covers edge cases with empty parts
-    it('returns false when any part is empty after split', () => {
-      expect(validateCaip19Token('eip155:1/erc20:')).toBe(false); // Empty asset reference
-      expect(validateCaip19Token('eip155:/erc20:0x123')).toBe(false); // Empty chain reference
-      expect(validateCaip19Token(':1/erc20:0x123')).toBe(false); // Empty chain namespace
-    });
+    it.each(['eip155:1/erc20:', 'eip155:/erc20:0x123', ':1/erc20:0x123'])(
+      'returns false when part is empty after split: %s',
+      (tokenId) => {
+        expect(validateCaip19Token(tokenId)).toBe(false);
+      }
+    );
   });
 }); 
