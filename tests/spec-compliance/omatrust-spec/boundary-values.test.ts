@@ -14,206 +14,107 @@
 import { describe, it, expect } from 'vitest';
 import { OnChainApp, OffChainMetadata, PlatformDetails, Artifact } from '@/schema/data-model';
 
+const validMetadataBase = {
+  description: 'A valid test application description',
+  publisher: 'Test Publisher',
+  image: 'https://example.com/icon.png',
+};
+
+function testStringBoundary(
+  field: string,
+  min: number,
+  max: number,
+  base: Record<string, unknown>,
+  schema: typeof OffChainMetadata
+) {
+  describe(`${field} field (min: ${min}, max: ${max})`, () => {
+    it.each([
+      { len: min - 1, shouldAccept: false, label: 'below minimum' },
+      { len: min, shouldAccept: true, label: 'at minimum' },
+      { len: min + 1, shouldAccept: true, label: 'above minimum' },
+      { len: max - 1, shouldAccept: true, label: 'below maximum' },
+      { len: max, shouldAccept: true, label: 'at maximum' },
+      { len: max + 1, shouldAccept: false, label: 'above maximum' },
+    ])('$label: $len characters', ({ len, shouldAccept }) => {
+      const result = schema.safeParse({
+        ...base,
+        [field]: 'A'.repeat(len),
+      });
+      expect(result.success).toBe(shouldAccept);
+    });
+  });
+}
+
 // ============================================================================
 // STRING LENGTH BOUNDARY TESTS
 // ============================================================================
 
 describe('Boundary Tests: String Length Limits', () => {
-  
-  const validMetadataBase = {
-    description: 'A valid test application description',
+  testStringBoundary('name', 2, 80, validMetadataBase, OffChainMetadata);
+
+  const descriptionBase = {
+    name: 'Test App',
     publisher: 'Test Publisher',
     image: 'https://example.com/icon.png',
   };
 
-  // -------------------------------------------------------------------------
-  // Name field: min 2, max 80 characters
-  // -------------------------------------------------------------------------
-  
-  describe('name field (min: 2, max: 80)', () => {
-    
-    it('rejects name with 1 character (below minimum)', () => {
-      const result = OffChainMetadata.safeParse({
-        ...validMetadataBase,
-        name: 'A',
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it('accepts name with exactly 2 characters (at minimum)', () => {
-      const result = OffChainMetadata.safeParse({
-        ...validMetadataBase,
-        name: 'AB',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('accepts name with 3 characters (above minimum)', () => {
-      const result = OffChainMetadata.safeParse({
-        ...validMetadataBase,
-        name: 'ABC',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('accepts name with 79 characters (below maximum)', () => {
-      const result = OffChainMetadata.safeParse({
-        ...validMetadataBase,
-        name: 'A'.repeat(79),
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('accepts name with exactly 80 characters (at maximum)', () => {
-      const result = OffChainMetadata.safeParse({
-        ...validMetadataBase,
-        name: 'A'.repeat(80),
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('rejects name with 81 characters (above maximum)', () => {
-      const result = OffChainMetadata.safeParse({
-        ...validMetadataBase,
-        name: 'A'.repeat(81),
-      });
-      expect(result.success).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Description field: min 10 characters (spec max: 4000)
-  // -------------------------------------------------------------------------
-  
   describe('description field (min: 10, spec max: 4000)', () => {
-    
-    it('rejects description with 9 characters (below minimum)', () => {
+    it.each([
+      { len: 9, shouldAccept: false, label: 'below minimum' },
+      { len: 10, shouldAccept: true, label: 'at minimum' },
+      { len: 11, shouldAccept: true, label: 'above minimum' },
+      { len: 3999, shouldAccept: true, label: 'below spec max' },
+      { len: 4000, shouldAccept: true, label: 'at spec max' },
+    ])('$label: $len characters', ({ len, shouldAccept }) => {
       const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: '123456789', // 9 chars
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
+        ...descriptionBase,
+        description: 'A'.repeat(len),
       });
-      expect(result.success).toBe(false);
-    });
-
-    it('accepts description with exactly 10 characters (at minimum)', () => {
-      const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: '1234567890', // 10 chars
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('accepts description with 11 characters (above minimum)', () => {
-      const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: '12345678901', // 11 chars
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('accepts description with 3999 characters (below spec max)', () => {
-      const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: 'A'.repeat(3999),
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('accepts description with exactly 4000 characters (at spec max)', () => {
-      const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: 'A'.repeat(4000),
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
-      });
-      // Note: Schema may not enforce max - this tests current behavior
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(shouldAccept);
     });
 
     it('documents behavior for description with 4001 characters (above spec max)', () => {
       const result = OffChainMetadata.safeParse({
-        name: 'Test App',
+        ...descriptionBase,
         description: 'A'.repeat(4001),
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
       });
-      // Per spec this should fail, but schema may not enforce yet
-      // This documents current behavior for the schema gap issue
-      if (result.success) {
-        console.warn('Schema accepts description > 4000 chars - known gap');
-      }
+      if (result.success) console.warn('Schema accepts description > 4000 chars - known gap');
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Summary field: spec max 80 characters
-  // -------------------------------------------------------------------------
-  
+  const summaryBase = {
+    name: 'Test App',
+    description: 'A valid description here',
+    publisher: 'Test Publisher',
+    image: 'https://example.com/icon.png',
+  };
+
   describe('summary field (optional, spec max: 80)', () => {
-    
     it('accepts undefined summary', () => {
-      const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: 'A valid description here',
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
-      });
-      expect(result.success).toBe(true);
+      expect(OffChainMetadata.safeParse(summaryBase).success).toBe(true);
     });
 
     it('accepts empty summary', () => {
-      const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: 'A valid description here',
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
-        summary: '',
-      });
-      expect(result.success).toBe(true);
+      expect(OffChainMetadata.safeParse({ ...summaryBase, summary: '' }).success).toBe(true);
     });
 
-    it('accepts summary with 79 characters (below spec max)', () => {
+    it.each([
+      { len: 79, shouldAccept: true, label: 'below spec max' },
+      { len: 80, shouldAccept: true, label: 'at spec max' },
+    ])('$label: $len characters', ({ len, shouldAccept }) => {
       const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: 'A valid description here',
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
-        summary: 'A'.repeat(79),
+        ...summaryBase,
+        summary: 'A'.repeat(len),
       });
-      expect(result.success).toBe(true);
-    });
-
-    it('accepts summary with exactly 80 characters (at spec max)', () => {
-      const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: 'A valid description here',
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
-        summary: 'A'.repeat(80),
-      });
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(shouldAccept);
     });
 
     it('documents behavior for summary with 81 characters (above spec max)', () => {
       const result = OffChainMetadata.safeParse({
-        name: 'Test App',
-        description: 'A valid description here',
-        publisher: 'Test Publisher',
-        image: 'https://example.com/icon.png',
+        ...summaryBase,
         summary: 'A'.repeat(81),
       });
-      // Per spec this should fail, but schema may not enforce yet
-      if (result.success) {
-        console.warn('Schema accepts summary > 80 chars - known gap');
-      }
+      if (result.success) console.warn('Schema accepts summary > 80 chars - known gap');
     });
   });
 

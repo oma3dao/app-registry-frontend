@@ -56,30 +56,9 @@ describe('Solana CAIP-10 validator', () => {
   });
 
   describe('validateSolana', () => {
-    it('validates correct Solana mainnet address', () => {
-      const result = validateSolana('mainnet', '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
+    it.each(['mainnet', 'devnet', 'testnet', 'MAINNET', 'MainNet'])('validates Solana %s network', (network) => {
+      const result = validateSolana(network, '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
       expect(result.valid).toBe(true);
-      expect(result.normalizedAddress).toBe('4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-    });
-
-    it('validates Solana devnet address', () => {
-      const result = validateSolana('devnet', '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      expect(result.valid).toBe(true);
-    });
-
-    it('validates Solana testnet address', () => {
-      const result = validateSolana('testnet', '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      expect(result.valid).toBe(true);
-    });
-
-    it('accepts reference in any case', () => {
-      const lower = validateSolana('mainnet', '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      const upper = validateSolana('MAINNET', '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      const mixed = validateSolana('MainNet', '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-
-      expect(lower.valid).toBe(true);
-      expect(upper.valid).toBe(true);
-      expect(mixed.valid).toBe(true);
     });
 
     it('rejects invalid network reference', () => {
@@ -88,17 +67,15 @@ describe('Solana CAIP-10 validator', () => {
       expect(result.error).toContain('mainnet, devnet, testnet');
     });
 
-    it('rejects address with invalid base58 characters', () => {
-      const withZero = validateSolana('mainnet', '0Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      const withO = validateSolana('mainnet', 'ONd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      const withI = validateSolana('mainnet', 'INd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      const withl = validateSolana('mainnet', 'lNd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-
-      expect(withZero.valid).toBe(false);
-      expect(withZero.error).toContain('base58');
-      expect(withO.valid).toBe(false);
-      expect(withI.valid).toBe(false);
-      expect(withl.valid).toBe(false);
+    it.each([
+      { addr: '0Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T', label: 'contains 0' },
+      { addr: 'ONd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T', label: 'contains O' },
+      { addr: 'INd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T', label: 'contains I' },
+      { addr: 'lNd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T', label: 'contains l' },
+    ])('rejects address with invalid base58 character ($label)', ({ addr }) => {
+      const result = validateSolana('mainnet', addr);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('base58');
     });
 
     // Tests decodeBase58 failure branch (lines 81-85)

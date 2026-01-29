@@ -32,15 +32,18 @@ describe('OMATrust Proof Spec - Signature Verification', () => {
      * Test: Valid JWS algorithms
      * Supported: ES256, ES384, ES512 (ECDSA), EdDSA
      */
-    it('accepts valid JWS algorithms', () => {
-      const validAlgorithms = ['ES256', 'ES384', 'ES512', 'EdDSA'];
-      const invalidAlgorithms = ['none', 'HS256', 'HS384']; // Symmetric not allowed
-
-      for (const alg of validAlgorithms) {
+    it.each([
+      { alg: 'ES256', valid: true },
+      { alg: 'ES384', valid: true },
+      { alg: 'ES512', valid: true },
+      { alg: 'EdDSA', valid: true },
+      { alg: 'none', valid: false },
+      { alg: 'HS256', valid: false },
+      { alg: 'HS384', valid: false },
+    ])('validates JWS algorithm: $alg (valid: $valid)', ({ alg, valid }) => {
+      if (valid) {
         expect(alg).toMatch(/^(ES\d{3}|EdDSA)$/);
-      }
-
-      for (const alg of invalidAlgorithms) {
+      } else {
         expect(alg).not.toMatch(/^(ES\d{3}|EdDSA)$/);
       }
     });
@@ -66,9 +69,7 @@ describe('OMATrust Proof Spec - Signature Verification', () => {
      * Test: Required JWS claims
      * iss, aud, iat, proofPurpose
      */
-    it('JWS payload contains required claims', () => {
-      const requiredClaims = ['iss', 'aud', 'iat', 'proofPurpose'];
-      
+    it.each(['iss', 'aud', 'iat', 'proofPurpose'])('JWS payload contains required claim: %s', (claim) => {
       const payload = {
         iss: 'did:web:example.com',
         aud: 'did:web:controller.com',
@@ -76,10 +77,7 @@ describe('OMATrust Proof Spec - Signature Verification', () => {
         proofPurpose: 'shared-control',
         exp: Math.floor(Date.now() / 1000) + 3600,
       };
-
-      for (const claim of requiredClaims) {
-        expect(payload).toHaveProperty(claim);
-      }
+      expect(payload).toHaveProperty(claim);
     });
 
     /**

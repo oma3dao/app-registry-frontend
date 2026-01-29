@@ -20,56 +20,18 @@ describe('utils', () => {
       expect(isMobile()).toBe(false);
     });
 
-    it('returns true for mobile user agents', () => {
-      // Save original navigator
+    it.each([
+      { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)', expected: true, label: 'iPhone' },
+      { userAgent: 'Mozilla/5.0 (Linux; Android 10; SM-G975F)', expected: true, label: 'Android' },
+      { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', expected: false, label: 'Desktop' },
+    ])('returns $expected for $label user agent', ({ userAgent, expected }) => {
       const originalNavigator = window.navigator;
-      
-      // Mock mobile user agent
       Object.defineProperty(window, 'navigator', {
-        value: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)' },
+        value: { userAgent },
         writable: true,
         configurable: true
       });
-      
-      expect(isMobile()).toBe(true);
-      
-      // Restore original navigator
-      Object.defineProperty(window, 'navigator', {
-        value: originalNavigator,
-        writable: true,
-        configurable: true
-      });
-    });
-
-    it('returns true for Android user agents', () => {
-      const originalNavigator = window.navigator;
-      
-      Object.defineProperty(window, 'navigator', {
-        value: { userAgent: 'Mozilla/5.0 (Linux; Android 10; SM-G975F)' },
-        writable: true,
-        configurable: true
-      });
-      
-      expect(isMobile()).toBe(true);
-      
-      Object.defineProperty(window, 'navigator', {
-        value: originalNavigator,
-        writable: true,
-        configurable: true
-      });
-    });
-
-    it('returns false for desktop user agents', () => {
-      const originalNavigator = window.navigator;
-      
-      Object.defineProperty(window, 'navigator', {
-        value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-        writable: true,
-        configurable: true
-      });
-      
-      expect(isMobile()).toBe(false);
-      
+      expect(isMobile()).toBe(expected);
       Object.defineProperty(window, 'navigator', {
         value: originalNavigator,
         writable: true,
@@ -141,12 +103,8 @@ describe('utils', () => {
       });
     });
 
-    it('handles null input', () => {
-      expect(normalizeMetadata(null)).toEqual({});
-    });
-
-    it('handles undefined input', () => {
-      expect(normalizeMetadata(undefined)).toEqual({});
+    it.each([null, undefined])('handles %s input', (input) => {
+      expect(normalizeMetadata(input)).toEqual({});
     });
 
     it('preserves all provided fields', () => {
@@ -163,13 +121,8 @@ describe('utils', () => {
       expect(result).toEqual(input);
     });
 
-    it('handles non-array screenshotUrls', () => {
-      const result = normalizeMetadata({ screenshotUrls: 'not-an-array' });
-      expect(result.screenshotUrls).toEqual([]);
-    });
-
-    it('handles null screenshotUrls', () => {
-      const result = normalizeMetadata({ screenshotUrls: null });
+    it.each(['not-an-array', null])('handles screenshotUrls as %s', (screenshotUrls) => {
+      const result = normalizeMetadata({ screenshotUrls });
       expect(result.screenshotUrls).toEqual([]);
     });
   });
@@ -186,41 +139,15 @@ describe('fetchMetadataImage', () => {
     expect(result).toBe('https://example.com/image.png');
   });
 
-  // This test checks that fetchMetadataImage returns null if no image is present
-  it('returns null if image is missing', async () => {
+  it.each([
+    { image: undefined, label: 'missing' },
+    { image: '', label: 'empty string' },
+    { image: '   ', label: 'whitespace only' },
+    { image: 12345, label: 'not a string' },
+  ])('returns null if image is $label', async ({ image }) => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({})
-    });
-    const result = await fetchMetadataImage('https://data.com');
-    expect(result).toBeNull();
-  });
-
-  // This test checks that fetchMetadataImage returns null if image is empty string
-  it('returns null if image is empty string', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ image: '' })
-    });
-    const result = await fetchMetadataImage('https://data.com');
-    expect(result).toBeNull();
-  });
-
-  // This test checks that fetchMetadataImage returns null if image is whitespace only
-  it('returns null if image is whitespace only', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ image: '   ' })
-    });
-    const result = await fetchMetadataImage('https://data.com');
-    expect(result).toBeNull();
-  });
-
-  // This test checks that fetchMetadataImage returns null if image is not a string
-  it('returns null if image is not a string', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ image: 12345 })
+      json: async () => (image === undefined ? {} : { image })
     });
     const result = await fetchMetadataImage('https://data.com');
     expect(result).toBeNull();

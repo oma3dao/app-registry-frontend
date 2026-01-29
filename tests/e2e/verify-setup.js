@@ -37,9 +37,9 @@ const requiredWorkflows = [
 ];
 
 const requiredDocs = [
-  'README_MASTER.md',
-  'QUICK_REFERENCE.md',
-  'TEST_COVERAGE_REPORT.md',
+  'README.md',
+  'RUNNING_TESTS.md',
+  'GETTING_STARTED.md',
 ];
 
 console.log('🔍 Verifying E2E Test Suite Setup...\n');

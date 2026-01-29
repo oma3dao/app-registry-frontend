@@ -44,12 +44,10 @@ describe('OMATrust Proof Spec - Handle-Link Statement', () => {
     /**
      * Test: Statement with different handle types
      */
-    it('supports various handle types', () => {
-      for (const handleType of VALID_HANDLE_TYPES) {
-        const statement = `I am linking my ${handleType} @testuser to this wallet.`;
-        expect(statement).toContain(handleType);
-        expect(statement).toContain('@testuser');
-      }
+    it.each(VALID_HANDLE_TYPES)('supports handle type: %s', (handleType) => {
+      const statement = `I am linking my ${handleType} @testuser to this wallet.`;
+      expect(statement).toContain(handleType);
+      expect(statement).toContain('@testuser');
     });
 
     /**
@@ -80,19 +78,18 @@ describe('OMATrust Proof Spec - Handle-Link Statement', () => {
      * Test: Twitter handle format
      * Valid: alphanumeric and underscores, 1-15 chars
      */
-    it('validates Twitter handle format', () => {
-      const validHandles = ['a', 'user123', 'my_handle', 'A1_b2_C3'];
-      const invalidHandles = ['', 'too-long-handle-name', '@user', 'user@domain'];
-      
+    it.each([
+      { handle: 'a', valid: true },
+      { handle: 'user123', valid: true },
+      { handle: 'my_handle', valid: true },
+      { handle: 'A1_b2_C3', valid: true },
+      { handle: '', valid: false },
+      { handle: 'too-long-handle-name', valid: false },
+      { handle: '@user', valid: false },
+      { handle: 'user@domain', valid: false },
+    ])('validates Twitter handle: $handle (valid: $valid)', ({ handle, valid }) => {
       const twitterHandleRegex = /^[a-zA-Z0-9_]{1,15}$/;
-      
-      for (const handle of validHandles) {
-        expect(twitterHandleRegex.test(handle), `${handle} should be valid`).toBe(true);
-      }
-      
-      for (const handle of invalidHandles) {
-        expect(twitterHandleRegex.test(handle), `${handle} should be invalid`).toBe(false);
-      }
+      expect(twitterHandleRegex.test(handle)).toBe(valid);
     });
 
     /**

@@ -167,12 +167,13 @@ describe('/api/verify-and-attest', () => {
   /**
    * Test: validates required inputs
    */
-  it('returns 400 when DID is missing', async () => {
+  it.each([
+    { missing: 'DID', body: { connectedAddress: '0x1234567890123456789012345678901234567890' }, contains: 'DID is required' },
+    { missing: 'connected address', body: { did: 'did:web:example.com' }, contains: 'Connected address is required' },
+  ])('returns 400 when $missing is missing', async ({ body, contains }) => {
     const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
       method: 'POST',
-      body: JSON.stringify({
-        connectedAddress: '0x1234567890123456789012345678901234567890',
-      }),
+      body: JSON.stringify(body),
     });
 
     const response = await POST(request);
@@ -180,23 +181,7 @@ describe('/api/verify-and-attest', () => {
 
     expect(response.status).toBe(400);
     expect(data.ok).toBe(false);
-    expect(data.error).toContain('DID is required');
-  });
-
-  it('returns 400 when connected address is missing', async () => {
-    const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
-      method: 'POST',
-      body: JSON.stringify({
-        did: 'did:web:example.com',
-      }),
-    });
-
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data.ok).toBe(false);
-    expect(data.error).toContain('Connected address is required');
+    expect(data.error).toContain(contains);
   });
 
   it('returns 400 when DID type is unsupported', async () => {
@@ -543,80 +528,36 @@ describe('/api/verify-and-attest', () => {
   });
 
   /**
-   * Test: covers line 862 - omachain-testnet chain selection
-   * Tests that the testnet chain is properly selected and configured
+   * Test: omachain-testnet and omachain-mainnet chain selection
+   * Verifies each chain is selected and configured without "Invalid active chain" error.
    */
-  it('successfully selects omachain-testnet chain', async () => {
-    const originalChain = process.env.NEXT_PUBLIC_ACTIVE_CHAIN;
-    process.env.NEXT_PUBLIC_ACTIVE_CHAIN = 'omachain-testnet';
+  it.each(['omachain-testnet', 'omachain-mainnet'] as const)(
+    'successfully selects %s chain',
+    async (chain) => {
+      const originalChain = process.env.NEXT_PUBLIC_ACTIVE_CHAIN;
+      process.env.NEXT_PUBLIC_ACTIVE_CHAIN = chain;
 
-    const dns = await import('dns');
-    const { readContract } = await import('thirdweb');
-    
-    // Mock successful DNS verification
-    getMockedDnsResolve().mockResolvedValue([
-      ['v=1 caip10=eip155:1:0x1234567890123456789012345678901234567890']
-    ]);
+      getMockedDnsResolve().mockResolvedValue([
+        ['v=1 caip10=eip155:1:0x1234567890123456789012345678901234567890'],
+      ]);
+      const { readContract } = await import('thirdweb');
+      vi.mocked(readContract).mockResolvedValue('0x0000000000000000000000000000000000000000');
 
-    // Mock no existing attestation
-    vi.mocked(readContract).mockResolvedValue('0x0000000000000000000000000000000000000000');
+      const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
+        method: 'POST',
+        body: JSON.stringify({
+          did: 'did:web:example.com',
+          connectedAddress: '0x1234567890123456789012345678901234567890',
+        }),
+      });
 
-    const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
-      method: 'POST',
-      body: JSON.stringify({
-        did: 'did:web:example.com',
-        connectedAddress: '0x1234567890123456789012345678901234567890',
-      }),
-    });
+      const response = await POST(request);
+      const data = await response.json();
 
-    const response = await POST(request);
-    const data = await response.json();
-
-    // Should process with testnet chain (line 862 executed)
-    // Either success or expected error, but not chain config error
-    expect(data.error).not.toBe('Invalid active chain');
-
-    // Restore
-    process.env.NEXT_PUBLIC_ACTIVE_CHAIN = originalChain;
-  });
-
-  /**
-   * Test: covers line 864 - omachain-mainnet chain selection
-   * Tests that the mainnet chain is properly selected and configured
-   */
-  it('successfully selects omachain-mainnet chain', async () => {
-    const originalChain = process.env.NEXT_PUBLIC_ACTIVE_CHAIN;
-    process.env.NEXT_PUBLIC_ACTIVE_CHAIN = 'omachain-mainnet';
-
-    const dns = await import('dns');
-    const { readContract } = await import('thirdweb');
-    
-    // Mock successful DNS verification
-    getMockedDnsResolve().mockResolvedValue([
-      ['v=1 caip10=eip155:1:0x1234567890123456789012345678901234567890']
-    ]);
-
-    // Mock no existing attestation
-    vi.mocked(readContract).mockResolvedValue('0x0000000000000000000000000000000000000000');
-
-    const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
-      method: 'POST',
-      body: JSON.stringify({
-        did: 'did:web:example.com',
-        connectedAddress: '0x1234567890123456789012345678901234567890',
-      }),
-    });
-
-    const response = await POST(request);
-    const data = await response.json();
-
-    // Should process with mainnet chain (line 864 executed)
-    // Either success or expected error, but not chain config error
-    expect(data.error).not.toBe('Invalid active chain');
-
-    // Restore
-    process.env.NEXT_PUBLIC_ACTIVE_CHAIN = originalChain;
-  });
+      expect(data.error).not.toBe('Invalid active chain');
+      process.env.NEXT_PUBLIC_ACTIVE_CHAIN = originalChain;
+    }
+  );
 
   it('returns 500 when Thirdweb client ID is missing', async () => {
     delete process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
@@ -1911,29 +1852,18 @@ it('returns 500 when all attestation writes fail', async () => {
     });
   });
 
-  /**
-   * Test: checkExistingAttestations edge cases
-   */
   describe('checkExistingAttestations error handling', () => {
-    it('handles RPC timeout errors gracefully', async () => {
-      // Test timeout error handling
+    it.each([
+      { label: 'RPC timeout', err: 'timeout connecting to RPC' },
+      { label: 'network connection', err: 'network connection failed' },
+    ])('handles $label errors gracefully', async ({ err }) => {
       const { sendTransaction } = await import('thirdweb');
-      
       vi.mocked(thirdweb.readContract).mockReset()
-        .mockRejectedValueOnce(new Error('timeout connecting to RPC')) // Initial check fails
-        .mockResolvedValueOnce('0xABCDEF1234567890123456789012345678901234'); // Post-write check
-
-      getMockedDnsResolve().mockResolvedValue([
-        ['v=1 caip10=eip155:1:0xABCDEF1234567890123456789012345678901234'],
-      ]);
-      
-      // Ensure issuer key is available
+        .mockRejectedValueOnce(new Error(err))
+        .mockResolvedValueOnce('0xABCDEF1234567890123456789012345678901234');
+      getMockedDnsResolve().mockResolvedValue([['v=1 caip10=eip155:1:0xABCDEF1234567890123456789012345678901234']]);
       vi.mocked(loadIssuerPrivateKey).mockReturnValue(mockEnv.ISSUER_PRIVATE_KEY);
-
-      // Mock successful transaction write
-      vi.mocked(sendTransaction).mockResolvedValue({
-        transactionHash: '0xtxhashtimeout',
-      } as any);
+      vi.mocked(sendTransaction).mockResolvedValue({ transactionHash: '0xtxhash' } as any);
 
       const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
         method: 'POST',
@@ -1946,46 +1876,6 @@ it('returns 500 when all attestation writes fail', async () => {
       });
 
       const response = await POST(request);
-      const data = await response.json();
-
-      // Should still attempt verification despite attestation check failure
-      expect(response.status).toBe(200);
-    });
-
-    it('handles network connection errors gracefully', async () => {
-      // Test network error handling
-      const { sendTransaction } = await import('thirdweb');
-      
-      vi.mocked(thirdweb.readContract).mockReset()
-        .mockRejectedValueOnce(new Error('network connection failed')) // Initial check fails
-        .mockResolvedValueOnce('0xABCDEF1234567890123456789012345678901234'); // Post-write check
-
-      getMockedDnsResolve().mockResolvedValue([
-        ['v=1 caip10=eip155:1:0xABCDEF1234567890123456789012345678901234'],
-      ]);
-      
-      // Ensure issuer key is available
-      vi.mocked(loadIssuerPrivateKey).mockReturnValue(mockEnv.ISSUER_PRIVATE_KEY);
-
-      // Mock successful transaction write
-      vi.mocked(sendTransaction).mockResolvedValue({
-        transactionHash: '0xtxhashnetwork',
-      } as any);
-
-      const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          did: 'did:web:example.com',
-          connectedAddress: '0xABCDEF1234567890123456789012345678901234',
-          requiredSchemas: ['oma3.ownership.v1'],
-        }),
-      });
-
-      const response = await POST(request);
-      const data = await response.json();
-
-      // Should still attempt verification
       expect(response.status).toBe(200);
     });
   });

@@ -104,21 +104,14 @@ describe('Integration: DID Resolution Flow', () => {
       expect(syntheticDocument.verificationMethod[0].blockchainAccountId).toContain(address);
     });
 
-    it('validates did:pkh chain support', () => {
-      /**
-       * Flow: Verify supported chains for did:pkh
-       */
-      const supportedChains = [
-        { namespace: 'eip155', chainId: '1', name: 'Ethereum Mainnet' },
-        { namespace: 'eip155', chainId: '137', name: 'Polygon' },
-        { namespace: 'eip155', chainId: '66238', name: 'OMAChain Testnet' },
-        { namespace: 'solana', chainId: 'mainnet', name: 'Solana' },
-      ];
-      
-      supportedChains.forEach(chain => {
-        const did = `did:pkh:${chain.namespace}:${chain.chainId}:0x${'0'.repeat(40)}`;
-        expect(did).toMatch(/^did:pkh:[a-z0-9]+:[a-zA-Z0-9]+:0x[0-9]+$/);
-      });
+    it.each([
+      { namespace: 'eip155', chainId: '1', name: 'Ethereum Mainnet' },
+      { namespace: 'eip155', chainId: '137', name: 'Polygon' },
+      { namespace: 'eip155', chainId: '66238', name: 'OMAChain Testnet' },
+      { namespace: 'solana', chainId: 'mainnet', name: 'Solana' },
+    ])('validates did:pkh chain support for $name', ({ namespace, chainId }) => {
+      const did = `did:pkh:${namespace}:${chainId}:0x${'0'.repeat(40)}`;
+      expect(did).toMatch(/^did:pkh:[a-z0-9]+:[a-zA-Z0-9]+:0x[0-9]+$/);
     });
   });
 
@@ -135,19 +128,12 @@ describe('Integration: DID Resolution Flow', () => {
       expect(parts[2]).toMatch(/^baf/); // CIDv1 with base32
     });
 
-    it('validates did:artifact CID format', () => {
-      /**
-       * Flow: CID must be valid CIDv1 with base32-lower
-       */
-      const validCIDs = [
-        'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
-        'bafkreigaknpexyvxt76xkl6vpp7lfkqhjpq5gv77uueljjwjfxxglgonai',
-      ];
-      
-      validCIDs.forEach(cid => {
-        // CIDv1 with base32 starts with 'bafy' or 'bafk'
-        expect(cid).toMatch(/^baf[a-z2-7]+$/);
-      });
+    it.each([
+      'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
+      'bafkreigaknpexyvxt76xkl6vpp7lfkqhjpq5gv77uueljjwjfxxglgonai',
+    ])('validates did:artifact CID format: %s', (cid) => {
+      // CIDv1 with base32 starts with 'bafy' or 'bafk'
+      expect(cid).toMatch(/^baf[a-z2-7]+$/);
     });
   });
 

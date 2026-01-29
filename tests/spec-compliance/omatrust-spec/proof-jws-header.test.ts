@@ -73,16 +73,9 @@ describe('OMATrust Proof Spec: JWS Header Claims (Extended)', () => {
       expect(header.jwk.crv).toBe('Ed25519');
     });
 
-    it('rejects unsupported algorithms', () => {
-      /**
-       * None and other insecure algorithms should be rejected
-       */
-      const unsupportedAlgorithms = ['none', 'HS256', 'HS384', 'HS512'];
-      
-      unsupportedAlgorithms.forEach(alg => {
-        const isSupported = Object.keys(supportedAlgorithms).includes(alg);
-        expect(isSupported).toBe(false);
-      });
+    it.each(['none', 'HS256', 'HS384', 'HS512'])('rejects unsupported algorithm: %s', (alg) => {
+      const isSupported = Object.keys(supportedAlgorithms).includes(alg);
+      expect(isSupported).toBe(false);
     });
   });
 
@@ -188,21 +181,17 @@ describe('OMATrust Proof Spec: JWS Header Claims (Extended)', () => {
       expect(mockSignature.length).toBe(2 + eddsaSignatureLength);
     });
 
-    it('rejects malformed signatures', () => {
-      /**
-       * Signatures must be valid hex
-       */
-      const malformedSignatures = [
-        '', // Empty
-        '0x', // Just prefix
-        '0xGGGG', // Invalid hex chars
-        'not-hex-at-all',
-      ];
-      
-      malformedSignatures.forEach(sig => {
-        const isValidHex = /^0x[a-fA-F0-9]+$/.test(sig) && sig.length > 2;
-        expect(isValidHex).toBe(false);
-      });
+    /**
+     * Signatures must be valid hex
+     */
+    it.each([
+      { sig: '', label: 'empty string' },
+      { sig: '0x', label: 'just prefix' },
+      { sig: '0xGGGG', label: 'invalid hex chars' },
+      { sig: 'not-hex-at-all', label: 'not hex at all' },
+    ])('rejects malformed signature: $label', ({ sig }) => {
+      const isValidHex = /^0x[a-fA-F0-9]+$/.test(sig) && sig.length > 2;
+      expect(isValidHex).toBe(false);
     });
   });
 
@@ -259,30 +248,21 @@ describe('OMATrust Proof Spec: JWS Header Claims (Extended)', () => {
       expect(nonces.size).toBe(100);
     });
 
-    it('validates issuer DID format', () => {
-      /**
-       * iss must be a valid DID
-       */
-      const validIssuers = [
-        'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
-        'did:pkh:eip155:1:0x1234567890123456789012345678901234567890',
-        'did:web:example.com',
-      ];
-      
-      const invalidIssuers = [
-        'not-a-did',
-        'did:',
-        'example.com',
-        '0x1234',
-      ];
-      
-      validIssuers.forEach(iss => {
-        expect(iss).toMatch(/^did:[a-z0-9]+:.+$/);
-      });
-      
-      invalidIssuers.forEach(iss => {
-        expect(iss).not.toMatch(/^did:[a-z0-9]+:.+$/);
-      });
+    it.each([
+      'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+      'did:pkh:eip155:1:0x1234567890123456789012345678901234567890',
+      'did:web:example.com',
+    ])('validates valid issuer DID format: %s', (iss) => {
+      expect(iss).toMatch(/^did:[a-z0-9]+:.+$/);
+    });
+
+    it.each([
+      'not-a-did',
+      'did:',
+      'example.com',
+      '0x1234',
+    ])('rejects invalid issuer DID format: %s', (iss) => {
+      expect(iss).not.toMatch(/^did:[a-z0-9]+:.+$/);
     });
   });
 });

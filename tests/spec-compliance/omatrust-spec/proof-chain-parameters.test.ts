@@ -30,35 +30,27 @@ describe('OMATrust Proof Spec Appendix A - Chain Parameters', () => {
      * Test: Common L1 chains are supported
      * BSC, Polygon, Avalanche, etc.
      */
-    it('supports major L1 chains', () => {
-      const majorL1s = [
-        { id: 1, name: 'ethereum' },
-        { id: 56, name: 'bsc' },
-        { id: 137, name: 'polygon' },
-        { id: 43114, name: 'avalanche' },
-      ];
-
-      for (const chain of majorL1s) {
-        const found = getChainById(chain.id);
-        expect(found, `Chain ${chain.name} (${chain.id}) should be supported`).toBeDefined();
-      }
+    it.each([
+      { id: 1, name: 'ethereum' },
+      { id: 56, name: 'bsc' },
+      { id: 137, name: 'polygon' },
+      { id: 43114, name: 'avalanche' },
+    ])('supports major L1 chain $name (chainId: $id)', ({ id, name }) => {
+      const found = getChainById(id);
+      expect(found, `Chain ${name} (${id}) should be supported`).toBeDefined();
     });
 
     /**
      * Test: L2 scaling solutions are supported
      * Arbitrum, Optimism, Base, zkSync, etc.
      */
-    it('supports L2 scaling solutions', () => {
-      const l2Chains = [
-        { id: 42161, name: 'arbitrum' },
-        { id: 10, name: 'optimism' },
-        { id: 8453, name: 'base' },
-      ];
-
-      for (const chain of l2Chains) {
-        const found = getChainById(chain.id);
-        expect(found, `L2 ${chain.name} (${chain.id}) should be supported`).toBeDefined();
-      }
+    it.each([
+      { id: 42161, name: 'arbitrum' },
+      { id: 10, name: 'optimism' },
+      { id: 8453, name: 'base' },
+    ])('supports L2 scaling solution $name (chainId: $id)', ({ id, name }) => {
+      const found = getChainById(id);
+      expect(found, `L2 ${name} (${id}) should be supported`).toBeDefined();
     });
 
     /**

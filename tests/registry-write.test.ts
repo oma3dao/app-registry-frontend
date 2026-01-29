@@ -233,31 +233,14 @@ describe('Registry Write Functions', () => {
       expect(result.params).toHaveLength(3);
     });
 
-    // Tests Active status
-    it('converts Active status to 0', () => {
-      mockStatusInput.status = 'Active';
-      
+    it.each([
+      { status: 'Active' as const, expected: 0 },
+      { status: 'Deprecated' as const, expected: 1 },
+      { status: 'Replaced' as const, expected: 2 },
+    ])('converts $status status to $expected', ({ status, expected }) => {
+      mockStatusInput.status = status;
       const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(0);
-    });
-
-    // Tests Deprecated status
-    it('converts Deprecated status to 1', () => {
-      mockStatusInput.status = 'Deprecated';
-      
-      const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(1); // Deprecated = 1
-    });
-
-    // Tests Replaced status
-    it('converts Replaced status to 2', () => {
-      mockStatusInput.status = 'Replaced';
-      
-      const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(2);
+      expect(result.params[2]).toBe(expected);
     });
 
     // Tests DID normalization

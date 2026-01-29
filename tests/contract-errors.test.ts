@@ -244,29 +244,23 @@ describe('Contract Errors', () => {
     });
 
     /**
-     * Test: covers line 92 branch - errorData is an empty string
+     * Test: covers line 92 branch - errorData is falsy, non-string, or invalid format.
+     * All yield CONTRACT_REVERT with "Transaction reverted".
      */
-    it('handles error data that is an empty string', () => {
+    it.each([
+      { label: 'empty string', data: '' },
+      { label: 'uppercase 0X prefix', data: '0Xdeadbeef0000000000000000000000000000000000000000000000000000000000000000' },
+      { label: '0', data: 0 },
+      { label: 'false', data: false },
+      { label: 'number', data: 12345 },
+      { label: 'array', data: ['0xdeadbeef'] },
+      { label: 'boolean true', data: true },
+      { label: 'object', data: { someProperty: 'value' } },
+    ])('handles error when data is $label', ({ data }) => {
       const error: any = new Error('execution reverted');
-      error.data = ''; // Empty string
-
+      error.data = data;
       const result = normalizeEvmError(error);
-
       expect(result.code).toBe('CONTRACT_REVERT');
-      expect(result.message).toBe('Transaction reverted');
-    });
-
-    /**
-     * Test: covers line 92 branch - errorData starts with 0X (uppercase)
-     */
-    it('handles error data with uppercase 0X prefix', () => {
-      const error: any = new Error('execution reverted');
-      error.data = '0Xdeadbeef0000000000000000000000000000000000000000000000000000000000000000'; // Uppercase 0X
-
-      const result = normalizeEvmError(error);
-
-      expect(result.code).toBe('CONTRACT_REVERT');
-      // startsWith('0x') is case-sensitive, so this won't match
       expect(result.message).toBe('Transaction reverted');
     });
 
@@ -350,85 +344,6 @@ describe('Contract Errors', () => {
         message: 'execution reverted',
         // no data, error, or cause properties
       };
-
-      const result = normalizeEvmError(error);
-
-      expect(result.code).toBe('CONTRACT_REVERT');
-      expect(result.message).toBe('Transaction reverted');
-    });
-
-    /**
-     * Test: covers line 92 branch - errorData is 0 (falsy number)
-     */
-    it('handles error when data is 0', () => {
-      const error: any = new Error('execution reverted');
-      error.data = 0; // falsy number
-
-      const result = normalizeEvmError(error);
-
-      expect(result.code).toBe('CONTRACT_REVERT');
-      expect(result.message).toBe('Transaction reverted');
-    });
-
-    /**
-     * Test: covers line 92 branch - errorData is false
-     */
-    it('handles error when data is false', () => {
-      const error: any = new Error('execution reverted');
-      error.data = false; // falsy boolean
-
-      const result = normalizeEvmError(error);
-
-      expect(result.code).toBe('CONTRACT_REVERT');
-      expect(result.message).toBe('Transaction reverted');
-    });
-
-    /**
-     * Test: covers lines 110-139 - error selector matching logic
-     * Tests error with non-string data
-     */
-    it('handles error data that is not a string', () => {
-      const error: any = new Error('execution reverted');
-      error.data = { someProperty: 'value' }; // Non-string data
-
-      const result = normalizeEvmError(error);
-
-      expect(result.code).toBe('CONTRACT_REVERT');
-      expect(result.message).toBe('Transaction reverted');
-    });
-
-    /**
-     * Test: covers line 92 branch - errorData is a number
-     */
-    it('handles error data that is a number', () => {
-      const error: any = new Error('execution reverted');
-      error.data = 12345; // Number data
-
-      const result = normalizeEvmError(error);
-
-      expect(result.code).toBe('CONTRACT_REVERT');
-      expect(result.message).toBe('Transaction reverted');
-    });
-
-    /**
-     * Test: covers line 92 branch - errorData is an array
-     */
-    it('handles error data that is an array', () => {
-      const error: any = new Error('execution reverted');
-      error.data = ['0xdeadbeef']; // Array data
-
-      const result = normalizeEvmError(error);
-
-      expect(result.code).toBe('CONTRACT_REVERT');
-      expect(result.message).toBe('Transaction reverted');
-    });
-
-    /**
-     * Test: covers line 92 branch - errorData is a boolean
-     */
-    it('handles error data that is a boolean', () => {
-      const error: any = new Error('execution reverted');
-      error.data = true; // Boolean data
 
       const result = normalizeEvmError(error);
 

@@ -61,59 +61,17 @@ describe('Network Failure and Error Recovery', () => {
 
   describe('Contract Read Failures', () => {
     /**
-     * Test: Network timeout handling
+     * getAppByDid returns null on network errors, invalid response, or malformed data.
      */
-    it('handles network timeout gracefully', async () => {
-      vi.mocked(readContract).mockRejectedValueOnce(new Error('Request timeout'));
-
+    it.each([
+      { label: 'network timeout', mock: () => vi.mocked(readContract).mockRejectedValueOnce(new Error('Request timeout')) },
+      { label: 'connection refused', mock: () => vi.mocked(readContract).mockRejectedValueOnce(new Error('ECONNREFUSED')) },
+      { label: 'RPC rate limit', mock: () => vi.mocked(readContract).mockRejectedValueOnce(new Error('429 Too Many Requests')) },
+      { label: 'invalid response (null)', mock: () => vi.mocked(readContract).mockResolvedValueOnce(null) },
+      { label: 'malformed contract response', mock: () => vi.mocked(readContract).mockResolvedValueOnce({ invalid: 'data' }) },
+    ])('handles $label gracefully', async ({ mock }) => {
+      mock();
       const app = await getAppByDid('did:web:example.com');
-      
-      // Should return null instead of throwing
-      expect(app).toBeNull();
-    });
-
-    /**
-     * Test: Connection refused error
-     */
-    it('handles connection refused error', async () => {
-      vi.mocked(readContract).mockRejectedValueOnce(new Error('ECONNREFUSED'));
-
-      const app = await getAppByDid('did:web:example.com');
-      
-      expect(app).toBeNull();
-    });
-
-    /**
-     * Test: RPC rate limiting
-     */
-    it('handles RPC rate limit errors', async () => {
-      vi.mocked(readContract).mockRejectedValueOnce(new Error('429 Too Many Requests'));
-
-      const app = await getAppByDid('did:web:example.com');
-      
-      expect(app).toBeNull();
-    });
-
-    /**
-     * Test: Invalid response format
-     */
-    it('handles invalid response format', async () => {
-      vi.mocked(readContract).mockResolvedValueOnce(null);
-
-      const app = await getAppByDid('did:web:example.com');
-      
-      expect(app).toBeNull();
-    });
-
-    /**
-     * Test: Malformed contract response
-     */
-    it('handles malformed contract response', async () => {
-      vi.mocked(readContract).mockResolvedValueOnce({ invalid: 'data' });
-
-      const app = await getAppByDid('did:web:example.com');
-      
-      // Should handle gracefully
       expect(app).toBeNull();
     });
   });
@@ -175,49 +133,21 @@ describe('Network Failure and Error Recovery', () => {
   });
 
   describe('Error Propagation', () => {
-    /**
-     * Test: Errors in getAppsByOwner are propagated
-     */
-    it('propagates errors in getAppsByOwner', async () => {
+    it.each([
+      { label: 'getAppsByOwner', fn: () => getAppsByOwner('0x1234567890123456789012345678901234567890') },
+      { label: 'listActiveApps', fn: () => listActiveApps() },
+    ])('propagates errors in $label', async ({ fn }) => {
       vi.mocked(readContract).mockRejectedValueOnce(new Error('Contract error'));
-
-      await expect(getAppsByOwner('0x1234567890123456789012345678901234567890')).rejects.toThrow();
-    });
-
-    /**
-     * Test: Errors in listActiveApps are propagated
-     */
-    it('propagates errors in listActiveApps', async () => {
-      vi.mocked(readContract).mockRejectedValueOnce(new Error('Contract error'));
-
-      await expect(listActiveApps()).rejects.toThrow();
+      await expect(fn()).rejects.toThrow();
     });
   });
 
   describe('Attestation Query Failures', () => {
-    /**
-     * Test: EAS service unavailable
-     */
-    it('handles EAS service unavailable', async () => {
+    it('returns empty array when EAS unavailable or invalid schema', async () => {
       const { getAttestationsForDID } = await import('@/lib/attestation-queries');
       vi.mocked(getAttestationsForDID).mockResolvedValueOnce([]);
-
       const result = await getAttestationsForDID('did:web:example.com', 5);
-      
-      // Should return empty array instead of throwing
       expect(result).toEqual([]);
-    });
-
-    /**
-     * Test: Invalid schema UID
-     */
-    it('handles invalid schema UID gracefully', async () => {
-      const { getAttestationsForDID } = await import('@/lib/attestation-queries');
-      vi.mocked(getAttestationsForDID).mockResolvedValueOnce([]);
-
-      const result = await getAttestationsForDID('did:web:example.com', 5);
-      
-      expect(Array.isArray(result)).toBe(true);
     });
   });
 

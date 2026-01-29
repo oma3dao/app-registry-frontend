@@ -128,34 +128,18 @@ describe('OMATrust Proof Spec: Verification Rules', () => {
       'tx-interaction': ['tx'],
     };
 
-    it('pop-jws only supports JWS format', () => {
-      const validFormats = proofTypeFormats['pop-jws'];
-      expect(validFormats).toContain('jws');
-      expect(validFormats).not.toContain('eip712');
-    });
-
-    it('pop-eip712 only supports EIP-712 format', () => {
-      const validFormats = proofTypeFormats['pop-eip712'];
-      expect(validFormats).toContain('eip712');
-      expect(validFormats).not.toContain('jws');
-    });
-
-    it('x402 proofs support both JWS and EIP-712', () => {
-      const receiptFormats = proofTypeFormats['x402-receipt'];
-      const offerFormats = proofTypeFormats['x402-offer'];
-      
-      expect(receiptFormats).toContain('jws');
-      expect(receiptFormats).toContain('eip712');
-      expect(offerFormats).toContain('jws');
-      expect(offerFormats).toContain('eip712');
-    });
-
-    it('transaction proofs use blockchain format', () => {
-      const txEncodedFormats = proofTypeFormats['tx-encoded-value'];
-      const txInteractionFormats = proofTypeFormats['tx-interaction'];
-      
-      expect(txEncodedFormats).toContain('tx');
-      expect(txInteractionFormats).toContain('tx');
+    it.each([
+      { type: 'pop-jws', formats: ['jws'], contains: ['jws'], notContains: ['eip712'], label: 'only supports JWS format' },
+      { type: 'pop-eip712', formats: ['eip712'], contains: ['eip712'], notContains: ['jws'], label: 'only supports EIP-712 format' },
+      { type: 'x402-receipt', formats: ['jws', 'eip712'], contains: ['jws', 'eip712'], notContains: [], label: 'supports both JWS and EIP-712' },
+      { type: 'x402-offer', formats: ['jws', 'eip712'], contains: ['jws', 'eip712'], notContains: [], label: 'supports both JWS and EIP-712' },
+      { type: 'tx-encoded-value', formats: ['tx'], contains: ['tx'], notContains: [], label: 'uses blockchain format' },
+      { type: 'tx-interaction', formats: ['tx'], contains: ['tx'], notContains: [], label: 'uses blockchain format' },
+    ])('$type $label', ({ type, formats, contains, notContains }) => {
+      const validFormats = proofTypeFormats[type as keyof typeof proofTypeFormats];
+      expect(validFormats).toEqual(formats);
+      contains.forEach(fmt => expect(validFormats).toContain(fmt));
+      notContains.forEach(fmt => expect(validFormats).not.toContain(fmt));
     });
   });
 

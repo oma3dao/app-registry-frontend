@@ -38,14 +38,11 @@ describe('EVM CAIP-10 validator', () => {
       expect(arbitrum.chainId).toBe(42161);
     });
 
-    it('rejects non-numeric chain ID', () => {
-      const result = validateEvm('mainnet', validAddress);
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('numeric chainId');
-    });
-
-    it('rejects negative chain ID', () => {
-      const result = validateEvm('-1', validAddress);
+    it.each([
+      { chainId: 'mainnet', label: 'non-numeric chain ID' },
+      { chainId: '-1', label: 'negative chain ID' },
+    ])('rejects $label', ({ chainId }) => {
+      const result = validateEvm(chainId, validAddress);
       expect(result.valid).toBe(false);
       expect(result.error).toContain('numeric chainId');
     });
@@ -147,24 +144,13 @@ describe('EVM CAIP-10 validator', () => {
       expect(result).toMatch(/^0x[0-9a-fA-F]{40}$/);
     });
 
-    it('returns error for invalid address format', () => {
-      const result = toEip55('not-an-address');
-      expect(result).toBeInstanceOf(Error);
-    });
-
-    it('returns error for address with non-hex', () => {
-      const result = toEip55('0xGHIJ567890123456789012345678901234567890');
-      expect(result).toBeInstanceOf(Error);
-    });
-
-    it('returns error for uppercase 0X prefix', () => {
-      const result = toEip55('0X1234567890123456789012345678901234567890');
-      expect(result).toBeInstanceOf(Error);
-    });
-
-    it('returns error for wrong length', () => {
-      const result = toEip55('0x12345');
-      expect(result).toBeInstanceOf(Error);
+    it.each([
+      { address: 'not-an-address', label: 'invalid address format' },
+      { address: '0xGHIJ567890123456789012345678901234567890', label: 'address with non-hex' },
+      { address: '0X1234567890123456789012345678901234567890', label: 'uppercase 0X prefix' },
+      { address: '0x12345', label: 'wrong length' },
+    ])('returns error for $label', ({ address }) => {
+      expect(toEip55(address)).toBeInstanceOf(Error);
     });
 
     it('handles zero address', () => {
@@ -174,47 +160,26 @@ describe('EVM CAIP-10 validator', () => {
   });
 
   describe('isEvmAddress', () => {
-    it('returns true for valid address', () => {
-      expect(isEvmAddress(validAddress)).toBe(true);
+    it.each([
+      validAddress,
+      validAddress.toLowerCase(),
+      '0xAbCdEf1234567890123456789012345678901234',
+      '0x0000000000000000000000000000000000000000',
+      '0xffffffffffffffffffffffffffffffffffffffff',
+    ])('returns true for valid-style address: %s', (addr) => {
+      expect(isEvmAddress(addr)).toBe(true);
     });
 
-    it('returns true for lowercase address', () => {
-      expect(isEvmAddress(validAddress.toLowerCase())).toBe(true);
-    });
-
-    it('returns true for mixed case hex address', () => {
-      expect(isEvmAddress('0xAbCdEf1234567890123456789012345678901234')).toBe(true);
-    });
-
-    it('returns false for uppercase 0X prefix', () => {
-      // ethers.isAddress rejects uppercase 0X prefix
-      expect(isEvmAddress('0X1234567890123456789012345678901234567890')).toBe(false);
-    });
-
-    it('returns false for address without 0x', () => {
-      expect(isEvmAddress(validAddress.slice(2))).toBe(false);
-    });
-
-    it('returns false for non-hex characters', () => {
-      expect(isEvmAddress('0xGHIJK67890123456789012345678901234567890')).toBe(false);
-    });
-
-    it('returns false for invalid format', () => {
-      expect(isEvmAddress('not-an-address')).toBe(false);
-      expect(isEvmAddress('')).toBe(false);
-    });
-
-    it('returns false for wrong length', () => {
-      expect(isEvmAddress('0x12345')).toBe(false);
-      expect(isEvmAddress('0x' + '1'.repeat(41))).toBe(false);
-    });
-
-    it('returns true for zero address', () => {
-      expect(isEvmAddress('0x0000000000000000000000000000000000000000')).toBe(true);
-    });
-
-    it('returns true for all-F address', () => {
-      expect(isEvmAddress('0xffffffffffffffffffffffffffffffffffffffff')).toBe(true);
+    it.each([
+      { addr: '0X1234567890123456789012345678901234567890', label: 'uppercase 0X prefix' },
+      { addr: validAddress.slice(2), label: 'address without 0x' },
+      { addr: '0xGHIJK67890123456789012345678901234567890', label: 'non-hex characters' },
+      { addr: 'not-an-address', label: 'invalid format' },
+      { addr: '', label: 'empty string' },
+      { addr: '0x12345', label: 'wrong length (short)' },
+      { addr: '0x' + '1'.repeat(41), label: 'wrong length (long)' },
+    ])('returns false for $label', ({ addr }) => {
+      expect(isEvmAddress(addr)).toBe(false);
     });
   });
 

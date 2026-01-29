@@ -608,10 +608,9 @@ describe('OMATrust Proof Spec 5.1 - Proof Taxonomy', () => {
     it('should prevent non-signers from using signature-based proofTypes - OT-PF-004', () => {
       const signatureBasedTypes = ['pop-jws', 'pop-eip712'];
       const nonSignatureTypes = ['evidence-pointer', 'tx-interaction'];
-      
-      // Non-signers should only use non-signature types
       const nonSignerAllowedTypes = nonSignatureTypes;
       
+      // Non-signers should only use non-signature types
       signatureBasedTypes.forEach(type => {
         expect(nonSignerAllowedTypes).not.toContain(type);
       });

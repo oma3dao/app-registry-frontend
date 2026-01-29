@@ -298,8 +298,7 @@ npx playwright show-report
 
 1. **Check Documentation:**
    - `README.md` - Main guide
-   - `QUICK_REFERENCE.md` - Quick commands
-   - `INDEX.md` - Documentation index
+   - `RUNNING_TESTS.md` - How to run tests (quick commands)
 
 2. **Verify Setup:**
    ```bash

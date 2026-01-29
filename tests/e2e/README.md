@@ -9,8 +9,7 @@
 
 ### Quick Start
 - **[GETTING_STARTED.md](GETTING_STARTED.md)** - Start here for setup
-- **[QUICK_START.md](QUICK_START.md)** - Quick commands reference
-- **[RUNNING_TESTS.md](RUNNING_TESTS.md)** - How to run tests
+- **[RUNNING_TESTS.md](RUNNING_TESTS.md)** - How to run tests (includes quick commands)
 
 ### Testing Guides
 - **[ACCESSIBILITY_TESTING_GUIDE.md](ACCESSIBILITY_TESTING_GUIDE.md)** - Accessibility testing
@@ -32,7 +31,6 @@
 - **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Migration strategies
 
 ### Reference
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference card
 - **[TEST_MATRIX.md](TEST_MATRIX.md)** - Test coverage matrix
 - **[TEST_METRICS.md](TEST_METRICS.md)** - Metrics and KPIs
 - **[TEST_UTILITIES_EXPANSION.md](TEST_UTILITIES_EXPANSION.md)** - Utility functions

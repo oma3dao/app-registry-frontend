@@ -37,28 +37,21 @@ describe('app-converter utilities', () => {
       });
     });
 
-    it('formats version correctly with non-zero patch', () => {
-      const app = { ...mockAppSummary, currentVersion: { major: 2, minor: 1, patch: 5 } };
-      const nft = appSummaryToNFT(app);
-      expect(nft.version).toBe('2.1.5');
+    it.each([
+      { version: { major: 2, minor: 1, patch: 5 }, expected: '2.1.5', label: 'non-zero patch' },
+      { version: { major: 2, minor: 1, patch: 0 }, expected: '2.1', label: 'zero patch' },
+    ])('formats version correctly with $label', ({ version, expected }) => {
+      const app = { ...mockAppSummary, currentVersion: version };
+      expect(appSummaryToNFT(app).version).toBe(expected);
     });
 
-    it('formats version correctly with zero patch', () => {
-      const app = { ...mockAppSummary, currentVersion: { major: 2, minor: 1, patch: 0 } };
-      const nft = appSummaryToNFT(app);
-      expect(nft.version).toBe('2.1');
-    });
-
-    it('handles deprecated status', () => {
-      const app = { ...mockAppSummary, status: 'Deprecated' as const };
-      const nft = appSummaryToNFT(app);
-      expect(nft.status).toBe(1);
-    });
-
-    it('handles replaced status', () => {
-      const app = { ...mockAppSummary, status: 'Replaced' as const };
-      const nft = appSummaryToNFT(app);
-      expect(nft.status).toBe(2);
+    it.each([
+      { status: 'Active' as const, expected: 0 },
+      { status: 'Deprecated' as const, expected: 1 },
+      { status: 'Replaced' as const, expected: 2 },
+    ])('handles $status status', ({ status, expected }) => {
+      const app = { ...mockAppSummary, status };
+      expect(appSummaryToNFT(app).status).toBe(expected);
     });
 
     it('handles missing optional fields', () => {
@@ -145,84 +138,41 @@ describe('app-converter utilities', () => {
   });
 
   describe('hasInterface', () => {
-    it('detects human interface (bit 0 = 1)', () => {
-      expect(hasInterface(0b001, 'human')).toBe(true);
-      expect(hasInterface(0b111, 'human')).toBe(true);
-      expect(hasInterface(0b000, 'human')).toBe(false);
-      expect(hasInterface(0b110, 'human')).toBe(false);
-    });
-
-    it('detects api interface (bit 1 = 2)', () => {
-      expect(hasInterface(0b010, 'api')).toBe(true);
-      expect(hasInterface(0b111, 'api')).toBe(true);
-      expect(hasInterface(0b000, 'api')).toBe(false);
-      expect(hasInterface(0b101, 'api')).toBe(false);
-    });
-
-    it('detects contract interface (bit 2 = 4)', () => {
-      expect(hasInterface(0b100, 'contract')).toBe(true);
-      expect(hasInterface(0b111, 'contract')).toBe(true);
-      expect(hasInterface(0b000, 'contract')).toBe(false);
-      expect(hasInterface(0b011, 'contract')).toBe(false);
-    });
-
-    it('handles multiple interfaces', () => {
-      const bitmap = 0b111; // All interfaces
-      expect(hasInterface(bitmap, 'human')).toBe(true);
-      expect(hasInterface(bitmap, 'api')).toBe(true);
-      expect(hasInterface(bitmap, 'contract')).toBe(true);
-    });
-
-    it('handles decimal numbers', () => {
-      expect(hasInterface(1, 'human')).toBe(true);  // 0b001
-      expect(hasInterface(2, 'api')).toBe(true);    // 0b010
-      expect(hasInterface(4, 'contract')).toBe(true); // 0b100
-      expect(hasInterface(7, 'human')).toBe(true);  // 0b111
-      expect(hasInterface(7, 'api')).toBe(true);
-      expect(hasInterface(7, 'contract')).toBe(true);
-    });
-
-    it('returns false for zero bitmap', () => {
-      expect(hasInterface(0, 'human')).toBe(false);
-      expect(hasInterface(0, 'api')).toBe(false);
-      expect(hasInterface(0, 'contract')).toBe(false);
+    it.each([
+      { bitmap: 0b001, type: 'human' as const, expected: true },
+      { bitmap: 0b111, type: 'human' as const, expected: true },
+      { bitmap: 0b000, type: 'human' as const, expected: false },
+      { bitmap: 0b110, type: 'human' as const, expected: false },
+      { bitmap: 0b010, type: 'api' as const, expected: true },
+      { bitmap: 0b111, type: 'api' as const, expected: true },
+      { bitmap: 0b000, type: 'api' as const, expected: false },
+      { bitmap: 0b101, type: 'api' as const, expected: false },
+      { bitmap: 0b100, type: 'contract' as const, expected: true },
+      { bitmap: 0b111, type: 'contract' as const, expected: true },
+      { bitmap: 0b000, type: 'contract' as const, expected: false },
+      { bitmap: 0b011, type: 'contract' as const, expected: false },
+      { bitmap: 1, type: 'human' as const, expected: true },
+      { bitmap: 2, type: 'api' as const, expected: true },
+      { bitmap: 4, type: 'contract' as const, expected: true },
+      { bitmap: 0, type: 'human' as const, expected: false },
+      { bitmap: 0, type: 'api' as const, expected: false },
+      { bitmap: 0, type: 'contract' as const, expected: false },
+    ])('hasInterface($bitmap, $type) = $expected', ({ bitmap, type, expected }) => {
+      expect(hasInterface(bitmap, type)).toBe(expected);
     });
   });
 
   describe('getInterfaceTypes', () => {
-    it('returns all interface types for bitmap 7', () => {
-      const types = getInterfaceTypes(7); // 0b111
-      expect(types).toEqual(['human', 'api', 'contract']);
-    });
-
-    it('returns only human for bitmap 1', () => {
-      const types = getInterfaceTypes(1); // 0b001
-      expect(types).toEqual(['human']);
-    });
-
-    it('returns only api for bitmap 2', () => {
-      const types = getInterfaceTypes(2); // 0b010
-      expect(types).toEqual(['api']);
-    });
-
-    it('returns only contract for bitmap 4', () => {
-      const types = getInterfaceTypes(4); // 0b100
-      expect(types).toEqual(['contract']);
-    });
-
-    it('returns human and api for bitmap 3', () => {
-      const types = getInterfaceTypes(3); // 0b011
-      expect(types).toEqual(['human', 'api']);
-    });
-
-    it('returns human and contract for bitmap 5', () => {
-      const types = getInterfaceTypes(5); // 0b101
-      expect(types).toEqual(['human', 'contract']);
-    });
-
-    it('returns api and contract for bitmap 6', () => {
-      const types = getInterfaceTypes(6); // 0b110
-      expect(types).toEqual(['api', 'contract']);
+    it.each([
+      { bitmap: 7, expected: ['human', 'api', 'contract'] },
+      { bitmap: 1, expected: ['human'] },
+      { bitmap: 2, expected: ['api'] },
+      { bitmap: 4, expected: ['contract'] },
+      { bitmap: 3, expected: ['human', 'api'] },
+      { bitmap: 5, expected: ['human', 'contract'] },
+      { bitmap: 6, expected: ['api', 'contract'] },
+    ])('getInterfaceTypes($bitmap) = $expected', ({ bitmap, expected }) => {
+      expect(getInterfaceTypes(bitmap)).toEqual(expected);
     });
 
     it('returns empty array for bitmap 0', () => {
@@ -244,34 +194,17 @@ describe('app-converter utilities', () => {
       expect(createInterfacesBitmap(['contract'])).toBe(4); // 0b100
     });
 
-    it('creates bitmap for all interfaces', () => {
-      expect(createInterfacesBitmap(['human', 'api', 'contract'])).toBe(7); // 0b111
-    });
-
-    it('creates bitmap for human and api', () => {
-      expect(createInterfacesBitmap(['human', 'api'])).toBe(3); // 0b011
-    });
-
-    it('creates bitmap for human and contract', () => {
-      expect(createInterfacesBitmap(['human', 'contract'])).toBe(5); // 0b101
-    });
-
-    it('creates bitmap for api and contract', () => {
-      expect(createInterfacesBitmap(['api', 'contract'])).toBe(6); // 0b110
-    });
-
-    it('returns 0 for empty array', () => {
-      expect(createInterfacesBitmap([])).toBe(0);
-    });
-
-    it('handles duplicate types', () => {
-      expect(createInterfacesBitmap(['human', 'human', 'api'])).toBe(3); // 0b011
-    });
-
-    it('order does not matter', () => {
-      expect(createInterfacesBitmap(['contract', 'human', 'api'])).toBe(7);
-      expect(createInterfacesBitmap(['api', 'contract', 'human'])).toBe(7);
-      expect(createInterfacesBitmap(['human', 'api', 'contract'])).toBe(7);
+    it.each([
+      { types: ['human', 'api', 'contract'] as const, expected: 7 },
+      { types: ['human', 'api'] as const, expected: 3 },
+      { types: ['human', 'contract'] as const, expected: 5 },
+      { types: ['api', 'contract'] as const, expected: 6 },
+      { types: [] as const, expected: 0 },
+      { types: ['human', 'human', 'api'] as const, expected: 3 },
+      { types: ['contract', 'human', 'api'] as const, expected: 7 },
+      { types: ['api', 'contract', 'human'] as const, expected: 7 },
+    ])('createInterfacesBitmap($types) = $expected', ({ types, expected }) => {
+      expect(createInterfacesBitmap([...types])).toBe(expected);
     });
   });
 

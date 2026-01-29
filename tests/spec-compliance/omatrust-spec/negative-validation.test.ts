@@ -1,9 +1,9 @@
 /**
  * Negative Validation Tests
- * 
+ *
  * Tests for invalid inputs, malformed data, and error handling across all specs.
  * These tests verify that the system correctly rejects invalid data.
- * 
+ *
  * Covers:
  * - Invalid DID formats
  * - Malformed attestation data
@@ -14,56 +14,41 @@
 
 import { describe, it, expect } from 'vitest';
 import { OnChainApp, OffChainMetadata, EndpointConfig, PlatformDetails, Artifact } from '@/schema/data-model';
-import { getAllSchemas, userReviewSchema, certificationSchema, keyBindingSchema } from '@/config/schemas';
+import { userReviewSchema, certificationSchema, keyBindingSchema } from '@/config/schemas';
+
+const validOnChainBase = {
+  did: 'did:web:example.com',
+  initialVersionMajor: 1,
+  initialVersionMinor: 0,
+  initialVersionPatch: 0,
+  interfaces: 1,
+  dataUrl: 'https://example.com/metadata.json',
+  dataHash: '0x' + '0'.repeat(64),
+  dataHashAlgorithm: 0,
+  minter: '0x1234567890123456789012345678901234567890',
+} as const;
+
+function expectOnChainReject(overrides: Record<string, unknown>) {
+  const result = OnChainApp.safeParse({ ...validOnChainBase, ...overrides });
+  expect(result.success).toBe(false);
+}
 
 // ============================================================================
 // INVALID DID FORMAT TESTS
 // ============================================================================
 
 describe('Negative Tests: Invalid DID Formats', () => {
-  
-  // Test that empty DIDs are rejected
   it('rejects empty DID string', () => {
-    const result = OnChainApp.safeParse({
-      did: '',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
+    const result = OnChainApp.safeParse({ ...validOnChainBase, did: '' });
     expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].path).toContain('did');
-    }
+    if (!result.success) expect(result.error.issues[0].path).toContain('did');
   });
 
-  // Test that whitespace-only DIDs are rejected
   it('rejects whitespace-only DID', () => {
-    const result = OnChainApp.safeParse({
-      did: '   ',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    // Note: Current schema may accept whitespace - this documents expected behavior
-    // If this passes, it's a potential schema gap
-    if (result.success) {
-      console.warn('Schema accepts whitespace-only DID - potential gap');
-    }
+    const result = OnChainApp.safeParse({ ...validOnChainBase, did: '   ' });
+    if (result.success) console.warn('Schema accepts whitespace-only DID - potential gap');
   });
 
-  // Test various malformed DID patterns
   const malformedDIDs = [
     { did: 'did:', reason: 'missing method and identifier' },
     { did: 'did:web', reason: 'missing identifier after method' },
@@ -76,23 +61,8 @@ describe('Negative Tests: Invalid DID Formats', () => {
 
   malformedDIDs.forEach(({ did, reason }) => {
     it(`handles potentially malformed DID: ${did} (${reason})`, () => {
-      // Note: W3C DID spec is permissive - these test current behavior
-      const result = OnChainApp.safeParse({
-        did,
-        initialVersionMajor: 1,
-        initialVersionMinor: 0,
-        initialVersionPatch: 0,
-        interfaces: 1,
-        dataUrl: 'https://example.com/metadata.json',
-        dataHash: '0x' + '0'.repeat(64),
-        dataHashAlgorithm: 0,
-        minter: '0x1234567890123456789012345678901234567890',
-      });
-      
-      // Document current behavior
-      if (result.success) {
-        // Schema accepts this DID - may need stricter validation
-      }
+      const result = OnChainApp.safeParse({ ...validOnChainBase, did });
+      if (result.success) { /* Schema accepts - may need stricter validation */ }
     });
   });
 });
@@ -102,88 +72,21 @@ describe('Negative Tests: Invalid DID Formats', () => {
 // ============================================================================
 
 describe('Negative Tests: Invalid Version Numbers', () => {
-  
-  // Test negative version numbers
-  it('rejects negative major version', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: -1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
+  it.each([
+    { major: -1, minor: 0, patch: 0, label: 'negative major' },
+    { major: 1, minor: -1, patch: 0, label: 'negative minor' },
+    { major: 1, minor: 0, patch: -1, label: 'negative patch' },
+  ])('rejects $label version', ({ major, minor, patch }) => {
+    expectOnChainReject({
+      initialVersionMajor: major,
+      initialVersionMinor: minor,
+      initialVersionPatch: patch,
     });
-    
-    expect(result.success).toBe(false);
   });
 
-  it('rejects negative minor version', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: -1,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects negative patch version', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: -1,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
-  });
-
-  // Test non-integer version numbers
-  it('rejects floating point version numbers', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1.5,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
-  });
-
-  // Test string version numbers
-  it('rejects string version numbers', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: '1' as any,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
+  it('rejects non-integer version numbers', () => {
+    expectOnChainReject({ initialVersionMajor: 1.5 });
+    expectOnChainReject({ initialVersionMajor: '1' as unknown as number });
   });
 });
 
@@ -192,8 +95,6 @@ describe('Negative Tests: Invalid Version Numbers', () => {
 // ============================================================================
 
 describe('Negative Tests: Invalid Data Hashes', () => {
-  
-  // Test invalid hash formats
   const invalidHashes = [
     { hash: '', reason: 'empty string' },
     { hash: '0x', reason: 'only prefix' },
@@ -207,53 +108,12 @@ describe('Negative Tests: Invalid Data Hashes', () => {
 
   invalidHashes.forEach(({ hash, reason }) => {
     it(`rejects invalid dataHash: ${reason}`, () => {
-      const result = OnChainApp.safeParse({
-        did: 'did:web:example.com',
-        initialVersionMajor: 1,
-        initialVersionMinor: 0,
-        initialVersionPatch: 0,
-        interfaces: 1,
-        dataUrl: 'https://example.com/metadata.json',
-        dataHash: hash,
-        dataHashAlgorithm: 0,
-        minter: '0x1234567890123456789012345678901234567890',
-      });
-      
-      expect(result.success).toBe(false);
+      expectOnChainReject({ dataHash: hash });
     });
   });
 
-  // Test invalid hash algorithm values
-  it('rejects invalid dataHashAlgorithm value', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 2, // Only 0 and 1 are valid
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects negative dataHashAlgorithm', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: -1,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
+  it.each([2, -1])('rejects invalid dataHashAlgorithm %s', (algo) => {
+    expectOnChainReject({ dataHashAlgorithm: algo });
   });
 });
 
@@ -262,8 +122,6 @@ describe('Negative Tests: Invalid Data Hashes', () => {
 // ============================================================================
 
 describe('Negative Tests: Invalid URLs', () => {
-  
-  // Test clearly invalid URL formats that should be rejected
   const definitelyInvalidUrls = [
     { url: '', reason: 'empty string' },
     { url: 'not-a-url', reason: 'plain text' },
@@ -274,24 +132,10 @@ describe('Negative Tests: Invalid URLs', () => {
 
   definitelyInvalidUrls.forEach(({ url, reason }) => {
     it(`rejects invalid dataUrl: ${reason}`, () => {
-      const result = OnChainApp.safeParse({
-        did: 'did:web:example.com',
-        initialVersionMajor: 1,
-        initialVersionMinor: 0,
-        initialVersionPatch: 0,
-        interfaces: 1,
-        dataUrl: url,
-        dataHash: '0x' + '0'.repeat(64),
-        dataHashAlgorithm: 0,
-        minter: '0x1234567890123456789012345678901234567890',
-      });
-      
-      expect(result.success).toBe(false);
+      expectOnChainReject({ dataUrl: url });
     });
   });
 
-  // Test potentially dangerous URL protocols - documents current behavior
-  // These should ideally be rejected but current schema accepts them (known gap)
   const dangerousUrls = [
     { url: 'javascript:alert(1)', reason: 'javascript protocol' },
     { url: 'data:text/html,<script>alert(1)</script>', reason: 'data URL with script' },
@@ -299,23 +143,8 @@ describe('Negative Tests: Invalid URLs', () => {
 
   dangerousUrls.forEach(({ url, reason }) => {
     it(`documents dangerous URL acceptance: ${reason}`, () => {
-      const result = OnChainApp.safeParse({
-        did: 'did:web:example.com',
-        initialVersionMajor: 1,
-        initialVersionMinor: 0,
-        initialVersionPatch: 0,
-        interfaces: 1,
-        dataUrl: url,
-        dataHash: '0x' + '0'.repeat(64),
-        dataHashAlgorithm: 0,
-        minter: '0x1234567890123456789012345678901234567890',
-      });
-      
-      // Document current behavior - these are accepted but shouldn't be
-      // This is part of the known schema gap (dataUrl should only allow HTTP/HTTPS)
-      if (result.success) {
-        console.warn(`Schema accepts ${reason} URL - security risk (known gap)`);
-      }
+      const result = OnChainApp.safeParse({ ...validOnChainBase, dataUrl: url });
+      if (result.success) console.warn(`Schema accepts ${reason} URL - security risk (known gap)`);
     });
   });
 });
@@ -426,39 +255,8 @@ describe('Negative Tests: Invalid OffChain Metadata', () => {
 // ============================================================================
 
 describe('Negative Tests: Invalid Interface Values', () => {
-  
-  // Test negative interface value
-  it('rejects negative interfaces value', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: -1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
-  });
-
-  // Test non-integer interface value
-  it('rejects non-integer interfaces value', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1.5,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
+  it.each([-1, 1.5])('rejects invalid interfaces value %s', (interfaces) => {
+    expectOnChainReject({ interfaces });
   });
 });
 
@@ -467,40 +265,8 @@ describe('Negative Tests: Invalid Interface Values', () => {
 // ============================================================================
 
 describe('Negative Tests: Invalid Status Values', () => {
-  
-  // Test out of range status
-  it('rejects status value greater than 2', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-      status: 3, // Only 0, 1, 2 are valid
-    });
-    
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects negative status value', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-      status: -1,
-    });
-    
-    expect(result.success).toBe(false);
+  it.each([3, -1])('rejects invalid status value %s', (status) => {
+    expectOnChainReject({ status });
   });
 });
 
@@ -708,37 +474,12 @@ describe('Negative Tests: Invalid Artifact', () => {
 // ============================================================================
 
 describe('Negative Tests: Null and Undefined Values', () => {
-  
   it('rejects null DID', () => {
-    const result = OnChainApp.safeParse({
-      did: null,
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
+    expectOnChainReject({ did: null });
   });
 
   it('rejects undefined required fields', () => {
-    const result = OnChainApp.safeParse({
-      did: undefined,
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
+    expectOnChainReject({ did: undefined });
   });
 
   it('handles null in metadata name', () => {
@@ -748,7 +489,6 @@ describe('Negative Tests: Null and Undefined Values', () => {
       publisher: 'Test Publisher',
       image: 'https://example.com/icon.png',
     });
-    
     expect(result.success).toBe(false);
   });
 });
@@ -758,53 +498,16 @@ describe('Negative Tests: Null and Undefined Values', () => {
 // ============================================================================
 
 describe('Negative Tests: Type Coercion Attempts', () => {
-  
   it('rejects object as DID', () => {
-    const result = OnChainApp.safeParse({
-      did: { value: 'did:web:example.com' },
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
+    expectOnChainReject({ did: { value: 'did:web:example.com' } });
   });
 
   it('rejects array as version number', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: [1],
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: 1,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
+    expectOnChainReject({ initialVersionMajor: [1] });
   });
 
   it('rejects boolean as interfaces', () => {
-    const result = OnChainApp.safeParse({
-      did: 'did:web:example.com',
-      initialVersionMajor: 1,
-      initialVersionMinor: 0,
-      initialVersionPatch: 0,
-      interfaces: true,
-      dataUrl: 'https://example.com/metadata.json',
-      dataHash: '0x' + '0'.repeat(64),
-      dataHashAlgorithm: 0,
-      minter: '0x1234567890123456789012345678901234567890',
-    });
-    
-    expect(result.success).toBe(false);
+    expectOnChainReject({ interfaces: true });
   });
 });
 

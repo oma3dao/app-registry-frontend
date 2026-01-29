@@ -56,41 +56,30 @@ describe('DID utilities', () => {
   });
 
   describe('isValidDid', () => {
-    it('returns true for valid did:web', () => {
-      expect(isValidDid('did:web:example.com')).toBe(true);
+    it.each([
+      'did:web:example.com',
+      'did:pkh:eip155:1:0x1234567890123456789012345678901234567890',
+      'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+    ])('returns true for valid DID: %s', (did) => {
+      expect(isValidDid(did)).toBe(true);
     });
 
-    it('returns true for valid did:pkh', () => {
-      expect(isValidDid('did:pkh:eip155:1:0x1234567890123456789012345678901234567890')).toBe(true);
+    it.each([
+      'did:web:example.com',
+      'did:pkh:eip155:1:0x123',
+      'did:ethr:0x123',
+      'did:ion:abc123',
+      'did:key:z123',
+    ])('returns true for DID method: %s', (did) => {
+      expect(isValidDid(did)).toBe(true);
     });
 
-    it('returns true for valid did:key', () => {
-      expect(isValidDid('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK')).toBe(true);
+    it.each(['not-a-did', 'example.com', ''])('returns false for invalid format: %s', (input) => {
+      expect(isValidDid(input)).toBe(false);
     });
 
-    it('returns true for various DID methods', () => {
-      const dids = [
-        'did:web:example.com',
-        'did:pkh:eip155:1:0x123',
-        'did:ethr:0x123',
-        'did:ion:abc123',
-        'did:key:z123',
-      ];
-
-      dids.forEach(did => {
-        expect(isValidDid(did)).toBe(true);
-      });
-    });
-
-    it('returns false for invalid format', () => {
-      expect(isValidDid('not-a-did')).toBe(false);
-      expect(isValidDid('example.com')).toBe(false);
-      expect(isValidDid('')).toBe(false);
-    });
-
-    it('returns false for missing identifier', () => {
-      expect(isValidDid('did:web:')).toBe(false);
-      expect(isValidDid('did:web')).toBe(false);
+    it.each(['did:web:', 'did:web'])('returns false for missing identifier: %s', (input) => {
+      expect(isValidDid(input)).toBe(false);
     });
 
     it('returns false for missing method', () => {
@@ -103,22 +92,16 @@ describe('DID utilities', () => {
   });
 
   describe('extractDidMethod', () => {
-    it('extracts method from did:web', () => {
-      expect(extractDidMethod('did:web:example.com')).toBe('web');
+    it.each([
+      { did: 'did:web:example.com', method: 'web' },
+      { did: 'did:pkh:eip155:1:0x123', method: 'pkh' },
+      { did: 'did:key:z123', method: 'key' },
+    ])('extracts method from $did', ({ did, method }) => {
+      expect(extractDidMethod(did)).toBe(method);
     });
 
-    it('extracts method from did:pkh', () => {
-      expect(extractDidMethod('did:pkh:eip155:1:0x123')).toBe('pkh');
-    });
-
-    it('extracts method from did:key', () => {
-      expect(extractDidMethod('did:key:z123')).toBe('key');
-    });
-
-    it('returns null for invalid DID', () => {
-      expect(extractDidMethod('not-a-did')).toBeNull();
-      expect(extractDidMethod('example.com')).toBeNull();
-      expect(extractDidMethod('')).toBeNull();
+    it.each(['not-a-did', 'example.com'])('returns null for invalid DID: %s', (input) => {
+      expect(extractDidMethod(input)).toBeNull();
     });
 
     it('returns null for malformed DID', () => {
@@ -136,31 +119,18 @@ describe('DID utilities', () => {
   });
 
   describe('extractDidIdentifier', () => {
-    it('extracts identifier from did:web', () => {
-      expect(extractDidIdentifier('did:web:example.com')).toBe('example.com');
+    it.each([
+      { did: 'did:web:example.com', expected: 'example.com' },
+      { did: 'did:pkh:eip155:1:0x1234567890123456789012345678901234567890', expected: 'eip155:1:0x1234567890123456789012345678901234567890' },
+      { did: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK', expected: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK' },
+      { did: 'did:pkh:eip155:1:0x123', expected: 'eip155:1:0x123' },
+      { did: 'did:web:example.com:user:alice', expected: 'example.com:user:alice' },
+    ])('extracts identifier from $did', ({ did, expected }) => {
+      expect(extractDidIdentifier(did)).toBe(expected);
     });
 
-    it('extracts identifier from did:pkh', () => {
-      const identifier = 'eip155:1:0x1234567890123456789012345678901234567890';
-      expect(extractDidIdentifier(`did:pkh:${identifier}`)).toBe(identifier);
-    });
-
-    it('extracts identifier from did:key', () => {
-      expect(extractDidIdentifier('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK')).toBe('z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK');
-    });
-
-    it('returns null for invalid DID', () => {
-      expect(extractDidIdentifier('not-a-did')).toBeNull();
-      expect(extractDidIdentifier('example.com')).toBeNull();
-      expect(extractDidIdentifier('')).toBeNull();
-    });
-
-    it('handles identifiers with colons', () => {
-      expect(extractDidIdentifier('did:pkh:eip155:1:0x123')).toBe('eip155:1:0x123');
-    });
-
-    it('handles complex identifiers', () => {
-      expect(extractDidIdentifier('did:web:example.com:user:alice')).toBe('example.com:user:alice');
+    it.each(['not-a-did', 'example.com', ''])('returns null for invalid DID: %s', (input) => {
+      expect(extractDidIdentifier(input)).toBeNull();
     });
   });
 

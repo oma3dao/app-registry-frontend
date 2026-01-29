@@ -76,37 +76,15 @@ describe('StarRating Component', () => {
   });
 
   describe('Star Fill States', () => {
-    /**
-     * Test: 0 rating shows no filled stars
-     */
-    it('shows no filled stars for 0 rating', () => {
-      render(<StarRating rating={0} count={0} />);
-      
+    it.each([
+      { rating: 0, expectedFilled: 0, label: 'no filled stars for 0 rating' },
+      { rating: 3, expectedFilled: 3, label: 'correct number of filled stars for integer rating' },
+      { rating: 5, expectedFilled: 5, label: 'all filled stars for 5 rating' },
+    ])('shows $label', ({ rating, expectedFilled }) => {
+      render(<StarRating rating={rating} count={10} />);
       const stars = screen.getAllByTestId('star-icon');
       const filledStars = stars.filter(s => s.getAttribute('data-filled') === 'true');
-      expect(filledStars.length).toBe(0);
-    });
-
-    /**
-     * Test: 5 rating shows all filled stars
-     */
-    it('shows all filled stars for 5 rating', () => {
-      render(<StarRating rating={5} count={10} />);
-      
-      const stars = screen.getAllByTestId('star-icon');
-      const filledStars = stars.filter(s => s.getAttribute('data-filled') === 'true');
-      expect(filledStars.length).toBe(5);
-    });
-
-    /**
-     * Test: 3 rating shows 3 filled stars
-     */
-    it('shows correct number of filled stars for integer rating', () => {
-      render(<StarRating rating={3} count={10} />);
-      
-      const stars = screen.getAllByTestId('star-icon');
-      const filledStars = stars.filter(s => s.getAttribute('data-filled') === 'true');
-      expect(filledStars.length).toBe(3);
+      expect(filledStars.length).toBe(expectedFilled);
     });
 
     /**
@@ -126,37 +104,16 @@ describe('StarRating Component', () => {
   });
 
   describe('Size Variants', () => {
-    /**
-     * Test: Small size variant
-     */
-    it('applies small size classes', () => {
-      render(<StarRating rating={4} count={10} size="sm" />);
-      
+    it.each([
+      { size: 'sm' as const, height: 'h-4', width: 'w-4', label: 'small size classes' },
+      { size: undefined, height: 'h-5', width: 'w-5', label: 'medium size classes by default' },
+      { size: 'lg' as const, height: 'h-6', width: 'w-6', label: 'large size classes' },
+    ])('applies $label', ({ size, height, width }) => {
+      const props = size ? { rating: 4, count: 10, size } : { rating: 4, count: 10 };
+      render(<StarRating {...props} />);
       const stars = screen.getAllByTestId('star-icon');
-      expect(stars[0].className).toContain('h-4');
-      expect(stars[0].className).toContain('w-4');
-    });
-
-    /**
-     * Test: Medium size variant (default)
-     */
-    it('applies medium size classes by default', () => {
-      render(<StarRating rating={4} count={10} />);
-      
-      const stars = screen.getAllByTestId('star-icon');
-      expect(stars[0].className).toContain('h-5');
-      expect(stars[0].className).toContain('w-5');
-    });
-
-    /**
-     * Test: Large size variant
-     */
-    it('applies large size classes', () => {
-      render(<StarRating rating={4} count={10} size="lg" />);
-      
-      const stars = screen.getAllByTestId('star-icon');
-      expect(stars[0].className).toContain('h-6');
-      expect(stars[0].className).toContain('w-6');
+      expect(stars[0].className).toContain(height);
+      expect(stars[0].className).toContain(width);
     });
   });
 

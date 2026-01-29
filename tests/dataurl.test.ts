@@ -27,26 +27,30 @@ describe('dataurl utilities', () => {
       expect(result1.hash).toBe(result2.hash);
     });
 
-    it('handles nested objects', () => {
-      const obj = {
-        name: 'Test',
-        nested: {
-          b: 2,
-          a: 1,
+    it.each([
+      { label: 'nested objects', obj: { name: 'Test', nested: { b: 2, a: 1 } } },
+      { label: 'arrays', obj: { name: 'Test', items: ['item1', 'item2', 'item3'] } },
+      {
+        label: 'complex nested structure',
+        obj: {
+          name: 'Complex App',
+          metadata: { version: '2.0.0', features: ['feature1', 'feature2'] },
+          platforms: { web: { url: 'https://web.example.com', supported: true }, mobile: { url: 'https://mobile.example.com', supported: false } },
+          tags: ['tag1', 'tag2'],
         },
-      };
-      
-      const result = canonicalizeForHash(obj);
-      expect(result.jcsJson).toBeDefined();
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
-    });
-
-    it('handles arrays', () => {
-      const obj = {
-        name: 'Test',
-        items: ['item1', 'item2', 'item3'],
-      };
-      
+      },
+      {
+        label: 'metadata-like objects',
+        obj: {
+          name: 'My App',
+          description: 'An awesome app',
+          image: 'https://example.com/image.png',
+          external_url: 'https://example.com',
+          screenshotUrls: ['https://example.com/shot1.png', 'https://example.com/shot2.png'],
+          platforms: { windows: 'https://download.example.com/windows', mac: 'https://download.example.com/mac' },
+        },
+      },
+    ])('handles $label', ({ obj }) => {
       const result = canonicalizeForHash(obj);
       expect(result.jcsJson).toBeDefined();
       expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
@@ -101,27 +105,7 @@ describe('dataurl utilities', () => {
     it('handles empty object', () => {
       const obj = {};
       const result = canonicalizeForHash(obj);
-      
       expect(result.jcsJson).toBe('{}');
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
-    });
-
-    it('handles complex nested structure', () => {
-      const obj = {
-        name: 'Complex App',
-        metadata: {
-          version: '2.0.0',
-          features: ['feature1', 'feature2'],
-        },
-        platforms: {
-          web: { url: 'https://web.example.com', supported: true },
-          mobile: { url: 'https://mobile.example.com', supported: false },
-        },
-        tags: ['tag1', 'tag2'],
-      };
-      
-      const result = canonicalizeForHash(obj);
-      expect(result.jcsJson).toBeDefined();
       expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
     });
 
@@ -138,30 +122,7 @@ describe('dataurl utilities', () => {
     it('JCS JSON has sorted keys', () => {
       const obj = { z: 1, a: 2, m: 3 };
       const result = canonicalizeForHash(obj);
-      
-      // Keys should be in alphabetical order
       expect(result.jcsJson).toBe('{"a":2,"m":3,"z":1}');
-    });
-
-    it('handles metadata-like objects', () => {
-      const metadata = {
-        name: 'My App',
-        description: 'An awesome app',
-        image: 'https://example.com/image.png',
-        external_url: 'https://example.com',
-        screenshotUrls: [
-          'https://example.com/shot1.png',
-          'https://example.com/shot2.png',
-        ],
-        platforms: {
-          windows: 'https://download.example.com/windows',
-          mac: 'https://download.example.com/mac',
-        },
-      };
-      
-      const result = canonicalizeForHash(metadata);
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
-      expect(result.jcsJson).toBeDefined();
     });
   });
 });
@@ -341,6 +302,32 @@ describe('computeDataHashFromDataUrl', () => {
     
     const result = await computeDataHashFromDataUrl('https://example.com/metadata.json');
     
+    expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+
+  it('accepts timeout configuration', async () => {
+    const { computeDataHashFromDataUrl } = await import('@/lib/utils/dataurl');
+    
+    const mockJson = { test: true };
+    const mockResponse = {
+      ok: true,
+      headers: {
+        get: () => 'application/json',
+      },
+      body: {
+        getReader: () => ({
+          read: vi.fn()
+            .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(JSON.stringify(mockJson)) })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+        }),
+      },
+    };
+    
+    mockFetch.mockResolvedValue(mockResponse);
+    
+    const result = await computeDataHashFromDataUrl('https://example.com/data.json', 0, { timeoutMs: 5000 });
+    
+    expect(result).toBeDefined();
     expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
   });
 });
