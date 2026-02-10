@@ -42,6 +42,16 @@ vi.mock('@/schema/mapping', () => {
   };
 });
 
+// Mock debounce to execute immediately - avoids setState-after-unmount when
+// UrlValidator's debounced check fires after test teardown
+vi.mock('@/lib/utils', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    debounce: (fn: (...args: unknown[]) => unknown) => fn,
+  };
+});
+
 // Mock validation utilities
 vi.mock('@/lib/validation', () => ({
   validateCaipAddress: vi.fn((address: string) => {

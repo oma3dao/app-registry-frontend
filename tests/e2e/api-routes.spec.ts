@@ -1,12 +1,13 @@
 /**
  * E2E Tests for API Routes
- * 
+ *
  * These tests verify API endpoint functionality:
  * - /api/portal-url/[did]/v/[version] (POST)
  * - /api/verify-and-attest (POST)
+ * - /api/controller-witness (POST)
  * - Error handling for invalid requests
  * - Request validation
- * 
+ *
  * Priority: High (Critical API endpoints)
  */
 
@@ -361,6 +362,153 @@ test.describe('API Routes', () => {
     if (Object.keys(json).length > 0) {
       expect(json).toHaveProperty('error');
     }
+  });
+
+  /**
+   * Test: Controller witness endpoint handles POST requests
+   * Verifies /api/controller-witness POST endpoint
+   *
+   * API structure (from controller-witness/route.ts):
+   * - POST with { attestationUid, chainId, easContract, schemaUid, subject, controller, method }
+   * - Returns { success, uid, txHash, blockNumber, observedAt, existing, elapsed } on success
+   * - Returns { error, code, elapsed } on error
+   *
+   * Note: May return 400 (validation), 403 (chain/schema not approved), or 500 depending on env.
+   *
+   * @tag @api - API endpoint test
+   */
+  test('should handle controller-witness POST requests', async ({ page }) => {
+    test.skip(!serverAvailable, 'Dev server is not available');
+
+    await setupTestPage(page, '/', {
+      navigationTimeout: 60000,
+      retries: 3,
+      waitForReact: true,
+      removeOverlays: true,
+    });
+
+    const validAddr = '0x' + 'a'.repeat(40);
+    const testData = {
+      attestationUid: '0x' + 'b'.repeat(64),
+      chainId: 66238,
+      easContract: '0x' + 'c'.repeat(40),
+      schemaUid: '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d',
+      subject: `did:pkh:eip155:66238:${validAddr}`,
+      controller: `did:pkh:eip155:66238:${validAddr}`,
+      method: 'dns-txt',
+    };
+
+    const response = await apiRequest(page, 'POST', '/api/controller-witness', {
+      data: testData,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 60000,
+      retries: 1,
+    });
+
+    // 200 (success), 400 (validation), 403 (chain/schema not approved), or 500
+    expect([200, 400, 403, 500]).toContain(response.status());
+
+    const json = await response.json().catch(() => ({}));
+    if (response.status() === 200) {
+      expect(json).toHaveProperty('success');
+      expect(json).toHaveProperty('uid');
+      expect(json).toHaveProperty('elapsed');
+    } else if (json && Object.keys(json).length > 0) {
+      expect(json).toHaveProperty('error');
+      if (json.code) expect(typeof json.code).toBe('string');
+    }
+  });
+
+  /**
+   * Test: Controller witness endpoint rejects missing required fields
+   */
+  test('should reject controller-witness requests with missing required fields', async ({ page }) => {
+    await setupTestPage(page, '/', {
+      navigationTimeout: 60000,
+      retries: 3,
+      waitForReact: true,
+      removeOverlays: true,
+    });
+
+    const response = await apiRequest(page, 'POST', '/api/controller-witness', {
+      data: {},
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(response.status()).toBe(400);
+
+    const json = await response.json().catch(() => ({}));
+    expect(json).toHaveProperty('error');
+    expect(json.error).toContain('Missing required fields');
+    expect(json).toHaveProperty('code', 'MISSING_FIELDS');
+  });
+
+  /**
+   * Test: Controller witness endpoint rejects invalid subject DID format
+   */
+  test('should reject controller-witness requests with invalid subject DID', async ({ page }) => {
+    await setupTestPage(page, '/', {
+      navigationTimeout: 60000,
+      retries: 3,
+      waitForReact: true,
+      removeOverlays: true,
+    });
+
+    const validAddr = '0x' + 'a'.repeat(40);
+    const testData = {
+      attestationUid: '0x' + 'b'.repeat(64),
+      chainId: 66238,
+      easContract: '0x' + 'c'.repeat(40),
+      schemaUid: '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d',
+      subject: 'not-a-valid-did',
+      controller: `did:pkh:eip155:66238:${validAddr}`,
+      method: 'dns-txt',
+    };
+
+    const response = await apiRequest(page, 'POST', '/api/controller-witness', {
+      data: testData,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(response.status()).toBe(400);
+
+    const json = await response.json().catch(() => ({}));
+    expect(json).toHaveProperty('error');
+    expect(json).toHaveProperty('code', 'INVALID_SUBJECT');
+  });
+
+  /**
+   * Test: Controller witness endpoint rejects invalid method
+   */
+  test('should reject controller-witness requests with invalid method', async ({ page }) => {
+    await setupTestPage(page, '/', {
+      navigationTimeout: 60000,
+      retries: 3,
+      waitForReact: true,
+      removeOverlays: true,
+    });
+
+    const validAddr = '0x' + 'a'.repeat(40);
+    const testData = {
+      attestationUid: '0x' + 'b'.repeat(64),
+      chainId: 66238,
+      easContract: '0x' + 'c'.repeat(40),
+      schemaUid: '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d',
+      subject: `did:pkh:eip155:66238:${validAddr}`,
+      controller: `did:pkh:eip155:66238:${validAddr}`,
+      method: 'invalid-method',
+    };
+
+    const response = await apiRequest(page, 'POST', '/api/controller-witness', {
+      data: testData,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(response.status()).toBe(400);
+
+    const json = await response.json().catch(() => ({}));
+    expect(json).toHaveProperty('error');
+    expect(json).toHaveProperty('code', 'INVALID_METHOD');
   });
 
   /**
@@ -1186,6 +1334,7 @@ test.describe('API Routes', () => {
       { method: 'GET', path: '/api/fetch-metadata', data: null },
       { method: 'GET', path: '/api/fetch-description', data: null },
       { method: 'POST', path: '/api/discover-controlling-wallet', data: {} },
+      { method: 'POST', path: '/api/controller-witness', data: {} },
     ];
 
     for (const endpoint of endpoints) {

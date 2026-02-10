@@ -122,8 +122,8 @@ describe('OMATrust Reputation Spec 9 - x-oma3 Extensions', () => {
       // Should have timestamp fields
       expect(timestampFields.length).toBeGreaterThan(0);
       
-      // Common timestamp fields
-      const commonTimestampNames = ['issuedAt', 'effectiveAt', 'expiresAt'];
+      // Common timestamp fields (includes controller-witness observedAt)
+      const commonTimestampNames = ['issuedAt', 'effectiveAt', 'expiresAt', 'observedAt'];
       timestampFields.forEach(fieldPath => {
         const fieldName = fieldPath.split('.')[1];
         expect(commonTimestampNames).toContain(fieldName);
@@ -169,8 +169,8 @@ describe('OMATrust Reputation Spec 9 - x-oma3 Extensions', () => {
       
       expect(didFields.length).toBeGreaterThan(0);
       
-      // Common DID fields
-      const expectedDIDFields = ['subject', 'attester', 'linkedId', 'keyId', 'organization', 'assessor', 'programID'];
+      // Common DID fields (includes controller-witness controller)
+      const expectedDIDFields = ['subject', 'attester', 'linkedId', 'keyId', 'organization', 'assessor', 'programID', 'controller'];
       didFields.forEach(fieldPath => {
         const fieldName = fieldPath.split('.')[1];
         expect(expectedDIDFields).toContain(fieldName);
