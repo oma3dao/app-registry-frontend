@@ -165,6 +165,24 @@ vi.mock('ethers', () => {
     return '0x' + Array.from(value).map(b => b.toString(16).padStart(2, '0')).join('');
   };
 
+  // Mock keccak256 (for did-index.ts)
+  const mockKeccak256 = (data: Uint8Array | string): string => {
+    // Convert to bytes if string
+    const bytes = typeof data === 'string' 
+      ? new TextEncoder().encode(data)
+      : data;
+    
+    // Simple deterministic hash for testing
+    let hash = 0;
+    for (let i = 0; i < bytes.length; i++) {
+      const char = bytes[i];
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    const hexHash = Math.abs(hash).toString(16).padStart(64, '0');
+    return '0x' + hexHash;
+  };
+
   return {
     ethers: {
       isAddress: isValidAddress,
@@ -173,6 +191,7 @@ vi.mock('ethers', () => {
       sha256: mockSha256,
       toUtf8Bytes: mockToUtf8Bytes,
       hexlify: mockHexlify,
+      keccak256: mockKeccak256,
       Contract: vi.fn(),
       providers: {
         JsonRpcProvider: vi.fn(),
@@ -184,6 +203,7 @@ vi.mock('ethers', () => {
     sha256: mockSha256,
     toUtf8Bytes: mockToUtf8Bytes,
     hexlify: mockHexlify,
+    keccak256: mockKeccak256,
   };
 });
 
@@ -192,9 +212,36 @@ vi.mock('thirdweb', () => ({
   createThirdwebClient: vi.fn(() => ({
     // Mock client methods as needed
   })),
-  getContract: vi.fn(),
+  getContract: vi.fn(() => ({
+    address: '0x1234567890123456789012345678901234567890',
+    chain: { id: 31337 },
+  })),
   readContract: vi.fn(),
   sendTransaction: vi.fn(),
+  prepareContractCall: vi.fn((options: any) => {
+    // Return a mock transaction object with all the necessary parameters
+    return {
+      to: options.contract?.address || '0x1234567890123456789012345678901234567890',
+      data: '0xmockedcalldata',
+      value: 0n,
+      args: options.params || [],
+      // Include the original params for test validation
+      params: options.params || [],
+      method: options.method || '',
+    };
+  }),
+}));
+
+// Mock EAS SDK to prevent initialization errors
+vi.mock('@ethereum-attestation-service/eas-sdk', () => ({
+  EAS: vi.fn().mockImplementation(() => ({
+    connect: vi.fn(),
+    getAttestation: vi.fn(),
+  })),
+  SchemaEncoder: vi.fn().mockImplementation(() => ({
+    encodeData: vi.fn(),
+    decodeData: vi.fn(),
+  })),
 }));
 
 // Mock registry read functions

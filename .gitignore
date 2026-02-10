@@ -19,6 +19,9 @@ coverage-analysis.json
 # debug screenshots
 debug-*.png
 
+# visual regression - actual screenshots and diffs (not baselines)
+test-results/screenshots/
+
 # next.js
 /.next/
 /out/

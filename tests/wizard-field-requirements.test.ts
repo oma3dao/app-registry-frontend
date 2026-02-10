@@ -22,27 +22,19 @@ describe('Wizard Field Requirements', () => {
     });
 
     // Tests common required fields
-    it('requires common fields for all interfaces', () => {
+    it.each([
+      { field: 'name', label: 'name' },
+      { field: 'did', label: 'did' },
+      { field: 'version', label: 'version' },
+      { field: 'dataUrl', label: 'dataUrl' },
+    ])('requires $label for all interfaces', ({ field }) => {
       const humanFlags: InterfaceFlags = { human: true, api: false, smartContract: false };
       const apiFlags: InterfaceFlags = { human: false, api: true, smartContract: false };
       const contractFlags: InterfaceFlags = { human: false, api: false, smartContract: true };
 
-      // Common fields should be required regardless of interface
-      expect(isFieldRequired('name', humanFlags)).toBe(true);
-      expect(isFieldRequired('name', apiFlags)).toBe(true);
-      expect(isFieldRequired('name', contractFlags)).toBe(true);
-
-      expect(isFieldRequired('did', humanFlags)).toBe(true);
-      expect(isFieldRequired('did', apiFlags)).toBe(true);
-      expect(isFieldRequired('did', contractFlags)).toBe(true);
-
-      expect(isFieldRequired('version', humanFlags)).toBe(true);
-      expect(isFieldRequired('version', apiFlags)).toBe(true);
-      expect(isFieldRequired('version', contractFlags)).toBe(true);
-
-      expect(isFieldRequired('dataUrl', humanFlags)).toBe(true);
-      expect(isFieldRequired('dataUrl', apiFlags)).toBe(true);
-      expect(isFieldRequired('dataUrl', contractFlags)).toBe(true);
+      expect(isFieldRequired(field, humanFlags)).toBe(true);
+      expect(isFieldRequired(field, apiFlags)).toBe(true);
+      expect(isFieldRequired(field, contractFlags)).toBe(true);
     });
 
     // Tests API-specific required fields
@@ -71,17 +63,18 @@ describe('Wizard Field Requirements', () => {
     });
 
     // Tests optional fields
-    it('returns false for optional fields', () => {
+    it.each([
+      'summary',
+      'legalUrl',
+      'supportUrl',
+      'traits',
+      'fungibleTokenId',
+      'contractId',
+      'iwpsPortalUrl',
+      'external_url',
+    ])('returns false for optional field: %s', (field) => {
       const flags: InterfaceFlags = { human: true, api: false, smartContract: false };
-
-      expect(isFieldRequired('summary', flags)).toBe(false);
-      expect(isFieldRequired('legalUrl', flags)).toBe(false);
-      expect(isFieldRequired('supportUrl', flags)).toBe(false);
-      expect(isFieldRequired('traits', flags)).toBe(false);
-      expect(isFieldRequired('fungibleTokenId', flags)).toBe(false);
-      expect(isFieldRequired('contractId', flags)).toBe(false);
-      expect(isFieldRequired('iwpsPortalUrl', flags)).toBe(false);
-      expect(isFieldRequired('external_url', flags)).toBe(false);
+      expect(isFieldRequired(field, flags)).toBe(false);
     });
 
     // Tests multiple interfaces enabled

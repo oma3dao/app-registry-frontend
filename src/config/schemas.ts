@@ -32,6 +32,8 @@ export interface AttestationSchema {
   fields: FormField[]
   deployedUIDs?: Record<number, string> // chainId -> schemaUID mapping
   deployedBlocks?: Record<number, number> // chainId -> deployment block number
+  revocable?: boolean // Whether attestations using this schema can be revoked (default: false)
+  easSchemaString?: string // Solidity-typed schema string for EAS SchemaEncoder
 }
 
 // Field definitions
@@ -199,6 +201,56 @@ const certificationFields: FormField[] = [
 ]
 
 const commonFields: FormField[] = []
+
+const controllerWitnessFields: FormField[] = [
+  {
+    "name": "subject",
+    "type": "string",
+    "label": "Subject DID",
+    "description": "The DID identity (typically did:web) of the entity authorizing the controller.",
+    "required": true,
+    "placeholder": "Enter subject",
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
+  },
+  {
+    "name": "controller",
+    "type": "string",
+    "label": "Controller DID",
+    "description": "The identity of the controller (e.g., did:pkh or did:key for keys, did:handle for usernames).",
+    "required": true,
+    "placeholder": "Enter controller",
+    "maxLength": 256,
+    "pattern": "^did:[a-z0-9]+:.+$",
+    "format": "did"
+  },
+  {
+    "name": "method",
+    "type": "enum",
+    "label": "Observation Method",
+    "description": "How the witness observed the controller assertion.",
+    "required": true,
+    "placeholder": "Enter method",
+    "options": [
+      "dns-txt",
+      "did-json",
+      "social-profile",
+      "manual"
+    ]
+  },
+  {
+    "name": "observedAt",
+    "type": "integer",
+    "label": "Observation Timestamp",
+    "description": "Unix timestamp (seconds) when the witness observed the controller assertion. This is the witness's local observation time, not the blockchain block timestamp.",
+    "required": true,
+    "placeholder": "0",
+    "autoDefault": "current-timestamp",
+    "subtype": "timestamp",
+    "min": 0
+  }
+]
 
 const endorsementFields: FormField[] = [
   {
@@ -698,6 +750,7 @@ export const certificationSchema: AttestationSchema = {
   title: 'Certification',
   description: 'Certification bodies use this attestation when a subject passes certification.',
   fields: certificationFields,
+  easSchemaString: 'string subject, string organization, string version, string versionHW, string subjectURI, string programID, string programURI, string assessor, string assessorURI, string certificationLevel, string outcome, string reportURI, string reportDigest, string payload, string payloadVersion, string payloadSpecURI, string payloadSpecDigest, uint256 issuedAt, uint256 effectiveAt, uint256 expiresAt',
   deployedUIDs: {
     97: '0xbb9e58a64550b7956561e9c9266e0a0747fc80c40bd57bb2637be7f8f2817bf7', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
@@ -731,11 +784,32 @@ export const commonSchema: AttestationSchema = {
   }
 };
 
+export const controllerWitnessSchema: AttestationSchema = {
+  id: 'controller-witness',
+  title: 'Controller Witness',
+  description: 'A witness attestation anchoring that, at observedAt, the controller of the subject DID was asserted via a mutable offchain method. The witness identity is the EAS attester address.',
+  fields: controllerWitnessFields,
+  easSchemaString: 'string subject, string controller, string method, uint256 observedAt',
+  deployedUIDs: {
+    97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
+    56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
+    66238: '0xc81419f828755c0be2c49091dcad0887b5ca7342316dfffb4314aadbf8205090', // OMAchain Testnet
+    6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
+  },
+  deployedBlocks: {
+    97: 0, // BSC Testnet
+    56: 0, // BSC Mainnet
+    66238: 348, // OMAchain Testnet
+    6623: 0  // OMAchain Mainnet
+  }
+};
+
 export const endorsementSchema: AttestationSchema = {
   id: 'endorsement',
   title: 'Endorsement',
   description: 'A lightweight attestation indicating support, trust, or approval for a DID-identified subject. The \'attestationType\' field may be used to distinguish informal endorsements from formal approvals.',
   fields: endorsementFields,
+  easSchemaString: 'string subject, string organization, string version, string policyURI, string payload, string payloadVersion, string payloadSpecURI, string payloadSpecDigest, uint256 issuedAt, uint256 effectiveAt, uint256 expiresAt',
   deployedUIDs: {
     97: '0xda787e2c5b89cd1b2c77d7a9565573cc89bac752e9b587f3348e85c62d606a68', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
@@ -755,6 +829,8 @@ export const keyBindingSchema: AttestationSchema = {
   title: 'Key Binding',
   description: 'Publishes a cryptographic key associated with a DID. Supports multi-purpose bindings, rotation, and revocation. Each attestation binds one key to one subject.',
   fields: keyBindingFields,
+  revocable: true,
+  easSchemaString: 'string subject, string keyId, string publicKeyJwk, string[] keyPurpose, string[] proofs, uint256 issuedAt, uint256 effectiveAt, uint256 expiresAt',
   deployedUIDs: {
     97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
@@ -774,6 +850,8 @@ export const linkedIdentifierSchema: AttestationSchema = {
   title: 'Linked Identifier',
   description: 'An attestation where the attester (a trusted third party) asserts that the subject controls the linked identifier. Both subject and linkedId MUST be valid DIDs, creating a symmetric DID-to-DID link that attests two identities are owned by the same entity.',
   fields: linkedIdentifierFields,
+  revocable: true,
+  easSchemaString: 'string subject, string linkedId, string method, string[] proofs, uint256 issuedAt, uint256 effectiveAt, uint256 expiresAt',
   deployedUIDs: {
     97: '0xd6ef74f4f2f8d79a8993132577713ada1ae9ba937d8bbd69a174cd6afe6beef6', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
@@ -793,6 +871,7 @@ export const securityAssessmentSchema: AttestationSchema = {
   title: 'Security Assessment',
   description: 'Use this form to record a security assessment onchain',
   fields: securityAssessmentFields,
+  easSchemaString: 'string subject, string organization, string version, string versionHW, string payload, string payloadVersion, string payloadSpecURI, string payloadSpecDigest, uint256 issuedAt, uint256 effectiveAt, uint256 expiresAt',
   deployedUIDs: {
     97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
@@ -812,6 +891,7 @@ export const userReviewResponseSchema: AttestationSchema = {
   title: 'User Review Response',
   description: 'A response from an app owner or representative to a UserReview attestation. Uses refUID to reference the original review.',
   fields: userReviewResponseFields,
+  easSchemaString: 'string subject, string refUID, string responseBody',
   deployedUIDs: {
     97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
@@ -831,6 +911,7 @@ export const userReviewSchema: AttestationSchema = {
   title: 'User Review',
   description: 'A flat schema for structured 1–5 star reviews of tokenized applications or digital services. Designed for onchain attestation and offchain anchoring.',
   fields: userReviewFields,
+  easSchemaString: 'string subject, string version, uint256 ratingValue, string reviewBody, string[] screenshotUrls, string[] proofs',
   deployedUIDs: {
     97: '0x21deb2c39c4899b39d3f4af965d455be97862c6be18ffd2c15dbd74aaf50a5f6', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
@@ -849,6 +930,7 @@ export const userReviewSchema: AttestationSchema = {
 const allSchemas: AttestationSchema[] = [
   certificationSchema,
   commonSchema,
+  controllerWitnessSchema,
   endorsementSchema,
   keyBindingSchema,
   linkedIdentifierSchema,

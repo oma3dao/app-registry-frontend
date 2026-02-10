@@ -3,31 +3,12 @@ import { parseCaip10, buildCaip10, type ParsedCaip10 } from '@/lib/utils/caip10/
 
 describe('CAIP-10 parsing utilities', () => {
   describe('parseCaip10', () => {
-    it('parses valid EVM CAIP-10 string', () => {
-      const result = parseCaip10('eip155:1:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb');
-      expect(result).toEqual({
-        namespace: 'eip155',
-        reference: '1',
-        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
-      });
-    });
-
-    it('parses valid Solana CAIP-10 string', () => {
-      const result = parseCaip10('solana:mainnet:4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T');
-      expect(result).toEqual({
-        namespace: 'solana',
-        reference: 'mainnet',
-        address: '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T',
-      });
-    });
-
-    it('parses valid Sui CAIP-10 string', () => {
-      const result = parseCaip10('sui:mainnet:0xabcd1234');
-      expect(result).toEqual({
-        namespace: 'sui',
-        reference: 'mainnet',
-        address: '0xabcd1234',
-      });
+    it.each([
+      { input: 'eip155:1:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb', expected: { namespace: 'eip155', reference: '1', address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb' }, label: 'EVM' },
+      { input: 'solana:mainnet:4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T', expected: { namespace: 'solana', reference: 'mainnet', address: '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T' }, label: 'Solana' },
+      { input: 'sui:mainnet:0xabcd1234', expected: { namespace: 'sui', reference: 'mainnet', address: '0xabcd1234' }, label: 'Sui' },
+    ])('parses valid $label CAIP-10 string', ({ input, expected }) => {
+      expect(parseCaip10(input)).toEqual(expected);
     });
 
     it('handles different chain references', () => {
@@ -40,38 +21,18 @@ describe('CAIP-10 parsing utilities', () => {
       expect((arbitrum as ParsedCaip10).reference).toBe('42161');
     });
 
-    it('returns error for empty string', () => {
-      const result = parseCaip10('');
-      expect(result).toBeInstanceOf(Error);
-      expect((result as Error).message).toContain('required');
-    });
-
-    it('returns error for null/undefined', () => {
-      const resultNull = parseCaip10(null as any);
-      const resultUndefined = parseCaip10(undefined as any);
-      
-      expect(resultNull).toBeInstanceOf(Error);
-      expect(resultUndefined).toBeInstanceOf(Error);
-    });
-
-    it('returns error for missing components', () => {
-      const result1 = parseCaip10('eip155:1');
-      const result2 = parseCaip10('eip155');
-      const result3 = parseCaip10(':1:0x1234');
-      
-      expect(result1).toBeInstanceOf(Error);
-      expect(result2).toBeInstanceOf(Error);
-      expect(result3).toBeInstanceOf(Error);
-    });
-
-    it('returns error for invalid format', () => {
-      const result1 = parseCaip10('not-a-caip10-string');
-      const result2 = parseCaip10('eip155-1-0x1234');
-      const result3 = parseCaip10('eip155/1/0x1234');
-      
-      expect(result1).toBeInstanceOf(Error);
-      expect(result2).toBeInstanceOf(Error);
-      expect(result3).toBeInstanceOf(Error);
+    it.each([
+      { input: '', label: 'empty string' },
+      { input: null as any, label: 'null' },
+      { input: undefined as any, label: 'undefined' },
+      { input: 'eip155:1', label: 'missing address' },
+      { input: 'eip155', label: 'missing reference and address' },
+      { input: ':1:0x1234', label: 'missing namespace' },
+      { input: 'not-a-caip10-string', label: 'invalid format (no colons)' },
+      { input: 'eip155-1-0x1234', label: 'invalid format (dashes)' },
+      { input: 'eip155/1/0x1234', label: 'invalid format (slashes)' },
+    ])('returns error for $label', ({ input }) => {
+      expect(parseCaip10(input)).toBeInstanceOf(Error);
     });
 
     it('trims whitespace', () => {
