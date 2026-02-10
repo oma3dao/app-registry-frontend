@@ -90,11 +90,26 @@ function getCurrentDeploymentUrl(): string {
  * Handles URL rewriting for different environments:
  * - Local development (NODE_ENV=development): Rewrites production URLs to localhost for testing
  * - Deployed environments (production/test): Rewrites localhost URLs to current deployment
+ * - Preview mode (DEBUG_ADAPTER=true): Rewrites registry.omatrust.org to current deployment
+ *   to avoid CORS issues (production domain 302-redirects to preview)
+ * 
+ * Preview mode detection: NEXT_PUBLIC_DEBUG_ADAPTER=true indicates preview phase
+ * When we move to real testnet, DEBUG_ADAPTER will be false and app serves at canonical URL
  */
 function getMetadataFetchUrl(dataUrl: string): string {
   const isLocalDev = process.env.NODE_ENV === 'development';
   const isLocalhostChain = activeChain.id === 31337;
+  const isPreviewMode = parsed.NEXT_PUBLIC_DEBUG_ADAPTER === 'true';
   const currentUrl = getCurrentDeploymentUrl();
+  
+  console.log(`[ENV] getMetadataFetchUrl called:`, {
+    dataUrl,
+    isLocalDev,
+    isLocalhostChain,
+    isPreviewMode,
+    currentUrl,
+    debugAdapter: parsed.NEXT_PUBLIC_DEBUG_ADAPTER
+  });
   
   // Local development (not localhost chain): Rewrite production URLs to localhost for testing
   if (isLocalDev && !isLocalhostChain) {
@@ -114,6 +129,24 @@ function getMetadataFetchUrl(dataUrl: string): string {
     return rewritten;
   }
   
+  // Preview mode: Rewrite production domains to current deployment URL
+  // This avoids CORS issues when registry.omatrust.org 302-redirects to preview.registry.omatrust.org
+  // Only active when DEBUG_ADAPTER=true (preview phase)
+  if (!isLocalDev && isPreviewMode) {
+    const productionDomains = [
+      'https://registry.omatrust.org',
+      'https://test.registry.omatrust.org'
+    ];
+    for (const domain of productionDomains) {
+      if (dataUrl.startsWith(domain)) {
+        const rewritten = dataUrl.replace(domain, currentUrl);
+        console.log(`[ENV] Preview mode - rewriting ${domain} to current deployment: ${dataUrl} → ${rewritten}`);
+        return rewritten;
+      }
+    }
+  }
+  
+  console.log(`[ENV] No rewrite needed, returning original URL: ${dataUrl}`);
   return dataUrl;
 }
 

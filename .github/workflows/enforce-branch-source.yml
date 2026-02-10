@@ -1,0 +1,17 @@
+name: Enforce Branch Source
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check source branch
+        run: |
+          if [[ "${{ github.head_ref }}" != "staging" && ! "${{ github.head_ref }}" =~ ^hotfix/ ]]; then
+            echo "❌ PRs to main must come from 'staging' or 'hotfix/*'"
+            echo "Source branch: ${{ github.head_ref }}"
+            exit 1
+          fi
+          echo "✅ Source branch '${{ github.head_ref }}' is allowed"

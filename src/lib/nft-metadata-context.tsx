@@ -5,6 +5,7 @@ import type { NFT } from "@/schema/data-model";
 
 import { buildVersionedDID } from "@/lib/utils";
 import { log } from "@/lib/log";
+import { env } from "@/config/env";
 import {
   METADATA_JSON_URL_DOWNLOAD_KEY,
   METADATA_JSON_URL_LAUNCH_KEY,
@@ -145,8 +146,9 @@ export function NFTMetadataProvider({ children }: { children: ReactNode }) {
       log(`[NFTMetadataContext] Fetching metadata for: ${versionedDID}`);
 
       // Environment-aware URL construction:
-      // - Production: Use the on-chain dataUrl (external URLs, CDNs, etc.)
       // - Development: Use relative URL to test local API routes
+      // - Production/Testnet: Use getMetadataFetchUrl to handle URL rewriting
+      //   (rewrites registry.omatrust.org to current deployment to avoid CORS issues)
       let fetchUrl: string;
 
       if (process.env.NODE_ENV === 'development') {
@@ -154,9 +156,9 @@ export function NFTMetadataProvider({ children }: { children: ReactNode }) {
         fetchUrl = `/api/data-url/${versionedDID}`;
         log(`[NFTMetadataContext] Development mode - using relative URL: ${fetchUrl}`);
       } else {
-        // Production: Use the actual on-chain dataUrl
-        fetchUrl = nft.dataUrl;
-        log(`[NFTMetadataContext] Production mode - using on-chain dataUrl: ${fetchUrl}`);
+        // Production/Testnet: Use URL rewriter to handle CORS and domain redirects
+        fetchUrl = env.getMetadataFetchUrl(nft.dataUrl);
+        log(`[NFTMetadataContext] Production mode - using rewritten URL: ${fetchUrl} (original: ${nft.dataUrl})`);
       }
 
       const response = await fetch(fetchUrl);
