@@ -1,15 +1,17 @@
 /**
  * ERC-8004 Standard Compliance Tests
- * 
+ *
  * Validates that the registry implementation complies with the ERC-8004
  * standard for tokenized agents/services.
- * 
+ *
  * Standard Reference: ERC-8004
+ * Extensions: ERC8004EXT-SECURITY.md (Security & Ownership), ERC8004EXT-WEB.md (Web Services Trust Layer)
  * Implementation: src/lib/contracts/registry.write.ts
  * Documentation: README.md lines 233-290
- * 
+ *
  * ⚠️ CRITICAL: These tests validate against the ERC-8004 SPECIFICATION,
  * not just the current implementation behavior.
+ * For extension-specific tests see: erc8004ext-security.test.ts, erc8004ext-web.test.ts
  */
 
 import { describe, it, expect } from 'vitest';

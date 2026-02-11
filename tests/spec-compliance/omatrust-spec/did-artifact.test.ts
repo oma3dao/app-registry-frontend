@@ -6,6 +6,7 @@
  * 
  * SPECIFICATION REFERENCES:
  * - OMATrust Identity Specification: omatrust-specification-identity.pdf
+ * - ERC8004EXT-WEB.md: artifacts field (keys=artifactDid, type, downloadUrls)
  * - Repository: https://github.com/oma3dao/omatrust-docs/tree/main/specification
  * - Section: Appendix A - did:artifact Method
  * - Related: Appendix B - Website Artifacts and SRI Manifests

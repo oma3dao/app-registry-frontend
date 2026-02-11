@@ -205,6 +205,12 @@ describe('schema/data-model functions', () => {
 
   describe('isMetadataOwnerVerified', () => {
     /**
+     * ERC8004EXT-SECURITY: Client Requirements - Registration File owner verification.
+     * "Clients MUST verify ownership: fetch Registration File, extract owner (CAIP-10),
+     *  compare with ownerOf(agentId) or getRegistration().currentOwner"
+     */
+
+    /**
      * Test: returns true when metadata owner matches contract owner
      */
     it('returns true when metadata owner matches contract owner', () => {
