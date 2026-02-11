@@ -34,6 +34,7 @@ export interface AttestationSchema {
   deployedBlocks?: Record<number, number> // chainId -> deployment block number
   revocable?: boolean // Whether attestations using this schema can be revoked (default: false)
   easSchemaString?: string // Solidity-typed schema string for EAS SchemaEncoder
+  witness?: { subjectField: string; controllerField: string } // Controller Witness API config from x-oma3-witness
 }
 
 // Field definitions
@@ -830,6 +831,7 @@ export const keyBindingSchema: AttestationSchema = {
   description: 'Publishes a cryptographic key associated with a DID. Supports multi-purpose bindings, rotation, and revocation. Each attestation binds one key to one subject.',
   fields: keyBindingFields,
   revocable: true,
+  witness: {"subjectField":"subject","controllerField":"keyId"},
   easSchemaString: 'string subject, string keyId, string publicKeyJwk, string[] keyPurpose, string[] proofs, uint256 issuedAt, uint256 effectiveAt, uint256 expiresAt',
   deployedUIDs: {
     97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
@@ -851,6 +853,7 @@ export const linkedIdentifierSchema: AttestationSchema = {
   description: 'An attestation where the attester (a trusted third party) asserts that the subject controls the linked identifier. Both subject and linkedId MUST be valid DIDs, creating a symmetric DID-to-DID link that attests two identities are owned by the same entity.',
   fields: linkedIdentifierFields,
   revocable: true,
+  witness: {"subjectField":"subject","controllerField":"linkedId"},
   easSchemaString: 'string subject, string linkedId, string method, string[] proofs, uint256 issuedAt, uint256 effectiveAt, uint256 expiresAt',
   deployedUIDs: {
     97: '0xd6ef74f4f2f8d79a8993132577713ada1ae9ba937d8bbd69a174cd6afe6beef6', // BSC Testnet

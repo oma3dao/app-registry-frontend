@@ -14,7 +14,7 @@ import {
   validateParams,
   ControllerWitnessRouteError,
   type ControllerWitnessAttestationParams,
-} from '@/lib/server/controller-witness';
+} from '@/lib/server/controller-witness-handler';
 
 export const runtime = 'nodejs';
 
