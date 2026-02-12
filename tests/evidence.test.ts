@@ -75,6 +75,24 @@ describe('evidence', () => {
       expect(result).not.toBeNull();
       expect(result!.controllers).toEqual(['did:pkh:eip155:1:0xabc123']);
     });
+
+    it('ignores unknown fields for forward compatibility', () => {
+      const result = parseEvidenceString('v=1;foo=bar;controller=did:pkh:eip155:1:0xabc;baz=qux');
+      expect(result).not.toBeNull();
+      expect(result!.controllers).toEqual(['did:pkh:eip155:1:0xabc']);
+    });
+
+    it('returns empty controllers when v=1 present but no controller fields', () => {
+      const result = parseEvidenceString('v=1;foo=bar');
+      expect(result).not.toBeNull();
+      expect(result!.controllers).toEqual([]);
+    });
+
+    it('handles mixed separator types (semicolons and whitespace)', () => {
+      const result = parseEvidenceString('v=1 controller=did:pkh:eip155:1:0xaaa;controller=did:pkh:eip155:1:0xbbb');
+      expect(result).not.toBeNull();
+      expect(result!.controllers).toEqual(['did:pkh:eip155:1:0xaaa', 'did:pkh:eip155:1:0xbbb']);
+    });
   });
 
   describe('extractAddress', () => {
@@ -101,6 +119,15 @@ describe('evidence', () => {
       expect(extractAddress('did:web:example.com')).toBeNull();
       expect(extractAddress('not-an-address')).toBeNull();
       expect(extractAddress('')).toBeNull();
+    });
+
+    it('returns null for 0x address with wrong length', () => {
+      expect(extractAddress('0xabc')).toBeNull(); // too short
+      expect(extractAddress('0x' + 'a'.repeat(41))).toBeNull(); // too long
+    });
+
+    it('returns null for 0x address with non-hex characters', () => {
+      expect(extractAddress('0x' + 'g'.repeat(40))).toBeNull();
     });
   });
 
@@ -208,6 +235,81 @@ describe('evidence', () => {
       expect(result.found).toBe(false);
       expect(result.details).toContain('DNS lookup failed');
       expect(result.details).toContain('ENOTFOUND');
+    });
+
+    it('handles DNS error that is not an Error instance', async () => {
+      getResolveTxt().mockRejectedValue('SERVFAIL');
+
+      const result = await findControllerInDnsTxt('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      expect(result.details).toContain('DNS lookup failed');
+      expect(result.details).toContain('SERVFAIL');
+    });
+
+    it('joins multi-chunk TXT records (DNS splits long records)', async () => {
+      // DNS TXT records > 255 chars are split into multiple strings within a single record
+      getResolveTxt().mockResolvedValue([
+        ['v=1;controller=', expectedDid],
+      ]);
+
+      const result = await findControllerInDnsTxt('example.com', expectedDid);
+
+      expect(result.found).toBe(true);
+      expect(result.matchedController).toBe(expectedDid);
+    });
+
+    it('checks multiple TXT records and finds match in second record', async () => {
+      const otherDid = 'did:pkh:eip155:1:0x' + 'b'.repeat(40);
+      getResolveTxt().mockResolvedValue([
+        ['v=1;controller=' + otherDid],
+        ['v=1;controller=' + expectedDid],
+      ]);
+
+      const result = await findControllerInDnsTxt('example.com', expectedDid);
+
+      expect(result.found).toBe(true);
+      expect(result.matchedController).toBe(expectedDid);
+    });
+
+    it('collects all controllers when multiple records have no match', async () => {
+      const didA = 'did:pkh:eip155:1:0x' + 'b'.repeat(40);
+      const didB = 'did:pkh:eip155:1:0x' + 'c'.repeat(40);
+      getResolveTxt().mockResolvedValue([
+        ['v=1;controller=' + didA],
+        ['v=1;controller=' + didB],
+      ]);
+
+      const result = await findControllerInDnsTxt('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      expect(result.details).toContain(didA);
+      expect(result.details).toContain(didB);
+      expect(result.details).toContain('do not match expected');
+    });
+
+    it('skips records without v=1 marker and reports no controllers', async () => {
+      getResolveTxt().mockResolvedValue([
+        ['some-other-txt-record'],
+        ['v=2;controller=' + expectedDid],
+      ]);
+
+      const result = await findControllerInDnsTxt('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      expect(result.details).toContain('no controller entries');
+    });
+
+    it('handles record with multiple controllers where second matches', async () => {
+      const otherDid = 'did:pkh:eip155:1:0x' + 'b'.repeat(40);
+      getResolveTxt().mockResolvedValue([
+        ['v=1;controller=' + otherDid + ';controller=' + expectedDid],
+      ]);
+
+      const result = await findControllerInDnsTxt('example.com', expectedDid);
+
+      expect(result.found).toBe(true);
+      expect(result.matchedController).toBe(expectedDid);
     });
   });
 
@@ -349,6 +451,171 @@ describe('evidence', () => {
       expect(result.found).toBe(false);
       expect(result.details).toContain('DID document fetch failed');
       expect(result.details).toContain('404');
+    });
+
+    it('handles fetch timeout (AbortError)', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.reject(new DOMException('The operation was aborted', 'AbortError')))
+      );
+
+      const result = await findControllerInDidDoc('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      expect(result.details).toContain('Failed to fetch DID document');
+      expect(result.details).toContain('aborted');
+    });
+
+    it('handles non-Error fetch rejection', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.reject('connection refused'))
+      );
+
+      const result = await findControllerInDidDoc('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      expect(result.details).toContain('Failed to fetch DID document');
+      expect(result.details).toContain('connection refused');
+    });
+
+    it('handles DID document with no verificationMethod property at all', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ id: 'did:web:example.com' }),
+          } as Response)
+        )
+      );
+
+      const result = await findControllerInDidDoc('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      expect(result.details).toContain('no verificationMethod entries');
+    });
+
+    it('skips malformed blockchainAccountId (not 3 CAIP-10 parts)', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() =>
+          Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                verificationMethod: [
+                  { blockchainAccountId: 'eip155:66238' }, // only 2 parts, missing address
+                  { blockchainAccountId: `eip155:66238:${expectedAddr}` }, // valid
+                ],
+              }),
+          } as Response)
+        )
+      );
+
+      const result = await findControllerInDidDoc('example.com', expectedDid);
+
+      expect(result.found).toBe(true);
+      expect(result.matchedController).toContain('did:pkh:');
+    });
+
+    it('reports only valid addresses in mismatch details (skips malformed)', async () => {
+      const otherAddr = '0x' + 'b'.repeat(40);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() =>
+          Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                verificationMethod: [
+                  { blockchainAccountId: 'invalid-format' }, // malformed, 1 part
+                  { blockchainAccountId: `eip155:66238:${otherAddr}` }, // valid but wrong
+                ],
+              }),
+          } as Response)
+        )
+      );
+
+      const result = await findControllerInDidDoc('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      expect(result.details).toContain(otherAddr);
+      expect(result.details).toContain('do not match expected');
+    });
+
+    it('checks multiple verification methods and finds match on publicKeyHex', async () => {
+      const otherAddr = '0x' + 'b'.repeat(40);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() =>
+          Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                verificationMethod: [
+                  { blockchainAccountId: `eip155:66238:${otherAddr}` },
+                  { publicKeyHex: expectedAddr.slice(2) }, // matches
+                ],
+              }),
+          } as Response)
+        )
+      );
+
+      const result = await findControllerInDidDoc('example.com', expectedAddr);
+
+      expect(result.found).toBe(true);
+      expect(result.matchedController).toBe(expectedAddr);
+    });
+
+    it('collects addresses from both blockchainAccountId and publicKeyHex in mismatch', async () => {
+      const addrA = '0x' + 'b'.repeat(40);
+      const addrB = 'c'.repeat(40); // publicKeyHex without 0x
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() =>
+          Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                verificationMethod: [
+                  { blockchainAccountId: `eip155:66238:${addrA}` },
+                  { publicKeyHex: addrB },
+                ],
+              }),
+          } as Response)
+        )
+      );
+
+      const result = await findControllerInDidDoc('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      expect(result.details).toContain(addrA);
+      expect(result.details).toContain('0x' + addrB);
+      expect(result.details).toContain('do not match expected');
+    });
+
+    it('handles verification method with neither blockchainAccountId nor publicKeyHex', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() =>
+          Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                verificationMethod: [
+                  { id: '#key-1', type: 'Ed25519VerificationKey2018' },
+                ],
+              }),
+          } as Response)
+        )
+      );
+
+      const result = await findControllerInDidDoc('example.com', expectedDid);
+
+      expect(result.found).toBe(false);
+      // No addresses extracted, so details should mention the addresses list is empty
+      expect(result.details).toContain('do not match expected');
     });
   });
 });
