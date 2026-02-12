@@ -18,7 +18,8 @@ export const APPROVED_WITNESS_CHAINS: Record<number, string> = {
 };
 
 export const APPROVED_CONTROLLER_SCHEMA_UIDS: string[] = [
-  '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d', // key-binding on OMAchain testnet
+  '0x807b38ce9aa23fdde4457de01db9c5e8d6ec7c8feebee242e52be70847b7b966', // key-binding on OMAchain testnet (redeployed)
+  '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d', // key-binding on OMAchain testnet (original — keep for existing attestations)
   // '0xed79388b434965a35d50573b75f4bbd6e3bc7912103c4a6ac0aff6a510ccadac', // linked-identifier on OMAchain testnet — not yet enabled (requires per-platform social API integration)
 ];
 
@@ -40,7 +41,12 @@ export interface SchemaFieldMapping {
 }
 
 export const SCHEMA_FIELD_MAPPINGS: Record<string, SchemaFieldMapping> = {
-  // key-binding: subject + keyId
+  // key-binding: subject + keyId (redeployed)
+  '0x807b38ce9aa23fdde4457de01db9c5e8d6ec7c8feebee242e52be70847b7b966': {
+    subjectField: 'subject',
+    controllerField: 'keyId',
+  },
+  // key-binding: subject + keyId (original — keep for existing attestations)
   '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d': {
     subjectField: 'subject',
     controllerField: 'keyId',
