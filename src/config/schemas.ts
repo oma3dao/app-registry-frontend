@@ -35,6 +35,7 @@ export interface AttestationSchema {
   revocable?: boolean // Whether attestations using this schema can be revoked (default: false)
   easSchemaString?: string // Solidity-typed schema string for EAS SchemaEncoder
   witness?: { subjectField: string; controllerField: string } // Controller Witness API config from x-oma3-witness
+  priorUIDs?: Record<number, string[]> // Previously-deployed schema UIDs per chain (preserved across redeployments for witness compatibility)
 }
 
 // Field definitions
@@ -838,6 +839,9 @@ export const keyBindingSchema: AttestationSchema = {
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
     66238: '0x807b38ce9aa23fdde4457de01db9c5e8d6ec7c8feebee242e52be70847b7b966', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
+  },
+  priorUIDs: {
+    66238: ['0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d'] // OMAchain Testnet
   },
   deployedBlocks: {
     97: 0, // BSC Testnet

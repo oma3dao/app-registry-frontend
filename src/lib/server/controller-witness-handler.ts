@@ -51,14 +51,11 @@ export interface ControllerWitnessAttestationResult {
 
 export {
   APPROVED_WITNESS_CHAINS,
-  APPROVED_CONTROLLER_SCHEMA_UIDS,
   APPROVED_CONTROLLER_WITNESS_ATTESTERS,
 } from '@/config/controller-witness-config';
 
 import {
   APPROVED_WITNESS_CHAINS,
-  APPROVED_CONTROLLER_SCHEMA_UIDS,
-  SCHEMA_FIELD_MAPPINGS,
 } from '@/config/controller-witness-config';
 
 import { EAS, SchemaEncoder } from '@ethereum-attestation-service/eas-sdk';
@@ -71,6 +68,12 @@ import {
   findControllerInDidDoc,
 } from '@/lib/server/evidence';
 import { loadIssuerPrivateKey } from '@/lib/server/issuer-key';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const ZERO_UID = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 // ---------------------------------------------------------------------------
 // Supported evidence methods
@@ -234,28 +237,32 @@ export async function verifyTargetControllerAttestation(
     );
   }
 
-  // --- Gate 2: Approved schema (in-memory, no RPC) ---
-  const schemaApproved = APPROVED_CONTROLLER_SCHEMA_UIDS.some(
-    (uid) => uid.toLowerCase() === schemaUid.toLowerCase(),
+  // --- Gate 2: Schema is witness-enabled (derived from schemas.ts) ---
+  // A schema is approved for witness if it has a `witness` config AND a
+  // non-zero deployedUID (or priorUID) matching the requested schemaUid.
+  // This eliminates the need for a separate APPROVED_CONTROLLER_SCHEMA_UIDS allowlist.
+  const matchingSchema = getAllSchemas().find((s) =>
+    s.witness &&
+    s.deployedUIDs &&
+    (
+      Object.values(s.deployedUIDs).some(
+        (uid) => uid.toLowerCase() === schemaUid.toLowerCase() && uid !== ZERO_UID,
+      ) ||
+      s.priorUIDs && Object.values(s.priorUIDs).some(
+        (uids) => uids.some((uid) => uid.toLowerCase() === schemaUid.toLowerCase()),
+      )
+    ),
   );
-  if (!schemaApproved) {
+  if (!matchingSchema || !matchingSchema.witness) {
     throw new ControllerWitnessRouteError(
-      `Schema ${schemaUid} is not in the approved list`,
+      `Schema ${schemaUid} is not a witness-enabled schema`,
       403,
       'SCHEMA_NOT_APPROVED',
     );
   }
 
-  // --- Gate 3: Field mapping exists for this schema ---
-  const fieldMapping = SCHEMA_FIELD_MAPPINGS[schemaUid.toLowerCase()]
-    ?? SCHEMA_FIELD_MAPPINGS[schemaUid];
-  if (!fieldMapping) {
-    throw new ControllerWitnessRouteError(
-      `No field mapping configured for schema ${schemaUid}`,
-      403,
-      'SCHEMA_NOT_APPROVED',
-    );
-  }
+  // Field mapping comes directly from the schema's witness config
+  const fieldMapping = matchingSchema.witness;
 
   // --- Gate 4: Attestation exists on-chain (single RPC call) ---
   const rpcUrl = getRpcUrl(chainId);
@@ -275,7 +282,6 @@ export async function verifyTargetControllerAttestation(
   }
 
   // EAS returns a zeroed-out struct for non-existent UIDs instead of throwing
-  const ZERO_UID = '0x0000000000000000000000000000000000000000000000000000000000000000';
   if (!attestation.uid || attestation.uid === ZERO_UID || attestation.schema === ZERO_UID) {
     throw new ControllerWitnessRouteError(
       `Attestation ${attestationUid} not found on chain ${chainId}`,
@@ -303,13 +309,8 @@ export async function verifyTargetControllerAttestation(
   }
 
   // --- Gate 7: Decode and match subject + controller fields ---
-  // Look up easSchemaString from schemas.ts (auto-generated from .eas.json)
-  const matchingSchema = getAllSchemas().find((s) =>
-    s.deployedUIDs && Object.values(s.deployedUIDs).some(
-      (uid) => uid.toLowerCase() === schemaUid.toLowerCase(),
-    ),
-  );
-  const easSchemaString = matchingSchema?.easSchemaString;
+  // matchingSchema was already resolved in Gate 2
+  const easSchemaString = matchingSchema.easSchemaString;
   if (!easSchemaString) {
     throw new ControllerWitnessRouteError(
       `No EAS schema string found for schema ${schemaUid} — regenerate schemas.ts`,
@@ -503,7 +504,6 @@ export async function submitControllerWitnessAttestation(
   // Look up the controller-witness schema's deployed UID for this chain
   const cwSchema = getSchema('controller-witness');
   const controllerWitnessSchemaUid = cwSchema?.deployedUIDs?.[params.chainId];
-  const ZERO_UID = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
   if (!controllerWitnessSchemaUid || controllerWitnessSchemaUid === ZERO_UID) {
     throw new ControllerWitnessRouteError(
