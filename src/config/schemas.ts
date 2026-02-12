@@ -836,13 +836,13 @@ export const keyBindingSchema: AttestationSchema = {
   deployedUIDs: {
     97: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d', // OMAchain Testnet
+    66238: '0x807b38ce9aa23fdde4457de01db9c5e8d6ec7c8feebee242e52be70847b7b966', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
   },
   deployedBlocks: {
     97: 0, // BSC Testnet
     56: 0, // BSC Mainnet
-    66238: 291, // OMAchain Testnet
+    66238: 349, // OMAchain Testnet
     6623: 0  // OMAchain Mainnet
   }
 };
