@@ -2,22 +2,24 @@
  * Tests for controller-witness allowlist config
  *
  * Validates behavior against the actual allowlists in
- * src/config/controller-witness-config.ts (approved chains,
- * schemas, field mappings). Ensures config structure and
- * consistency for controller-witness route.
+ * src/config/controller-witness-config.ts (approved chains, attesters)
+ * and the schema-derived witness approval from src/config/schemas.ts.
+ *
+ * Schema approval is now derived from schemas.ts — any schema with a
+ * `witness` config and a non-zero deployedUID is automatically approved.
+ * Field mappings (subjectField, controllerField) come from the schema's
+ * `witness` block. No manual UID list to maintain.
  */
 
 import { describe, it, expect } from 'vitest';
 import {
   APPROVED_WITNESS_CHAINS,
-  APPROVED_CONTROLLER_SCHEMA_UIDS,
-  SCHEMA_FIELD_MAPPINGS,
   APPROVED_CONTROLLER_WITNESS_ATTESTERS,
-  type SchemaFieldMapping,
 } from '@/config/controller-witness-config';
+import { getAllSchemas } from '@/config/schemas';
 
 const HEX_20_BYTES = /^0x[0-9a-fA-F]{40}$/;
-const HEX_32_BYTES = /^0x[0-9a-fA-F]{64}$/;
+const ZERO_UID = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 describe('controller-witness-config', () => {
   describe('APPROVED_WITNESS_CHAINS', () => {
@@ -39,54 +41,6 @@ describe('controller-witness-config', () => {
       for (const easContract of Object.values(APPROVED_WITNESS_CHAINS)) {
         expect(typeof easContract).toBe('string');
         expect(HEX_20_BYTES.test(easContract)).toBe(true);
-      }
-    });
-  });
-
-  describe('APPROVED_CONTROLLER_SCHEMA_UIDS', () => {
-    it('is a non-empty array', () => {
-      expect(Array.isArray(APPROVED_CONTROLLER_SCHEMA_UIDS)).toBe(true);
-      expect(APPROVED_CONTROLLER_SCHEMA_UIDS.length).toBeGreaterThan(0);
-    });
-
-    it('contains only 32-byte hex schema UIDs', () => {
-      for (const uid of APPROVED_CONTROLLER_SCHEMA_UIDS) {
-        expect(typeof uid).toBe('string');
-        expect(HEX_32_BYTES.test(uid)).toBe(true);
-      }
-    });
-
-    it('has no duplicate UIDs', () => {
-      const lower = APPROVED_CONTROLLER_SCHEMA_UIDS.map((u) => u.toLowerCase());
-      const set = new Set(lower);
-      expect(set.size).toBe(APPROVED_CONTROLLER_SCHEMA_UIDS.length);
-    });
-  });
-
-  describe('SCHEMA_FIELD_MAPPINGS', () => {
-    it('has an entry for every approved schema UID', () => {
-      for (const schemaUid of APPROVED_CONTROLLER_SCHEMA_UIDS) {
-        const mapping =
-          SCHEMA_FIELD_MAPPINGS[schemaUid] ??
-          SCHEMA_FIELD_MAPPINGS[schemaUid.toLowerCase()];
-        expect(mapping).toBeDefined();
-        expect(mapping).toHaveProperty('subjectField');
-        expect(mapping).toHaveProperty('controllerField');
-      }
-    });
-
-    it('mappings have non-empty subjectField and controllerField', () => {
-      for (const mapping of Object.values(SCHEMA_FIELD_MAPPINGS) as SchemaFieldMapping[]) {
-        expect(typeof mapping.subjectField).toBe('string');
-        expect(mapping.subjectField.length).toBeGreaterThan(0);
-        expect(typeof mapping.controllerField).toBe('string');
-        expect(mapping.controllerField.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('subjectField is "subject" for all current mappings', () => {
-      for (const mapping of Object.values(SCHEMA_FIELD_MAPPINGS) as SchemaFieldMapping[]) {
-        expect(mapping.subjectField).toBe('subject');
       }
     });
   });
@@ -124,6 +78,122 @@ describe('controller-witness-config', () => {
         const attesters = APPROVED_CONTROLLER_WITNESS_ATTESTERS[chainId];
         expect(attesters).toBeDefined();
         expect(attesters!.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe('schema-derived witness approval', () => {
+    const allSchemas = getAllSchemas();
+    const witnessSchemas = allSchemas.filter((s) => s.witness);
+
+    it('at least one schema has a witness config', () => {
+      expect(witnessSchemas.length).toBeGreaterThan(0);
+    });
+
+    it('witness schemas have subjectField and controllerField', () => {
+      for (const schema of witnessSchemas) {
+        expect(schema.witness).toBeDefined();
+        expect(typeof schema.witness!.subjectField).toBe('string');
+        expect(schema.witness!.subjectField.length).toBeGreaterThan(0);
+        expect(typeof schema.witness!.controllerField).toBe('string');
+        expect(schema.witness!.controllerField.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('witness schemas have at least one non-zero deployedUID', () => {
+      for (const schema of witnessSchemas) {
+        expect(schema.deployedUIDs).toBeDefined();
+        const nonZeroUIDs = Object.values(schema.deployedUIDs!).filter(
+          (uid) => uid !== ZERO_UID
+        );
+        expect(nonZeroUIDs.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('witness schemas have an easSchemaString for decoding', () => {
+      for (const schema of witnessSchemas) {
+        expect(typeof schema.easSchemaString).toBe('string');
+        expect(schema.easSchemaString!.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('key-binding schema has witness config with keyId as controllerField', () => {
+      const kb = allSchemas.find((s) => s.id === 'key-binding');
+      expect(kb).toBeDefined();
+      expect(kb!.witness).toBeDefined();
+      expect(kb!.witness!.subjectField).toBe('subject');
+      expect(kb!.witness!.controllerField).toBe('keyId');
+    });
+
+    it('linked-identifier schema has witness config with linkedId as controllerField', () => {
+      const li = allSchemas.find((s) => s.id === 'linked-identifier');
+      expect(li).toBeDefined();
+      expect(li!.witness).toBeDefined();
+      expect(li!.witness!.subjectField).toBe('subject');
+      expect(li!.witness!.controllerField).toBe('linkedId');
+    });
+
+    it('controller-witness schema exists but does not have witness config (it IS the witness)', () => {
+      const cw = allSchemas.find((s) => s.id === 'controller-witness');
+      expect(cw).toBeDefined();
+      expect(cw!.witness).toBeUndefined();
+    });
+
+    it('each witness schema is deployed on at least one approved witness chain', () => {
+      // Schemas may be deployed on chains that aren't yet approved for witnessing
+      // (e.g., BSC Testnet). The requirement is that at least one approved chain
+      // has a non-zero deployedUID for each witness-enabled schema.
+      const approvedChainIds = Object.keys(APPROVED_WITNESS_CHAINS).map(Number);
+      for (const schema of witnessSchemas) {
+        const hasDeploymentOnApprovedChain = approvedChainIds.some(
+          (chainId) =>
+            schema.deployedUIDs![chainId] &&
+            schema.deployedUIDs![chainId] !== ZERO_UID
+        );
+        expect(hasDeploymentOnApprovedChain).toBe(true);
+      }
+    });
+
+    it('witness subjectField references an actual field in the schema', () => {
+      for (const schema of witnessSchemas) {
+        const fieldNames = schema.fields.map((f: any) => f.name);
+        expect(fieldNames).toContain(schema.witness!.subjectField);
+      }
+    });
+
+    it('witness controllerField references an actual field in the schema', () => {
+      for (const schema of witnessSchemas) {
+        const fieldNames = schema.fields.map((f: any) => f.name);
+        expect(fieldNames).toContain(schema.witness!.controllerField);
+      }
+    });
+
+    it('witness field references point to string-typed fields', () => {
+      for (const schema of witnessSchemas) {
+        const subjectField = schema.fields.find(
+          (f: any) => f.name === schema.witness!.subjectField
+        );
+        const controllerField = schema.fields.find(
+          (f: any) => f.name === schema.witness!.controllerField
+        );
+        expect(subjectField).toBeDefined();
+        expect(subjectField!.type).toBe('string');
+        expect(controllerField).toBeDefined();
+        expect(controllerField!.type).toBe('string');
+      }
+    });
+
+    it('priorUIDs entries (if present) are arrays of 32-byte hex strings', () => {
+      const HEX_32_BYTES = /^0x[0-9a-fA-F]{64}$/;
+      for (const schema of allSchemas) {
+        if (!schema.priorUIDs) continue;
+        for (const [chainIdStr, uids] of Object.entries(schema.priorUIDs)) {
+          expect(Number.isInteger(Number(chainIdStr))).toBe(true);
+          expect(Array.isArray(uids)).toBe(true);
+          for (const uid of uids as string[]) {
+            expect(HEX_32_BYTES.test(uid)).toBe(true);
+          }
+        }
       }
     });
   });

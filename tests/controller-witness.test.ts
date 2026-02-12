@@ -19,7 +19,7 @@ import {
   submitControllerWitnessAttestation,
   ControllerWitnessRouteError,
   type ControllerWitnessAttestationParams,
-} from '@/lib/server/controller-witness';
+} from '@/lib/server/controller-witness-handler';
 import * as evidence from '@/lib/server/evidence';
 import * as schemas from '@/config/schemas';
 import * as issuerKey from '@/lib/server/issuer-key';
@@ -27,27 +27,21 @@ import * as issuerKey from '@/lib/server/issuer-key';
 const APPROVED_EAS = '0x' + 'b'.repeat(40);
 const SCHEMA_UID = '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d';
 // Mock config and heavy dependencies - use literals to avoid hoisting issues
+// Schema approval is now derived from schemas.ts witness config — no manual UID list
 vi.mock('@/config/controller-witness-config', () => ({
   APPROVED_WITNESS_CHAINS: { 66238: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
-  APPROVED_CONTROLLER_SCHEMA_UIDS: [
-    '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d',
-  ],
   APPROVED_CONTROLLER_WITNESS_ATTESTERS: { 66238: ['0x7D5beD223Bc343F114Aa28961Cc447dbbc9c2330'] },
-  SCHEMA_FIELD_MAPPINGS: {
-    '0x290ce7f909a98f74d2356cf24102ac813555fa0bcd456f1bab17da2d92632e1d': {
-      subjectField: 'subject',
-      controllerField: 'keyId',
-    },
-  },
 }));
 
 const mockEasGetAttestation = vi.fn();
+const mockEasAttest = vi.fn();
 const mockSchemaEncoderDecode = vi.fn();
 
 vi.mock('@ethereum-attestation-service/eas-sdk', () => ({
   EAS: vi.fn().mockImplementation(() => ({
     connect: vi.fn(),
     getAttestation: mockEasGetAttestation,
+    attest: mockEasAttest,
   })),
   SchemaEncoder: vi.fn().mockImplementation(() => ({
     decodeData: mockSchemaEncoderDecode,
@@ -211,6 +205,46 @@ describe('controller-witness', () => {
         expect((e as ControllerWitnessRouteError).code).toBe('INVALID_METHOD');
         expect((e as any).message).toContain('dns-txt');
         expect((e as any).message).toContain('did-json');
+      }
+    });
+
+    it('throws on null chainId (treated as missing)', () => {
+      const body = { ...validBody, chainId: null };
+      expect(() => validateParams(body)).toThrow(ControllerWitnessRouteError);
+      try {
+        validateParams(body);
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('MISSING_FIELDS');
+        expect((e as any).message).toContain('chainId');
+      }
+    });
+
+    it('throws on invalid schemaUid format (not 32-byte hex)', () => {
+      const body = { ...validBody, schemaUid: '0x' + 'a'.repeat(40) };
+      expect(() => validateParams(body)).toThrow(ControllerWitnessRouteError);
+      try {
+        validateParams(body);
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('MISSING_FIELDS');
+        expect((e as any).message).toContain('schemaUid');
+        expect((e as any).message).toContain('32-byte');
+      }
+    });
+
+    it('lists all missing fields when multiple are absent', () => {
+      const body = { attestationUid: undefined, chainId: undefined, easContract: undefined };
+      expect(() => validateParams(body as any)).toThrow(ControllerWitnessRouteError);
+      try {
+        validateParams(body as any);
+      } catch (e) {
+        const msg = (e as ControllerWitnessRouteError).message;
+        expect(msg).toContain('attestationUid');
+        expect(msg).toContain('chainId');
+        expect(msg).toContain('easContract');
+        expect(msg).toContain('schemaUid');
+        expect(msg).toContain('subject');
+        expect(msg).toContain('controller');
+        expect(msg).toContain('method');
       }
     });
   });
@@ -412,6 +446,7 @@ describe('controller-witness', () => {
       vi.mocked(schemas.getAllSchemas).mockReturnValue([
         {
           id: 'key-binding',
+          witness: { subjectField: 'subject', controllerField: 'keyId' },
           deployedUIDs: { 66238: SCHEMA_UID },
           easSchemaString: 'string subject,string keyId',
         } as any,
@@ -500,6 +535,75 @@ describe('controller-witness', () => {
       }
     });
 
+    it('throws ATTESTATION_NOT_FOUND when EAS returns zeroed-out uid', async () => {
+      const ZERO_UID = '0x' + '0'.repeat(64);
+      mockEasGetAttestation.mockResolvedValue({
+        uid: ZERO_UID,
+        schema: SCHEMA_UID,
+        revocationTime: 0n,
+        data: '0x',
+      });
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('ATTESTATION_NOT_FOUND');
+        expect((e as ControllerWitnessRouteError).statusCode).toBe(404);
+      }
+    });
+
+    it('throws ATTESTATION_NOT_FOUND when EAS returns zeroed-out schema', async () => {
+      const ZERO_UID = '0x' + '0'.repeat(64);
+      mockEasGetAttestation.mockResolvedValue({
+        uid: '0x' + 'a'.repeat(64),
+        schema: ZERO_UID,
+        revocationTime: 0n,
+        data: '0x',
+      });
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('ATTESTATION_NOT_FOUND');
+      }
+    });
+
     it('throws when attestation schema does not match', async () => {
       mockEasGetAttestation.mockResolvedValue({
         uid: '0x' + 'a'.repeat(64),
@@ -531,6 +635,328 @@ describe('controller-witness', () => {
       } catch (e) {
         expect((e as ControllerWitnessRouteError).code).toBe('FIELDS_MISMATCH');
       }
+    });
+
+    it('throws SCHEMA_NOT_APPROVED when schemaUid has no witness-enabled match', async () => {
+      const unknownSchemaUid = '0x' + '1'.repeat(64);
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          unknownSchemaUid,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          unknownSchemaUid,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('SCHEMA_NOT_APPROVED');
+        expect((e as ControllerWitnessRouteError).statusCode).toBe(403);
+      }
+    });
+
+    it('throws SCHEMA_NOT_APPROVED when schema has no witness config', async () => {
+      // Schema exists with matching UID but no witness config
+      vi.mocked(schemas.getAllSchemas).mockReturnValue([
+        {
+          id: 'user-review',
+          deployedUIDs: { 66238: SCHEMA_UID },
+          easSchemaString: 'string subject,uint8 ratingValue',
+        } as any,
+      ]);
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('SCHEMA_NOT_APPROVED');
+      }
+    });
+
+    it('approves schema via priorUIDs when deployedUID has changed', async () => {
+      // Simulate a redeployed schema — current deployedUID is different,
+      // but the requested schemaUid matches a priorUID entry
+      const priorSchemaUid = SCHEMA_UID;
+      const currentDeployedUid = '0x' + '7'.repeat(64);
+
+      vi.mocked(schemas.getAllSchemas).mockReturnValue([
+        {
+          id: 'key-binding',
+          witness: { subjectField: 'subject', controllerField: 'keyId' },
+          deployedUIDs: { 66238: currentDeployedUid },
+          priorUIDs: { 66238: [priorSchemaUid] },
+          easSchemaString: 'string subject,string keyId',
+        } as any,
+      ]);
+
+      mockEasGetAttestation.mockResolvedValue({
+        uid: '0x' + 'a'.repeat(64),
+        schema: priorSchemaUid,
+        revocationTime: 0n,
+        data: '0x',
+      });
+      mockSchemaEncoderDecode.mockReturnValue([
+        { name: 'subject', value: subject },
+        { name: 'keyId', value: controller },
+      ]);
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          priorSchemaUid,
+          subject,
+          controller
+        )
+      ).resolves.toBeUndefined();
+    });
+
+    it('throws ATTESTATION_REVOKED when attestation has been revoked', async () => {
+      mockEasGetAttestation.mockResolvedValue({
+        uid: '0x' + 'a'.repeat(64),
+        schema: SCHEMA_UID,
+        revocationTime: 1700000000n, // non-zero = revoked
+        data: '0x',
+      });
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('ATTESTATION_REVOKED');
+        expect((e as ControllerWitnessRouteError).statusCode).toBe(409);
+      }
+    });
+
+    it('throws FIELDS_MISMATCH when decoded subject does not match', async () => {
+      mockEasGetAttestation.mockResolvedValue({
+        uid: '0x' + 'a'.repeat(64),
+        schema: SCHEMA_UID,
+        revocationTime: 0n,
+        data: '0x',
+      });
+      mockSchemaEncoderDecode.mockReturnValue([
+        { name: 'subject', value: 'did:pkh:eip155:66238:0xwrongsubject000000000000000000000000000' },
+        { name: 'keyId', value: controller },
+      ]);
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('FIELDS_MISMATCH');
+        expect((e as ControllerWitnessRouteError).message).toContain('Subject mismatch');
+      }
+    });
+
+    it('throws FIELDS_MISMATCH when decoded controller does not match', async () => {
+      mockEasGetAttestation.mockResolvedValue({
+        uid: '0x' + 'a'.repeat(64),
+        schema: SCHEMA_UID,
+        revocationTime: 0n,
+        data: '0x',
+      });
+      mockSchemaEncoderDecode.mockReturnValue([
+        { name: 'subject', value: subject },
+        { name: 'keyId', value: 'did:pkh:eip155:66238:0xwrongcontrol00000000000000000000000000' },
+      ]);
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('FIELDS_MISMATCH');
+        expect((e as ControllerWitnessRouteError).message).toContain('Controller mismatch');
+      }
+    });
+
+    it('throws SERVER_ERROR when matching schema has no easSchemaString', async () => {
+      vi.mocked(schemas.getAllSchemas).mockReturnValue([
+        {
+          id: 'key-binding',
+          witness: { subjectField: 'subject', controllerField: 'keyId' },
+          deployedUIDs: { 66238: SCHEMA_UID },
+          // no easSchemaString
+        } as any,
+      ]);
+
+      mockEasGetAttestation.mockResolvedValue({
+        uid: '0x' + 'a'.repeat(64),
+        schema: SCHEMA_UID,
+        revocationTime: 0n,
+        data: '0x',
+      });
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('SERVER_ERROR');
+        expect((e as ControllerWitnessRouteError).message).toContain('No EAS schema string');
+      }
+    });
+
+    it('throws SERVER_ERROR when decodeData throws a non-route error', async () => {
+      mockEasGetAttestation.mockResolvedValue({
+        uid: '0x' + 'a'.repeat(64),
+        schema: SCHEMA_UID,
+        revocationTime: 0n,
+        data: '0xbaddata',
+      });
+      mockSchemaEncoderDecode.mockImplementation(() => {
+        throw new Error('Invalid data format');
+      });
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).rejects.toThrow(ControllerWitnessRouteError);
+
+      try {
+        mockSchemaEncoderDecode.mockImplementation(() => {
+          throw new Error('Invalid data format');
+        });
+        await verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        );
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('SERVER_ERROR');
+        expect((e as ControllerWitnessRouteError).message).toContain('Failed to decode attestation data');
+        expect((e as ControllerWitnessRouteError).message).toContain('Invalid data format');
+      }
+    });
+
+    it('extracts nested value objects from decoded attestation data', async () => {
+      mockEasGetAttestation.mockResolvedValue({
+        uid: '0x' + 'a'.repeat(64),
+        schema: SCHEMA_UID,
+        revocationTime: 0n,
+        data: '0x',
+      });
+      // EAS SDK sometimes returns nested { value: { value: "actual" } } structures
+      mockSchemaEncoderDecode.mockReturnValue([
+        { name: 'subject', value: { value: subject } },
+        { name: 'keyId', value: { value: controller } },
+      ]);
+
+      await expect(
+        verifyTargetControllerAttestation(
+          '0x' + 'a'.repeat(64),
+          66238,
+          APPROVED_EAS,
+          SCHEMA_UID,
+          subject,
+          controller
+        )
+      ).resolves.toBeUndefined();
     });
 
     it('succeeds when attestation is valid and fields match', async () => {
@@ -587,6 +1013,7 @@ describe('controller-witness', () => {
       vi.mocked(schemas.getAllSchemas).mockReturnValue([
         {
           id: 'key-binding',
+          witness: { subjectField: 'subject', controllerField: 'keyId' },
           deployedUIDs: { 66238: SCHEMA_UID },
           easSchemaString: 'string subject,string keyId',
         } as any,
@@ -645,6 +1072,217 @@ describe('controller-witness', () => {
       await expect(submitControllerWitnessAttestation(paramsNoCache)).rejects.toThrow(
         /Issuer key not configured/
       );
+    });
+
+    it('throws when controller-witness schema is not deployed on chain', async () => {
+      const ZERO_UID = '0x' + '0'.repeat(64);
+      const uniqueParams: ControllerWitnessAttestationParams = {
+        ...params,
+        subject: 'did:web:cw-not-deployed.example.com',
+        controller: 'did:pkh:eip155:66238:0x' + '1'.repeat(40),
+      };
+
+      mockSchemaEncoderDecode.mockReturnValueOnce([
+        { name: 'subject', value: uniqueParams.subject },
+        { name: 'keyId', value: uniqueParams.controller },
+      ]);
+      vi.mocked(evidence.findControllerInDnsTxt).mockResolvedValueOnce({
+        found: true,
+        matchedController: uniqueParams.controller,
+      });
+      // Return CW schema with zero deployedUID for this chain
+      vi.mocked(schemas.getSchema).mockReturnValueOnce({
+        id: 'controller-witness',
+        deployedUIDs: { 66238: ZERO_UID },
+        easSchemaString: 'string subject,string controller,string method,uint256 observedAt',
+      } as any);
+
+      await expect(submitControllerWitnessAttestation(uniqueParams)).rejects.toThrow(
+        ControllerWitnessRouteError,
+      );
+
+      // Re-mock for the assertion check
+      mockSchemaEncoderDecode.mockReturnValueOnce([
+        { name: 'subject', value: uniqueParams.subject },
+        { name: 'keyId', value: uniqueParams.controller },
+      ]);
+      vi.mocked(evidence.findControllerInDnsTxt).mockResolvedValueOnce({
+        found: true,
+        matchedController: uniqueParams.controller,
+      });
+      vi.mocked(schemas.getSchema).mockReturnValueOnce({
+        id: 'controller-witness',
+        deployedUIDs: { 66238: ZERO_UID },
+        easSchemaString: 'string subject,string controller,string method,uint256 observedAt',
+      } as any);
+
+      try {
+        await submitControllerWitnessAttestation(uniqueParams);
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('SERVER_ERROR');
+        expect((e as ControllerWitnessRouteError).message).toContain('schema not deployed');
+      }
+    });
+
+    it('throws when controller-witness schema has no easSchemaString', async () => {
+      const uniqueParams: ControllerWitnessAttestationParams = {
+        ...params,
+        subject: 'did:web:cw-no-schema-string.example.com',
+        controller: 'did:pkh:eip155:66238:0x' + '2'.repeat(40),
+      };
+
+      mockSchemaEncoderDecode.mockReturnValueOnce([
+        { name: 'subject', value: uniqueParams.subject },
+        { name: 'keyId', value: uniqueParams.controller },
+      ]);
+      vi.mocked(evidence.findControllerInDnsTxt).mockResolvedValueOnce({
+        found: true,
+        matchedController: uniqueParams.controller,
+      });
+      // Return CW schema with valid UID but no easSchemaString
+      vi.mocked(schemas.getSchema).mockReturnValueOnce({
+        id: 'controller-witness',
+        deployedUIDs: { 66238: '0x' + 'c'.repeat(64) },
+        // no easSchemaString
+      } as any);
+
+      await expect(submitControllerWitnessAttestation(uniqueParams)).rejects.toThrow(
+        ControllerWitnessRouteError,
+      );
+
+      mockSchemaEncoderDecode.mockReturnValueOnce([
+        { name: 'subject', value: uniqueParams.subject },
+        { name: 'keyId', value: uniqueParams.controller },
+      ]);
+      vi.mocked(evidence.findControllerInDnsTxt).mockResolvedValueOnce({
+        found: true,
+        matchedController: uniqueParams.controller,
+      });
+      vi.mocked(schemas.getSchema).mockReturnValueOnce({
+        id: 'controller-witness',
+        deployedUIDs: { 66238: '0x' + 'c'.repeat(64) },
+      } as any);
+
+      try {
+        await submitControllerWitnessAttestation(uniqueParams);
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('SERVER_ERROR');
+        expect((e as ControllerWitnessRouteError).message).toContain('easSchemaString not found');
+      }
+    });
+
+    it('throws SERVER_ERROR when EAS attest call fails', async () => {
+      const uniqueParams: ControllerWitnessAttestationParams = {
+        ...params,
+        subject: 'did:web:eas-fail.example.com',
+        controller: 'did:pkh:eip155:66238:0x' + '3'.repeat(40),
+      };
+
+      mockSchemaEncoderDecode.mockReturnValueOnce([
+        { name: 'subject', value: uniqueParams.subject },
+        { name: 'keyId', value: uniqueParams.controller },
+      ]);
+      vi.mocked(evidence.findControllerInDnsTxt).mockResolvedValueOnce({
+        found: true,
+        matchedController: uniqueParams.controller,
+      });
+      mockEasAttest.mockRejectedValueOnce(new Error('insufficient funds'));
+
+      await expect(submitControllerWitnessAttestation(uniqueParams)).rejects.toThrow(
+        ControllerWitnessRouteError,
+      );
+
+      mockSchemaEncoderDecode.mockReturnValueOnce([
+        { name: 'subject', value: uniqueParams.subject },
+        { name: 'keyId', value: uniqueParams.controller },
+      ]);
+      vi.mocked(evidence.findControllerInDnsTxt).mockResolvedValueOnce({
+        found: true,
+        matchedController: uniqueParams.controller,
+      });
+      mockEasAttest.mockRejectedValueOnce({ reason: 'execution reverted' });
+
+      try {
+        await submitControllerWitnessAttestation(uniqueParams);
+      } catch (e) {
+        expect((e as ControllerWitnessRouteError).code).toBe('SERVER_ERROR');
+        expect((e as ControllerWitnessRouteError).message).toContain('EAS attestation submission failed');
+      }
+    });
+
+    it('completes full success path: gate checks → evidence → EAS submission', async () => {
+      const uniqueParams: ControllerWitnessAttestationParams = {
+        ...params,
+        subject: 'did:web:full-success.example.com',
+        controller: 'did:pkh:eip155:66238:0x' + '4'.repeat(40),
+      };
+
+      mockSchemaEncoderDecode.mockReturnValueOnce([
+        { name: 'subject', value: uniqueParams.subject },
+        { name: 'keyId', value: uniqueParams.controller },
+      ]);
+      vi.mocked(evidence.findControllerInDnsTxt).mockResolvedValueOnce({
+        found: true,
+        matchedController: uniqueParams.controller,
+      });
+
+      const expectedUid = '0x' + 'f'.repeat(64);
+      mockEasAttest.mockResolvedValueOnce({
+        wait: vi.fn().mockResolvedValue(expectedUid),
+        receipt: {
+          hash: '0xtxhash123',
+          blockNumber: 42,
+        },
+      });
+
+      const result = await submitControllerWitnessAttestation(uniqueParams);
+
+      expect(result.success).toBe(true);
+      expect(result.existing).toBe(false);
+      expect(result.uid).toBe(expectedUid);
+      expect(result.txHash).toBe('0xtxhash123');
+      expect(result.blockNumber).toBe(42);
+      expect(typeof result.observedAt).toBe('number');
+      expect(result.observedAt).toBeGreaterThan(0);
+
+      // Verify the attestation was cached for duplicate detection
+      const cached = await checkExistingControllerWitnessAttestation(
+        uniqueParams.subject,
+        uniqueParams.controller,
+      );
+      expect(cached).not.toBeNull();
+      expect(cached!.uid).toBe(expectedUid);
+    });
+
+    it('success path returns null txHash/blockNumber when receipt is missing', async () => {
+      const uniqueParams: ControllerWitnessAttestationParams = {
+        ...params,
+        subject: 'did:web:no-receipt.example.com',
+        controller: 'did:pkh:eip155:66238:0x' + '5'.repeat(40),
+      };
+
+      mockSchemaEncoderDecode.mockReturnValueOnce([
+        { name: 'subject', value: uniqueParams.subject },
+        { name: 'keyId', value: uniqueParams.controller },
+      ]);
+      vi.mocked(evidence.findControllerInDnsTxt).mockResolvedValueOnce({
+        found: true,
+        matchedController: uniqueParams.controller,
+      });
+
+      const expectedUid = '0x' + 'a'.repeat(62) + 'ff';
+      mockEasAttest.mockResolvedValueOnce({
+        wait: vi.fn().mockResolvedValue(expectedUid),
+        receipt: undefined, // no receipt
+      });
+
+      const result = await submitControllerWitnessAttestation(uniqueParams);
+
+      expect(result.success).toBe(true);
+      expect(result.existing).toBe(false);
+      expect(result.uid).toBe(expectedUid);
+      expect(result.txHash).toBeNull();
+      expect(result.blockNumber).toBeNull();
     });
   });
 });

@@ -14,14 +14,13 @@ import {
   validateParams,
   type ControllerWitnessAttestationParams,
   type ControllerWitnessAttestationResult,
-} from '@/lib/server/controller-witness';
+} from '@/lib/server/controller-witness-handler';
 
 // Minimal mocks so we can import and assert types/codes
+// Schema approval is now derived from schemas.ts witness config — no manual UID list
 vi.mock('@/config/controller-witness-config', () => ({
   APPROVED_WITNESS_CHAINS: {},
-  APPROVED_CONTROLLER_SCHEMA_UIDS: [],
   APPROVED_CONTROLLER_WITNESS_ATTESTERS: {},
-  SCHEMA_FIELD_MAPPINGS: {},
 }));
 vi.mock('@ethereum-attestation-service/eas-sdk', () => ({
   EAS: vi.fn(),
