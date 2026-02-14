@@ -25,7 +25,7 @@ export function PreAlphaBanner() {
     <div className="relative bg-yellow-100 text-black px-4 py-3 shadow-sm border-b">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <p className="text-sm font-medium">
-          Pre-Alpha Preview — Smart contracts are deployed to testnets only. Features are incomplete and may change.
+          Devaloper Preview — Smart contracts are deployed to testnets only and data could be lost.
         </p>
         <button
           onClick={handleDismiss}
