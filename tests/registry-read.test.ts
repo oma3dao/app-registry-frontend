@@ -8,6 +8,7 @@ import {
   listActiveApps,
   getTotalActiveApps,
   searchByDid,
+  getTokenIdFromEvents,
 } from '@/lib/contracts/registry.read';
 import type { AppSummary } from '@/lib/contracts/types';
 
@@ -16,18 +17,56 @@ vi.mock('thirdweb', () => ({
   readContract: vi.fn(),
 }));
 
+// Mock ethers (use importOriginal so keccak256/toUtf8Bytes exist for did.ts computeDidHash)
+const mockGetLogs = vi.fn();
+const mockParseLog = vi.fn();
+const mockGetEvent = vi.fn();
+
+vi.mock('ethers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ethers')>();
+  return {
+    ...actual,
+    ethers: {
+      ...(typeof actual.ethers === 'object' ? actual.ethers : {}),
+      JsonRpcProvider: vi.fn().mockImplementation(() => ({
+        getLogs: mockGetLogs,
+      })),
+      Interface: vi.fn().mockImplementation(() => ({
+        getEvent: mockGetEvent,
+        parseLog: mockParseLog,
+      })),
+      id: vi.fn((str: string) => `0x${Buffer.from(str).toString('hex').padEnd(64, '0')}`),
+    },
+  };
+});
+
 // Mock contract client
 vi.mock('@/lib/contracts/client', () => ({
   getAppRegistryContract: vi.fn(() => ({
     address: '0x1234567890123456789012345678901234567890',
     chain: { id: 31337 },
   })),
+  getActiveChain: vi.fn(() => ({
+    rpc: 'http://localhost:8545',
+    id: 31337,
+  })),
 }));
 
-// Mock DID utils
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did),
-  getDidHash: vi.fn(async (did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0')}`),
+// Mock DID utils (importOriginal pattern, remove getDidHash; use computeDidHash from actual)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((did: string) => did),
+    normalizeDid: vi.fn((did: string) => did),
+  };
+});
+
+// Mock env
+vi.mock('@/config/env', () => ({
+  env: {
+    registryAddress: '0x1234567890123456789012345678901234567890',
+  },
 }));
 
 import { readContract } from 'thirdweb';
@@ -116,33 +155,29 @@ describe('Registry Read Operations', () => {
     });
 
     // Tests status parsing
-    it('correctly parses different status values', async () => {
-      const testCases = [
-        { statusNum: 0, expected: 'Active' },
-        { statusNum: 1, expected: 'Deprecated' },
-        { statusNum: 2, expected: 'Replaced' },
-      ];
+    it.each([
+      { statusNum: 0, expected: 'Active' },
+      { statusNum: 1, expected: 'Deprecated' },
+      { statusNum: 2, expected: 'Replaced' },
+    ])('correctly parses status $statusNum as $expected', async ({ statusNum, expected }) => {
+      (readContract as any).mockResolvedValueOnce(1);
+      (readContract as any).mockResolvedValueOnce({
+        did: 'did:web:example.com',
+        minter: '0xMinterAddress',
+        interfaces: 1,
+        versionMajor: 1,
+        status: statusNum,
+        dataHashAlgorithm: 0,
+        dataHash: '0xhash',
+        fungibleTokenId: 0n,
+        contractId: 0n,
+        dataUrl: 'https://example.com/metadata.json',
+        versionHistory: [],
+        traitHashes: [],
+      });
 
-      for (const { statusNum, expected } of testCases) {
-        (readContract as any).mockResolvedValueOnce(1);
-        (readContract as any).mockResolvedValueOnce({
-          did: 'did:web:example.com',
-          minter: '0xMinterAddress',
-          interfaces: 1,
-          versionMajor: 1,
-          status: statusNum,
-          dataHashAlgorithm: 0,
-          dataHash: '0xhash',
-          fungibleTokenId: 0n,
-          contractId: 0n,
-          dataUrl: 'https://example.com/metadata.json',
-          versionHistory: [],
-          traitHashes: [],
-        });
-
-        const result = await getAppByDid('did:web:example.com');
-        expect(result?.status).toBe(expected);
-      }
+      const result = await getAppByDid('did:web:example.com');
+      expect(result?.status).toBe(expected);
     });
 
     // Tests version history parsing
@@ -178,31 +213,14 @@ describe('Registry Read Operations', () => {
   });
 
   describe('isDidRegistered', () => {
-    // Tests detection of registered DID
-    it('returns true for registered DID', async () => {
-      (readContract as any).mockResolvedValueOnce(1); // Latest major = 1
-
+    it.each([
+      { mock: () => (readContract as any).mockResolvedValueOnce(1), expected: true, label: 'registered DID (major = 1)' },
+      { mock: () => (readContract as any).mockResolvedValueOnce(0), expected: false, label: 'unregistered DID (major = 0)' },
+      { mock: () => (readContract as any).mockRejectedValueOnce(new Error('DIDHashNotFound')), expected: false, label: 'contract throws error' },
+    ])('returns $expected for $label', async ({ mock, expected }) => {
+      mock();
       const result = await isDidRegistered('did:web:example.com');
-
-      expect(result).toBe(true);
-    });
-
-    // Tests detection of unregistered DID
-    it('returns false for unregistered DID', async () => {
-      (readContract as any).mockResolvedValueOnce(0); // Latest major = 0
-
-      const result = await isDidRegistered('did:web:unregistered.com');
-
-      expect(result).toBe(false);
-    });
-
-    // Tests error handling for unregistered DID
-    it('returns false when contract throws error', async () => {
-      (readContract as any).mockRejectedValueOnce(new Error('DIDHashNotFound'));
-
-      const result = await isDidRegistered('did:web:error.com');
-
-      expect(result).toBe(false);
+      expect(result).toBe(expected);
     });
   });
 
@@ -541,14 +559,14 @@ describe('Registry Read Operations', () => {
 
     // Tests DID normalization
     it('normalizes DID before searching', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       
       (readContract as any).mockResolvedValueOnce(1);
       (readContract as any).mockResolvedValueOnce(null);
 
       await searchByDid('DID:WEB:EXAMPLE.COM');
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 
@@ -596,13 +614,13 @@ describe('Registry Read Operations', () => {
     // This test verifies that hasAnyTraits normalizes DID before checking
     it('normalizes DID before checking traits', async () => {
       const { hasAnyTraits } = await import('@/lib/contracts/registry.read');
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       
       (readContract as any).mockResolvedValueOnce(false);
 
       await hasAnyTraits('DID:WEB:EXAMPLE.COM', 1, ['0xtrait1']);
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 
@@ -650,14 +668,119 @@ describe('Registry Read Operations', () => {
     // This test verifies that hasAllTraits normalizes DID before checking
     it('normalizes DID before checking traits', async () => {
       const { hasAllTraits } = await import('@/lib/contracts/registry.read');
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       
       (readContract as any).mockResolvedValueOnce(false);
 
       await hasAllTraits('DID:WEB:EXAMPLE.COM', 1, ['0xtrait1']);
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 });
 
+
+
+describe('getTokenIdFromEvents', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetLogs.mockReset();
+    mockParseLog.mockReset();
+    mockGetEvent.mockReset();
+  });
+
+  it('returns tokenId when matching event is found', async () => {
+    const mockLogs = [{
+      topics: ['0xtopic1', '0x0000000000000000000000000000000000000000000000000000000000000042', '0xtopic3', '0xdidhash'],
+      data: '0xdata',
+    }];
+    
+    mockGetEvent.mockReturnValue({ topicHash: '0xtopic1' });
+    mockGetLogs.mockResolvedValue(mockLogs);
+    mockParseLog.mockReturnValue({
+      args: {
+        tokenId: 66n,
+        versionMajor: 1,
+      },
+    });
+    
+    const result = await getTokenIdFromEvents('did:web:example.com', 1);
+    
+    expect(result).toBe(66);
+  });
+
+  it('returns undefined when no matching major version found', async () => {
+    const mockLogs = [{
+      topics: ['0xtopic1', '0x42', '0xtopic3', '0xdidhash'],
+      data: '0xdata',
+    }];
+    
+    mockGetEvent.mockReturnValue({ topicHash: '0xtopic1' });
+    mockGetLogs.mockResolvedValue(mockLogs);
+    mockParseLog.mockReturnValue({
+      args: {
+        tokenId: 66n,
+        versionMajor: 2, // Different major version
+      },
+    });
+    
+    const result = await getTokenIdFromEvents('did:web:example.com', 1);
+    
+    expect(result).toBeUndefined();
+  });
+
+  it('returns undefined when no events found', async () => {
+    mockGetEvent.mockReturnValue({ topicHash: '0xtopic1' });
+    mockGetLogs.mockResolvedValue([]);
+    
+    const result = await getTokenIdFromEvents('did:web:example.com', 1);
+    
+    expect(result).toBeUndefined();
+  });
+
+  it('returns undefined when event fragment not found', async () => {
+    mockGetEvent.mockReturnValue(null); // No event fragment
+    
+    const result = await getTokenIdFromEvents('did:web:example.com', 1);
+    
+    expect(result).toBeUndefined();
+  });
+
+  it('handles errors gracefully and returns undefined', async () => {
+    mockGetEvent.mockImplementation(() => {
+      throw new Error('Interface error');
+    });
+    
+    const result = await getTokenIdFromEvents('did:web:example.com', 1);
+    
+    expect(result).toBeUndefined();
+  });
+
+  it('skips unparseable logs and continues searching', async () => {
+    const mockLogs = [
+      { topics: ['0xtopic1'], data: '0xinvalid' },
+      { topics: ['0xtopic1', '0x42'], data: '0xvalid' },
+    ];
+    
+    mockGetEvent.mockReturnValue({ topicHash: '0xtopic1' });
+    mockGetLogs.mockResolvedValue(mockLogs);
+    
+    let parseCallCount = 0;
+    mockParseLog.mockImplementation(() => {
+      parseCallCount++;
+      if (parseCallCount === 1) {
+        throw new Error('Parse error');
+      }
+      return {
+        args: {
+          tokenId: 99n,
+          versionMajor: 1,
+        },
+      };
+    });
+    
+    const result = await getTokenIdFromEvents('did:web:example.com', 1);
+    
+    expect(result).toBe(99);
+  });
+});

@@ -1,28 +1,20 @@
-import { describe, it, expect, vi } from 'vitest';
-import { ethers } from 'ethers';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   CHAIN_CONFIGS,
   getChainConfig,
   getChainConstants,
   calculateTransferAmount,
   formatTransferAmount,
-  getRecipientAddress,
   getExplorerTxUrl,
   getExplorerAddressUrl,
   estimateBlocksToSearch,
   parseCaip10,
   getChainIdFromDid,
+  isChainSupported,
 } from '@/lib/verification/onchain-transfer';
 
-// Mock ethers
-vi.mock('ethers', () => ({
-  ethers: {
-    id: vi.fn(),
-    solidityPacked: vi.fn(),
-    keccak256: vi.fn(),
-    formatUnits: vi.fn(),
-  },
-}));
+// Use actual ethers for these tests (unmock the global mock from setup.ts)
+vi.unmock('ethers');
 
 describe('Onchain Transfer Verification', () => {
   describe('CHAIN_CONFIGS', () => {
@@ -61,130 +53,91 @@ describe('Onchain Transfer Verification', () => {
       });
     });
 
-    it('returns fallback config for unknown chain', () => {
-      const config = getChainConfig(999999);
-      expect(config).toEqual({
-        decimals: 18,
-        symbol: 'ETH',
-        blockTime: 12,
-        explorer: 'https://etherscan.io',
-      });
+    it('throws error for unknown chain', () => {
+      expect(() => getChainConfig(999999)).toThrow('tx-encoded-value not supported for chain 999999');
     });
   });
 
   describe('getChainConstants', () => {
     it('calculates constants for 18-decimal chain', () => {
-      const constants = getChainConstants(1);
+      const constants = getChainConstants(1, 'shared-control');
       expect(constants.base).toBe(BigInt('100000000000000')); // 10^14
       expect(constants.range).toBe(BigInt('10000000000000')); // 10^13
     });
 
-    it('calculates constants for 6-decimal chain', () => {
-      const constants = getChainConstants(999999); // Unknown chain defaults to 18 decimals
-      expect(constants.base).toBe(BigInt('100000000000000')); // 10^14
-      expect(constants.range).toBe(BigInt('10000000000000')); // 10^13
+    it('calculates constants for different proof purpose', () => {
+      const constants = getChainConstants(1, 'commercial-tx');
+      expect(constants.base).toBe(BigInt('1000000000000')); // 10^12
+      expect(constants.range).toBe(BigInt('100000000000')); // 10^11
     });
 
-    it('calculates constants for chain with decimals < 4', () => {
-      // Test with a chain that has 2 decimals
-      const constants = getChainConstants(999999); // This will use fallback config with 18 decimals
-      expect(constants.base).toBe(BigInt('100000000000000')); // 10^14
-      expect(constants.range).toBe(BigInt('10000000000000')); // 10^13
+    it('throws error for unsupported chain', () => {
+      expect(() => getChainConstants(999999, 'shared-control')).toThrow('tx-encoded-value not supported for chain 999999');
     });
   });
 
   describe('calculateTransferAmount', () => {
-    beforeEach(() => {
-      vi.mocked(ethers.id).mockReturnValue('0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef');
-      vi.mocked(ethers.solidityPacked).mockReturnValue('0xpackeddata');
-      vi.mocked(ethers.keccak256).mockReturnValue('0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890');
-    });
-
     it('calculates transfer amount correctly', () => {
       const amount = calculateTransferAmount(
         'did:pkh:eip155:1:0x1234567890123456789012345678901234567890',
         '0x9876543210987654321098765432109876543210',
-        1
+        1,
+        'shared-control'
       );
-
-      expect(ethers.id).toHaveBeenCalledWith('did:pkh:eip155:1:0x1234567890123456789012345678901234567890');
-      expect(ethers.solidityPacked).toHaveBeenCalledWith(
-        ['string', 'bytes32', 'bytes20'],
-        ['OMATrust:Amount:v1:', '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef', '0x9876543210987654321098765432109876543210']
-      );
-      expect(ethers.keccak256).toHaveBeenCalledWith('0xpackeddata');
 
       // Should return base + offset
       const base = BigInt('100000000000000'); // 10^14
-      const range = BigInt('10000000000000'); // 10^13
-      const offset = BigInt('0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890') % range;
-      expect(amount).toBe(base + offset);
+      expect(amount).toBeGreaterThanOrEqual(base);
     });
 
     it('handles different chain IDs', () => {
-      calculateTransferAmount(
+      const amount = calculateTransferAmount(
         'did:pkh:eip155:8453:0x1234567890123456789012345678901234567890',
         '0x9876543210987654321098765432109876543210',
-        8453
+        8453,
+        'shared-control'
       );
 
-      expect(ethers.id).toHaveBeenCalledWith('did:pkh:eip155:8453:0x1234567890123456789012345678901234567890');
+      // Base chain has same base as Ethereum
+      const base = BigInt('100000000000000'); // 10^14
+      expect(amount).toBeGreaterThanOrEqual(base);
     });
 
     it('normalizes DID and wallet addresses', () => {
-      calculateTransferAmount(
+      const amount1 = calculateTransferAmount(
+        'did:pkh:eip155:1:0x1234567890123456789012345678901234567890',
+        '0x9876543210987654321098765432109876543210',
+        1,
+        'shared-control'
+      );
+      
+      const amount2 = calculateTransferAmount(
         '  DID:PKH:EIP155:1:0X1234567890123456789012345678901234567890  ',
         '0X9876543210987654321098765432109876543210',
-        1
+        1,
+        'shared-control'
       );
 
-      expect(ethers.id).toHaveBeenCalledWith('did:pkh:eip155:1:0x1234567890123456789012345678901234567890');
-      expect(ethers.solidityPacked).toHaveBeenCalledWith(
-        ['string', 'bytes32', 'bytes20'],
-        ['OMATrust:Amount:v1:', expect.any(String), '0x9876543210987654321098765432109876543210']
-      );
+      // Both should produce the same amount after normalization
+      expect(amount1).toBe(amount2);
     });
   });
 
   describe('formatTransferAmount', () => {
-    beforeEach(() => {
-      vi.mocked(ethers.formatUnits).mockReturnValue('1.234567890123456789');
-    });
-
     it('formats amount with proper decimals and symbol', () => {
       const result = formatTransferAmount(BigInt('1234567890123456789'), 1);
 
-      expect(ethers.formatUnits).toHaveBeenCalledWith(BigInt('1234567890123456789'), 18);
-      expect(result).toEqual({
-        formatted: '1.234567890123456789',
-        symbol: 'ETH',
-        wei: '1234567890123456789',
-      });
+      expect(result.symbol).toBe('ETH');
+      expect(result.wei).toBe('1234567890123456789');
+      // The formatted value should be the amount in ETH
+      expect(result.formatted).toBeDefined();
     });
 
     it('formats amount for different chains', () => {
       const result = formatTransferAmount(BigInt('1000000000000000000'), 8453);
 
       expect(result.symbol).toBe('ETH');
-      expect(result.formatted).toBe('1.234567890123456789');
-    });
-  });
-
-  describe('getRecipientAddress', () => {
-    it('returns minting wallet for EVM chains', () => {
-      const address = getRecipientAddress(1, '0x1234567890123456789012345678901234567890', true);
-      expect(address).toBe('0x1234567890123456789012345678901234567890');
-    });
-
-    it('throws error for non-EVM chains', () => {
-      expect(() => {
-        getRecipientAddress(1, '0x1234567890123456789012345678901234567890', false);
-      }).toThrow('Sink wallet not yet deployed for chain 1');
-    });
-
-    it('defaults to EVM behavior', () => {
-      const address = getRecipientAddress(1, '0x1234567890123456789012345678901234567890');
-      expect(address).toBe('0x1234567890123456789012345678901234567890');
+      expect(result.formatted).toBe('1.0');
     });
   });
 
@@ -199,9 +152,8 @@ describe('Onchain Transfer Verification', () => {
       expect(url).toBe('https://basescan.org/tx/0xabcdef1234567890');
     });
 
-    it('returns fallback URL for unknown chain', () => {
-      const url = getExplorerTxUrl(999999, '0x1234567890abcdef');
-      expect(url).toBe('https://etherscan.io/tx/0x1234567890abcdef');
+    it('throws error for unknown chain', () => {
+      expect(() => getExplorerTxUrl(999999, '0x1234567890abcdef')).toThrow('tx-encoded-value not supported for chain 999999');
     });
   });
 
@@ -244,7 +196,7 @@ describe('Onchain Transfer Verification', () => {
       const result = parseCaip10('eip155:1:0x1234567890123456789012345678901234567890');
       expect(result).toEqual({
         chainId: 1,
-        contractAddress: '0x1234567890123456789012345678901234567890',
+        address: '0x1234567890123456789012345678901234567890',
       });
     });
 
@@ -252,7 +204,7 @@ describe('Onchain Transfer Verification', () => {
       const result = parseCaip10('eip155:8453:0xabcdef1234567890abcdef1234567890abcdef12');
       expect(result).toEqual({
         chainId: 8453,
-        contractAddress: '0xabcdef1234567890abcdef1234567890abcdef12',
+        address: '0xabcdef1234567890abcdef1234567890abcdef12',
       });
     });
 

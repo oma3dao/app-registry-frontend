@@ -1,0 +1,263 @@
+{
+  "generated": "2025-12-01T04:13:48.986Z",
+  "summary": {
+    "totalTestFiles": 21,
+    "totalTests": 106,
+    "totalSuites": 21
+  },
+  "coverage": [
+    {
+      "file": "accessibility.spec.ts",
+      "tests": 5,
+      "suites": 1,
+      "testNames": [
+        "landing page should meet basic accessibility requirements",
+        "dashboard should meet basic accessibility requirements",
+        "navigation links should have accessible names",
+        "buttons should have accessible names",
+        "form inputs should have associated labels"
+      ]
+    },
+    {
+      "file": "additional-scenarios.spec.ts",
+      "tests": 10,
+      "suites": 1,
+      "testNames": [
+        "should have proper page metadata",
+        "should support keyboard navigation",
+        "should have alt text on images",
+        "should not have broken internal links",
+        "should be responsive at different viewport sizes",
+        "should handle errors gracefully",
+        "should show appropriate loading states",
+        "should have proper form validation",
+        "should support dark mode",
+        "should have proper analytics setup"
+      ]
+    },
+    {
+      "file": "api-integration.spec.ts",
+      "tests": 5,
+      "suites": 1,
+      "testNames": [
+        "should handle data URL endpoint requests",
+        "should fetch and display metadata correctly",
+        "should handle API errors gracefully",
+        "should complete API requests within performance budget",
+        "should have appropriate security headers for API responses"
+      ]
+    },
+    {
+      "file": "api-routes.spec.ts",
+      "tests": 8,
+      "suites": 1,
+      "testNames": [
+        "should handle portal-url POST requests with valid data",
+        "should reject portal-url requests with invalid DID format",
+        "should reject portal-url requests with missing required fields",
+        "should handle verify-and-attest POST requests",
+        "should reject verify-and-attest requests with missing required fields",
+        "should reject requests with malformed JSON",
+        "should return appropriate CORS headers",
+        "should handle rate limiting appropriately"
+      ]
+    },
+    {
+      "file": "authenticated-example-improved.spec.ts",
+      "tests": 3,
+      "suites": 2,
+      "testNames": [
+        "should connect wallet and display dashboard",
+        "should open wizard after wallet connection",
+        "should use authenticatedDashboard fixture"
+      ]
+    },
+    {
+      "file": "authenticated-example.spec.ts",
+      "tests": 4,
+      "suites": 1,
+      "testNames": [
+        "should display dashboard when authenticated (using fixture)",
+        "should display dashboard when authenticated (using helper)",
+        "should open wizard modal when authenticated",
+        "should allow navigation when authenticated"
+      ]
+    },
+    {
+      "file": "component-interactions.spec.ts",
+      "tests": 6,
+      "suites": 1,
+      "testNames": [
+        "should handle navigation component interactions",
+        "should dismiss pre-alpha banner",
+        "should display toast notifications",
+        "should handle modal interactions",
+        "should handle form field interactions",
+        "should handle button click interactions"
+      ]
+    },
+    {
+      "file": "dashboard.spec.ts",
+      "tests": 4,
+      "suites": 1,
+      "testNames": [
+        "should load dashboard page",
+        "should display appropriate content based on auth state",
+        "should display dashboard when authenticated",
+        "should allow navigation within dashboard"
+      ]
+    },
+    {
+      "file": "enhanced-auth.spec.ts",
+      "tests": 3,
+      "suites": 1,
+      "testNames": [
+        "should connect wallet using email method",
+        "should detect authentication state correctly",
+        "should handle unauthenticated dashboard access"
+      ]
+    },
+    {
+      "file": "environment-setup.spec.ts",
+      "tests": 2,
+      "suites": 1,
+      "testNames": [
+        "should be able to connect to dev server",
+        "should load page without critical runtime errors"
+      ]
+    },
+    {
+      "file": "error-boundary.spec.ts",
+      "tests": 8,
+      "suites": 1,
+      "testNames": [
+        "should handle missing or invalid data gracefully",
+        "should handle network timeouts gracefully",
+        "should handle malformed JSON responses",
+        "should handle empty API responses",
+        "should handle console errors without breaking page",
+        "should handle very long content without breaking layout",
+        "should handle rapid navigation without errors",
+        "should handle missing optional environment variables"
+      ]
+    },
+    {
+      "file": "example-with-fixtures.spec.ts",
+      "tests": 3,
+      "suites": 1,
+      "testNames": [
+        "landing page fixture example",
+        "dashboard page fixture example",
+        "authenticated page fixture example"
+      ]
+    },
+    {
+      "file": "landing-page-comprehensive.spec.ts",
+      "tests": 8,
+      "suites": 1,
+      "testNames": [
+        "should display hero section with main heading",
+        "should display complete navigation with all links",
+        "should display feature sections",
+        "should have working external navigation links",
+        "should be responsive on mobile viewport",
+        "should have clickable interactive elements",
+        "should not have critical console errors",
+        "should load within acceptable time"
+      ]
+    },
+    {
+      "file": "landing-page-debug.spec.ts",
+      "tests": 1,
+      "suites": 0,
+      "testNames": [
+        "debug - check what is actually on the page"
+      ]
+    },
+    {
+      "file": "landing-page.spec.ts",
+      "tests": 6,
+      "suites": 1,
+      "testNames": [
+        "should load and display main content",
+        "should display navigation with all links",
+        "should display Get Started button in hero section",
+        "should display feature sections",
+        "should be responsive on mobile viewport",
+        "should not have console errors"
+      ]
+    },
+    {
+      "file": "navigation-tests.spec.ts",
+      "tests": 6,
+      "suites": 1,
+      "testNames": [
+        "should handle browser back navigation",
+        "should handle browser forward navigation",
+        "should handle deep links to specific states",
+        "should preserve state across navigation",
+        "should handle URL parameters correctly",
+        "should handle hash fragment navigation"
+      ]
+    },
+    {
+      "file": "network.spec.ts",
+      "tests": 3,
+      "suites": 1,
+      "testNames": [
+        "landing page should load with successful network requests",
+        "external navigation links should be accessible",
+        "images should load successfully"
+      ]
+    },
+    {
+      "file": "performance.spec.ts",
+      "tests": 4,
+      "suites": 1,
+      "testNames": [
+        "landing page should load within performance budget",
+        "navigation should be responsive",
+        "page interactions should be smooth",
+        "dashboard should load efficiently"
+      ]
+    },
+    {
+      "file": "verify-firefox.spec.ts",
+      "tests": 2,
+      "suites": 1,
+      "testNames": [
+        "should run in Firefox browser",
+        "should support Firefox rendering"
+      ]
+    },
+    {
+      "file": "visual-regression.spec.ts",
+      "tests": 7,
+      "suites": 1,
+      "testNames": [
+        "landing page should match visual baseline",
+        "landing page hero section should match baseline",
+        "navigation bar should match baseline",
+        "dashboard should match visual baseline",
+        "landing page mobile viewport should match baseline",
+        "landing page tablet viewport should match baseline",
+        "feature sections should match baseline"
+      ]
+    },
+    {
+      "file": "wizard-flow.spec.ts",
+      "tests": 8,
+      "suites": 1,
+      "testNames": [
+        "should open wizard modal from dashboard",
+        "should display verification step when wizard opens",
+        "should show validation errors for required fields",
+        "should close wizard modal",
+        "should display step indicator",
+        "should complete full wizard flow",
+        "should validate required fields",
+        "should allow navigating back through steps"
+      ]
+    }
+  ]
+}

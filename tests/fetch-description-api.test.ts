@@ -84,22 +84,15 @@ describe('/api/fetch-description API', () => {
     expect(data).toEqual({ content: JSON.stringify({ title: 'Test', data: 'some data' }, null, 2) });
   });
 
-  it('returns 400 when URL parameter is missing', async () => {
-    const request = createMockRequest('http://localhost:3000/api/fetch-description');
+  it.each([
+    { label: 'URL parameter missing', url: 'http://localhost:3000/api/fetch-description', error: 'URL parameter is required' },
+    { label: 'invalid URL format', url: 'http://localhost:3000/api/fetch-description?url=invalid-url', error: 'Invalid URL format provided' },
+  ])('returns 400 when $label', async ({ url, error }) => {
+    const request = createMockRequest(url);
     const result = await GET(request);
     const data = await result.json();
-
     expect(result.status).toBe(400);
-    expect(data).toEqual({ error: 'URL parameter is required' });
-  });
-
-  it('returns 400 for invalid URL format', async () => {
-    const request = createMockRequest('http://localhost:3000/api/fetch-description?url=invalid-url');
-    const result = await GET(request);
-    const data = await result.json();
-
-    expect(result.status).toBe(400);
-    expect(data).toEqual({ error: 'Invalid URL format provided' });
+    expect(data).toEqual({ error });
   });
 
   it('returns 500 when fetch fails with network error', async () => {

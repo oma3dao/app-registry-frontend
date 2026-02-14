@@ -19,10 +19,15 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID normalization
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did.toLowerCase()),
-}));
+// Mock DID normalization (importOriginal pattern per TEST-MIGRATION-GUIDE)
+vi.mock('@/lib/utils/did', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((did: string) => did.toLowerCase()),
+    normalizeDid: vi.fn((did: string) => did.toLowerCase()),
+  };
+});
 
 // Mock error normalization
 vi.mock('@/lib/contracts/errors', () => ({
@@ -94,10 +99,10 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       prepareMintApp(mockMintInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Tests with fungibleTokenId
@@ -228,39 +233,22 @@ describe('Registry Write Functions', () => {
       expect(result.params).toHaveLength(3);
     });
 
-    // Tests Active status
-    it('converts Active status to 0', () => {
-      mockStatusInput.status = 'Active';
-      
+    it.each([
+      { status: 'Active' as const, expected: 0 },
+      { status: 'Deprecated' as const, expected: 1 },
+      { status: 'Replaced' as const, expected: 2 },
+    ])('converts $status status to $expected', ({ status, expected }) => {
+      mockStatusInput.status = status;
       const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(0);
-    });
-
-    // Tests Deprecated status
-    it('converts Deprecated status to 1', () => {
-      mockStatusInput.status = 'Deprecated';
-      
-      const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(1); // Deprecated = 1
-    });
-
-    // Tests Replaced status
-    it('converts Replaced status to 2', () => {
-      mockStatusInput.status = 'Replaced';
-      
-      const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(2);
+      expect(result.params[2]).toBe(expected);
     });
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       prepareUpdateStatus(mockStatusInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Tests major version parameter
@@ -315,10 +303,10 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       prepareUpdateApp(mockUpdateInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Tests with new data hash
@@ -554,10 +542,10 @@ describe('Registry Write Functions', () => {
 
     // Test DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@/lib/utils/did');
       prepareRegisterApp8004(mockMintInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Test error handling (covers lines 187-190)

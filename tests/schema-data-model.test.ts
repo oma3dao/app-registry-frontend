@@ -176,66 +176,30 @@ describe('schema/data-model functions', () => {
   });
 
   describe('getStatusLabel', () => {
-    /**
-     * Test: returns correct label for status 0 (Active)
-     */
-    it('returns "Active" for status 0', () => {
-      expect(getStatusLabel(0)).toBe('Active');
+    it.each([
+      { status: 0, expected: 'Active' },
+      { status: 1, expected: 'Deprecated' },
+      { status: 2, expected: 'Replaced' },
+    ])('returns "$expected" for status $status', ({ status, expected }) => {
+      expect(getStatusLabel(status)).toBe(expected);
     });
 
-    /**
-     * Test: returns correct label for status 1 (Deprecated)
-     */
-    it('returns "Deprecated" for status 1', () => {
-      expect(getStatusLabel(1)).toBe('Deprecated');
-    });
-
-    /**
-     * Test: returns correct label for status 2 (Replaced)
-     */
-    it('returns "Replaced" for status 2', () => {
-      expect(getStatusLabel(2)).toBe('Replaced');
-    });
-
-    /**
-     * Test: returns "Unknown" for invalid status numbers
-     */
-    it('returns "Unknown" for invalid status numbers', () => {
-      expect(getStatusLabel(3)).toBe('Unknown');
-      expect(getStatusLabel(-1)).toBe('Unknown');
-      expect(getStatusLabel(999)).toBe('Unknown');
+    it.each([3, -1, 999])('returns "Unknown" for invalid status: %s', (status) => {
+      expect(getStatusLabel(status)).toBe('Unknown');
     });
   });
 
   describe('getStatusClasses', () => {
-    /**
-     * Test: returns green classes for Active status (0)
-     */
-    it('returns green classes for Active status', () => {
-      expect(getStatusClasses(0)).toBe('bg-green-100 text-green-800');
+    it.each([
+      { status: 0, expected: 'bg-green-100 text-green-800', label: 'green classes for Active status' },
+      { status: 1, expected: 'bg-red-100 text-red-800', label: 'red classes for Deprecated status' },
+      { status: 2, expected: 'bg-yellow-100 text-yellow-800', label: 'yellow classes for Replaced status' },
+    ])('returns $label', ({ status, expected }) => {
+      expect(getStatusClasses(status)).toBe(expected);
     });
 
-    /**
-     * Test: returns red classes for Deprecated status (1)
-     */
-    it('returns red classes for Deprecated status', () => {
-      expect(getStatusClasses(1)).toBe('bg-red-100 text-red-800');
-    });
-
-    /**
-     * Test: returns yellow classes for Replaced status (2)
-     */
-    it('returns yellow classes for Replaced status', () => {
-      expect(getStatusClasses(2)).toBe('bg-yellow-100 text-yellow-800');
-    });
-
-    /**
-     * Test: returns gray classes for unknown statuses
-     */
-    it('returns gray classes for unknown statuses', () => {
-      expect(getStatusClasses(3)).toBe('bg-gray-100 text-gray-800');
-      expect(getStatusClasses(-1)).toBe('bg-gray-100 text-gray-800');
-      expect(getStatusClasses(999)).toBe('bg-gray-100 text-gray-800');
+    it.each([3, -1, 999])('returns gray classes for unknown status: %s', (status) => {
+      expect(getStatusClasses(status)).toBe('bg-gray-100 text-gray-800');
     });
   });
 
@@ -411,7 +375,7 @@ describe('schema/data-model functions', () => {
         smartContract: false,
       };
 
-      const fields = getVisibleFields('basic', interfaceFlags);
+      const fields = getVisibleFields('common', interfaceFlags);
       expect(Array.isArray(fields)).toBe(true);
       // Each field should have at least one matching interface
       fields.forEach(field => {
@@ -430,7 +394,7 @@ describe('schema/data-model functions', () => {
         smartContract: false,
       };
 
-      const fields = getVisibleFields('basic', interfaceFlags);
+      const fields = getVisibleFields('common', interfaceFlags);
       expect(fields).toEqual([]);
     });
 
@@ -446,11 +410,11 @@ describe('schema/data-model functions', () => {
 
       // Get all fields for a step that has human interface fields
       // The function should return fields that match ANY of the enabled interfaces
-      const allFieldsForStep = getFieldsForStep('basic');
+      const allFieldsForStep = getFieldsForStep('common');
       
       if (allFieldsForStep.length > 0) {
         // Test that getVisibleFields filters correctly
-        const visibleFields = getVisibleFields('basic', interfaceFlags);
+        const visibleFields = getVisibleFields('common', interfaceFlags);
         
         // Each visible field should match at least one enabled interface
         visibleFields.forEach(field => {
@@ -467,10 +431,10 @@ describe('schema/data-model functions', () => {
           expect(visibleFields.length).toBeGreaterThan(0);
         }
       } else {
-        // If basic step has no fields, test with a step that likely has fields
-        const metadataFields = getVisibleFields('metadata', interfaceFlags);
+        // If common step has no fields, test with a step that likely has fields
+        const verificationFields = getVisibleFields('verification', interfaceFlags);
         // Just verify the function works correctly
-        expect(Array.isArray(metadataFields)).toBe(true);
+        expect(Array.isArray(verificationFields)).toBe(true);
       }
     });
 
@@ -486,7 +450,7 @@ describe('schema/data-model functions', () => {
       };
 
       // Get all fields and find one that has multiple interfaces
-      const allFields = getFieldsForStep('basic');
+      const allFields = getFieldsForStep('common');
       
       // Test with a field that has multiple interfaces (if any exist)
       // The .some() callback should return true if ANY interface matches
@@ -915,3 +879,36 @@ describe('schema/data-model functions', () => {
   });
 });
 
+
+
+describe('getFieldsByStorage', () => {
+  it('returns on-chain fields when onChain=true', () => {
+    const fields = getFieldsByStorage(true);
+    expect(Array.isArray(fields)).toBe(true);
+    fields.forEach(field => {
+      expect(field.onChain).toBe(true);
+    });
+  });
+
+  it('returns off-chain fields when onChain=false', () => {
+    const fields = getFieldsByStorage(false);
+    expect(Array.isArray(fields)).toBe(true);
+    fields.forEach(field => {
+      expect(field.onChain).toBe(false);
+    });
+  });
+
+  it('returns same result as getOnChainFields when onChain=true', () => {
+    const byStorage = getFieldsByStorage(true);
+    const onChain = getOnChainFields();
+    expect(byStorage.length).toBe(onChain.length);
+    expect(byStorage.map(f => f.id).sort()).toEqual(onChain.map(f => f.id).sort());
+  });
+
+  it('returns same result as getOffChainFields when onChain=false', () => {
+    const byStorage = getFieldsByStorage(false);
+    const offChain = getOffChainFields();
+    expect(byStorage.length).toBe(offChain.length);
+    expect(byStorage.map(f => f.id).sort()).toEqual(offChain.map(f => f.id).sort());
+  });
+});
