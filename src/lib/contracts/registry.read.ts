@@ -11,7 +11,7 @@
 import { readContract } from 'thirdweb';
 import { getAppRegistryContract } from './client';
 import type { AppSummary, Paginated, Status, Version } from './types';
-import { normalizeDid, computeDidHash } from '../utils/did';
+import { normalizeDid, computeDidHash } from '@oma3/omatrust/identity';
 import { normalizeEvmError } from './errors';
 import { getCurrentVersion } from '../utils/version';
 import type { AbiFunction } from 'abitype';

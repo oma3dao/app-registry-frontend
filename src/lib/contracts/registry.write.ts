@@ -12,7 +12,7 @@ import { prepareContractCall } from 'thirdweb';
 import { getAppRegistryContract } from './client';
 import { normalizeEvmError } from './errors';
 import type { Status, MintAppInput, UpdateAppInput, UpdateStatusInput } from './types';
-import { normalizeDid } from '../utils/did';
+import { normalizeDid } from '@oma3/omatrust/identity';
 
 /**
  * Convert Status to number

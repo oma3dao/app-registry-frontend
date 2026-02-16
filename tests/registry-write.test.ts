@@ -20,9 +20,13 @@ vi.mock('@/lib/contracts/client', () => ({
 }));
 
 // Mock DID normalization
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did.toLowerCase()),
-}));
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
+  return {
+    ...actual,
+    normalizeDid: vi.fn((did: string) => did.toLowerCase()),
+  };
+});
 
 // Mock error normalization
 vi.mock('@/lib/contracts/errors', () => ({
@@ -94,10 +98,10 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareMintApp(mockMintInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Tests with fungibleTokenId
@@ -257,10 +261,10 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareUpdateStatus(mockStatusInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Tests major version parameter
@@ -315,10 +319,10 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareUpdateApp(mockUpdateInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Tests with new data hash
@@ -554,10 +558,10 @@ describe('Registry Write Functions', () => {
 
     // Test DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareRegisterApp8004(mockMintInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Test error handling (covers lines 187-190)

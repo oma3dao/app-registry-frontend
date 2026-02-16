@@ -5,8 +5,7 @@ import {
   extractDidMethod,
   extractDidIdentifier,
   normalizeDomain,
-  getDidHashSync,
-} from '@/lib/utils/did';
+} from '@oma3/omatrust/identity';
 
 describe('DID utilities', () => {
   describe('normalizeDidWeb', () => {
@@ -198,17 +197,11 @@ describe('DID utilities', () => {
     });
 
     it('handles empty string', () => {
-      expect(normalizeDomain('')).toBe('');
+      expect(() => normalizeDomain('')).toThrow();
     });
 
     it('handles domains with hyphens', () => {
       expect(normalizeDomain('my-app.example-domain.com')).toBe('my-app.example-domain.com');
-    });
-  });
-
-  describe('getDidHashSync', () => {
-    it('throws error (not implemented)', () => {
-      expect(() => getDidHashSync('did:web:example.com')).toThrow('not implemented');
     });
   });
 

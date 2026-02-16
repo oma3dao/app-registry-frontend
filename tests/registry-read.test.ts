@@ -25,10 +25,14 @@ vi.mock('@/lib/contracts/client', () => ({
 }));
 
 // Mock DID utils
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did),
-  getDidHash: vi.fn(async (did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0')}`),
-}));
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
+  return {
+    ...actual,
+    normalizeDid: vi.fn((did: string) => did),
+    getDidHash: vi.fn(async (did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0')}`),
+  };
+});
 
 import { readContract } from 'thirdweb';
 
@@ -541,14 +545,14 @@ describe('Registry Read Operations', () => {
 
     // Tests DID normalization
     it('normalizes DID before searching', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       
       (readContract as any).mockResolvedValueOnce(1);
       (readContract as any).mockResolvedValueOnce(null);
 
       await searchByDid('DID:WEB:EXAMPLE.COM');
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 
@@ -596,13 +600,13 @@ describe('Registry Read Operations', () => {
     // This test verifies that hasAnyTraits normalizes DID before checking
     it('normalizes DID before checking traits', async () => {
       const { hasAnyTraits } = await import('@/lib/contracts/registry.read');
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       
       (readContract as any).mockResolvedValueOnce(false);
 
       await hasAnyTraits('DID:WEB:EXAMPLE.COM', 1, ['0xtrait1']);
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 
@@ -650,13 +654,13 @@ describe('Registry Read Operations', () => {
     // This test verifies that hasAllTraits normalizes DID before checking
     it('normalizes DID before checking traits', async () => {
       const { hasAllTraits } = await import('@/lib/contracts/registry.read');
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       
       (readContract as any).mockResolvedValueOnce(false);
 
       await hasAllTraits('DID:WEB:EXAMPLE.COM', 1, ['0xtrait1']);
 
-      expect(normalizeDidWeb).toHaveBeenCalled();
+      expect(normalizeDid).toHaveBeenCalled();
     });
   });
 });

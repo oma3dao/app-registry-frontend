@@ -12,7 +12,7 @@
 
 import dns from 'dns';
 import { promisify } from 'util';
-import { getAddressFromDidPkh, getDomainFromDidWeb } from '@/lib/utils/did';
+import { getAddressFromDidPkh, getDomainFromDidWeb } from '@oma3/omatrust/identity';
 
 const resolveTxt = promisify(dns.resolveTxt);
 

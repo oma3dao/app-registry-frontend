@@ -17,7 +17,7 @@ import { privateKeyToAccount } from 'thirdweb/wallets';
 import { ethers } from 'ethers';
 import { localhost, omachainTestnet, omachainMainnet } from '@/config/chains';
 import { getRpcUrl, withRetry } from '@/lib/rpc';
-import { normalizeDomain, buildEvmDidPkh } from '@/lib/utils/did';
+import { normalizeDomain, buildEvmDidPkh } from '@oma3/omatrust/identity';
 import { loadIssuerPrivateKey, getThirdwebManagedWallet } from '@/lib/server/issuer-key';
 import { calculateTransferAmount, PROOF_PURPOSE } from '@/lib/verification/onchain-transfer';
 import resolverAbi from '@/abi/resolver.json';

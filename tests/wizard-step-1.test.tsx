@@ -11,10 +11,14 @@ vi.mock('thirdweb/react', () => ({
   })),
 }));
 
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did),
-  normalizeDomain: vi.fn((domain: string) => domain),
-}));
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
+  return {
+    ...actual,
+    normalizeDidWeb: vi.fn((did: string) => did),
+    normalizeDomain: vi.fn((domain: string) => domain),
+  };
+});
 
 describe('Wizard Step 1 - Verification', () => {
   let mockContext: StepRenderContext;

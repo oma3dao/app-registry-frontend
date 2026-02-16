@@ -130,9 +130,13 @@ vi.mock('@/lib/rpc', () => ({
 }));
 
 // Mock DID utils
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDomain: vi.fn((domain) => domain.toLowerCase()),
-}));
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
+  return {
+    ...actual,
+    normalizeDomain: vi.fn((domain) => domain.toLowerCase()),
+  };
+});
 
 // Mock issuer key loader
 vi.mock('@/lib/server/issuer-key', () => ({
