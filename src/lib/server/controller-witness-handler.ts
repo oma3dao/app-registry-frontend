@@ -63,6 +63,7 @@ import { ethers } from 'ethers';
 import { getRpcUrl } from '@/lib/rpc';
 import { getAllSchemas, getSchema } from '@/config/schemas';
 import { getDomainFromDidWeb } from '@/lib/utils/did';
+import { didToAddress } from '@oma3/omatrust/identity';
 import {
   findControllerInDnsTxt,
   findControllerInDidDoc,
@@ -556,7 +557,7 @@ export async function submitControllerWitnessAttestation(
     const tx = await eas.attest({
       schema: controllerWitnessSchemaUid,
       data: {
-        recipient: ethers.ZeroAddress, // controller-witness has no specific recipient
+        recipient: didToAddress(params.subject), // DID Address of the subject for attestation indexing
         expirationTime: 0n,
         revocable: false,
         refUID: ZERO_UID,
