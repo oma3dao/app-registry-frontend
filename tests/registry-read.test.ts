@@ -17,7 +17,7 @@ vi.mock('thirdweb', () => ({
   readContract: vi.fn(),
 }));
 
-// Mock ethers (use importOriginal so keccak256/toUtf8Bytes exist for did.ts computeDidHash)
+// Mock ethers (used by getTokenIdFromEvents for event parsing)
 const mockGetLogs = vi.fn();
 const mockParseLog = vi.fn();
 const mockGetEvent = vi.fn();
@@ -58,7 +58,7 @@ vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
   return {
     ...actual,
     normalizeDid: vi.fn((did: string) => did),
-    getDidHash: vi.fn(async (did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0')}`),
+    computeDidHash: vi.fn((did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0').slice(0, 64)}` as `0x${string}`),
   };
 });
 

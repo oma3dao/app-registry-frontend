@@ -56,7 +56,7 @@ vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
 | File | Usage |
 |------|-------|
 | `registry-write.test.ts` | Mocks `@oma3/omatrust/identity`, uses `normalizeDid` |
-| `registry-read.test.ts` | Mocks `@oma3/omatrust/identity`, uses `normalizeDid`, `getDidHash` |
+| `registry-read.test.ts` | Mocks `@oma3/omatrust/identity`, uses `normalizeDid`, `computeDidHash` |
 | `did-verification.test.tsx` | Mocks `@oma3/omatrust/identity` |
 | `wizard-step-1.test.tsx` | Mocks `@oma3/omatrust/identity` |
 | `api-routes-error-handling.test.ts` | Mocks `@oma3/omatrust/identity` |
