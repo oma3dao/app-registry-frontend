@@ -83,7 +83,7 @@ describe('OMATrust Specification: DID Format Requirements', () => {
      * KNOWN BUG: BUG-001 - normalizeDidWeb() incorrectly converts did:pkh to did:web
      * See: OMATRUST_SPECIFICATION_REQUIREMENTS.md Section 5 - Known Issues
      * 
-     * This test is skipped until the bug is fixed in src/lib/utils/did.ts
+     * This test is skipped until the bug is fixed in @oma3/omatrust SDK.
      * The prepareMintApp function calls normalizeDidWeb which incorrectly transforms
      * did:pkh:eip155:1:0x... to did:web:did:pkh:eip155:1:0x...
      */
@@ -362,7 +362,7 @@ describe('OMATrust Specification: DID Format Requirements', () => {
      * KNOWN BUG: BUG-001 - normalizeDidWeb() incorrectly converts did:pkh to did:web
      * See: OMATRUST_SPECIFICATION_REQUIREMENTS.md Section 5 - Known Issues
      * 
-     * This test is skipped until the bug is fixed in src/lib/utils/did.ts
+     * This test is skipped until the bug is fixed in @oma3/omatrust SDK.
      */
     it.skip('supports did:pkh for smart contract registration (BUG-001: normalizeDidWeb incorrectly converts did:pkh)', () => {
       /**
