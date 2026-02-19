@@ -9,13 +9,12 @@ import {
   isValidDid,
   extractDidMethod,
   extractDidIdentifier,
-} from '@/lib/utils/did';
+} from '@oma3/omatrust/identity';
 
 /**
  * OMATrust Identity Specification - Section 5.3: Reputation Service
  *
  * Tests for DID → Index Address conversion used for EAS attestation indexing.
- * Migrated from @/lib/did-index to @/lib/utils/did per TEST-MIGRATION-GUIDE.
  * This is a critical function for the OMATrust reputation system.
  */
 

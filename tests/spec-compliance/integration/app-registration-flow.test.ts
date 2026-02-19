@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { prepareMintApp } from '@/lib/contracts/registry.write';
 import { getAppByDid, isDidRegistered, getLatestMajor } from '@/lib/contracts/registry.read';
-import { normalizeDid } from '@/lib/utils/did';
+import { normalizeDid } from '@oma3/omatrust/identity';
 import type { MintAppInput, AppSummary } from '@/lib/contracts/types';
 
 // Mock thirdweb
@@ -33,9 +33,9 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID utilities (importOriginal pattern, remove getDidHash; use computeDidHash from actual)
-vi.mock('@/lib/utils/did', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+// Mock DID utilities
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
   return {
     ...actual,
     normalizeDidWeb: vi.fn((did: string) => {

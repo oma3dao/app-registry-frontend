@@ -65,9 +65,9 @@ vi.mock('@/config/attestation-services', () => ({
   getContractAddress: vi.fn(() => '0x1234567890123456789012345678901234567890'),
 }));
 
-// Mock DID utils (migrated from @/lib/did-index to @/lib/utils/did)
-vi.mock('@/lib/utils/did', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+// Mock DID utils
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
   return {
     ...actual,
     didToAddress: vi.fn((did: string) => '0x' + 'a'.repeat(40)),

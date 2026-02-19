@@ -23,13 +23,14 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID utilities (importOriginal pattern, remove getDidHash; use computeDidHash from actual)
-vi.mock('@/lib/utils/did', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+// Mock DID utilities
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
   return {
     ...actual,
     normalizeDidWeb: vi.fn((did: string) => did),
     normalizeDid: vi.fn((did: string) => did),
+    computeDidHash: vi.fn((did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0').slice(0, 64)}` as `0x${string}`),
   };
 });
 

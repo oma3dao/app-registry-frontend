@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { prepareRegisterApp8004, prepareMintApp, prepareUpdateApp } from '@/lib/contracts/registry.write';
 import { hashTrait, hashTraits } from '@/lib/utils/traits';
-import { normalizeDid, computeDidHash } from '@/lib/utils/did';
+import { normalizeDid, computeDidHash } from '@oma3/omatrust/identity';
 import { OffChainMetadata, OnChainApp } from '@/schema/data-model';
 import type { MintAppInput } from '@/lib/contracts/types';
 import { keccak256, toUtf8Bytes } from 'ethers';

@@ -31,7 +31,7 @@ vi.mock('ethers', () => ({
 }));
 vi.mock('@/lib/rpc', () => ({ getRpcUrl: vi.fn() }));
 vi.mock('@/config/schemas', () => ({ getAllSchemas: vi.fn(), getSchema: vi.fn() }));
-vi.mock('@/lib/utils/did', () => ({ getDomainFromDidWeb: vi.fn() }));
+vi.mock('@oma3/omatrust/identity', () => ({ getDomainFromDidWeb: vi.fn() }));
 vi.mock('@/lib/server/evidence', () => ({
   findControllerInDnsTxt: vi.fn(),
   findControllerInDidDoc: vi.fn(),

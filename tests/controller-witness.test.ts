@@ -65,12 +65,17 @@ vi.mock('@/config/schemas', () => ({
   getSchema: vi.fn(),
 }));
 
-vi.mock('@/lib/utils/did', () => ({
-  getDomainFromDidWeb: vi.fn((did: string) => {
-    if (did.startsWith('did:web:')) return did.slice('did:web:'.length).split('/')[0];
-    return null;
-  }),
-}));
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
+  return {
+    ...actual,
+    getDomainFromDidWeb: vi.fn((did: string) => {
+      if (did.startsWith('did:web:')) return did.slice('did:web:'.length).split('/')[0];
+      return null;
+    }),
+    didToAddress: vi.fn((did: string) => '0x' + 'a'.repeat(40)),
+  };
+});
 
 vi.mock('@/lib/server/evidence', () => ({
   findControllerInDnsTxt: vi.fn(),

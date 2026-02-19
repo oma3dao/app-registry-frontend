@@ -66,7 +66,7 @@ describe('Integration: App Registration to Attestation Flow', () => {
       /**
        * Flow: Generate index address for the registered app
        */
-      const { didToAddress } = await import('@/lib/utils/did');
+      const { didToAddress } = await import('@oma3/omatrust/identity');
       
       const did = 'did:web:myapp.example.com';
       const indexAddress = didToAddress(did);

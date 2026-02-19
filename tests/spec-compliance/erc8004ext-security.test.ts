@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { canonicalizeForHash } from '@/lib/utils/dataurl';
-import { normalizeDid, computeDidHash, normalizeDidWeb, getDomainFromDidWeb } from '@/lib/utils/did';
+import { normalizeDid, computeDidHash, normalizeDidWeb, getDomainFromDidWeb } from '@oma3/omatrust/identity';
 import { APP_STATUSES } from '@/schema/data-model';
 import { prepareRegisterApp8004, prepareMintApp, prepareUpdateApp } from '@/lib/contracts/registry.write';
 import type { MintAppInput } from '@/lib/contracts/types';
@@ -95,7 +95,7 @@ describe('ERC-8004 Security Extension (ERC8004EXT-SECURITY)', () => {
 
     /** Spec: normalizeDidWeb throws when given non-web DID (wrong method). */
     it('normalizeDidWeb throws for non-web DID', () => {
-      expect(() => normalizeDidWeb('did:pkh:eip155:1:0x1234567890123456789012345678901234567890')).toThrow(/non-web DID/);
+      expect(() => normalizeDidWeb('did:pkh:eip155:1:0x1234567890123456789012345678901234567890')).toThrow(/Expected did:web DID|non-web DID/);
     });
 
     /** Spec: did:pkh address is lowercased for canonical form. */

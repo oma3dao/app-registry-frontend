@@ -1,7 +1,7 @@
 /**
  * Tests for DID Address Utilities (EAS attestation indexing)
- * Migrated from @/lib/did-index to @/lib/utils/did per TEST-MIGRATION-GUIDE.
  * Tests OMATrust specification section 5.3.2 implementation.
+ * Uses @oma3/omatrust/identity SDK.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -17,7 +17,7 @@ import {
   normalizeDidWeb,
   normalizeDid,
   normalizeDidPkh,
-} from '@/lib/utils/did';
+} from '@oma3/omatrust/identity';
 
 describe('DID Address Utilities', () => {
   describe('normalizeDid / normalizeDidWeb / normalizeDidPkh (replaces canonicalizeDID)', () => {
@@ -37,7 +37,7 @@ describe('DID Address Utilities', () => {
     });
 
     it('normalizeDidWeb throws for non-web DID', () => {
-      expect(() => normalizeDidWeb('did:pkh:eip155:1:0xabc')).toThrow(/normalizeDidWeb received non-web DID/);
+      expect(() => normalizeDidWeb('did:pkh:eip155:1:0xabc')).toThrow(/Expected did:web DID|non-web DID/);
     });
 
     it('normalizeDidPkh throws for invalid did:pkh format', () => {
