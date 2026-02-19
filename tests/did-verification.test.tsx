@@ -13,14 +13,13 @@ vi.mock('thirdweb/react', () => ({
 	useActiveAccount: () => (mockAccount.address ? { address: mockAccount.address } : undefined),
 }))
 
-// Mock DID utils (include normalizeDid per TEST-MIGRATION-GUIDE)
-vi.mock('@/lib/utils/did', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('@/lib/utils/did')>()
+// Mock DID utils
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
 	return {
 		...actual,
 		normalizeDidWeb: (input: string) => (input.startsWith('did:') ? input : `did:web:${input}`),
-		normalizeDid: (input: string) => (input.startsWith('did:') ? input : `did:web:${input}`),
-	}
+	};
 })
 
 // Mock fetch

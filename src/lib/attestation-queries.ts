@@ -8,7 +8,7 @@ import { EAS, SchemaEncoder } from '@ethereum-attestation-service/eas-sdk'
 import { ethers } from 'ethers'
 import { getAllSchemas, type AttestationSchema } from '@/config/schemas'
 import { getContractAddress } from '@/config/attestation-services'
-import { didToAddress } from '@/lib/utils/did';
+import { didToAddress } from '@oma3/omatrust/identity';
 import { log } from '@/lib/log'
 
 const OMACHAIN_TESTNET_RPC = 'https://rpc.testnet.chain.oma3.org/'

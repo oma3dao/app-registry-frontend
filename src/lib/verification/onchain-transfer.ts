@@ -12,7 +12,7 @@ import canonicalize from 'canonicalize';
 import { 
   computeDidHash, 
   buildEvmDidPkh,
-} from '@/lib/utils/did';
+} from '@oma3/omatrust/identity';
 
 // ============================================================================
 // Proof Purpose Constants

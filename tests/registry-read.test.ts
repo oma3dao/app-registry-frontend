@@ -52,13 +52,13 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID utils (importOriginal pattern, remove getDidHash; use computeDidHash from actual)
-vi.mock('@/lib/utils/did', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+// Mock DID utils
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
   return {
     ...actual,
-    normalizeDidWeb: vi.fn((did: string) => did),
     normalizeDid: vi.fn((did: string) => did),
+    getDidHash: vi.fn(async (did: string) => `0x${Buffer.from(did).toString('hex').padEnd(64, '0')}`),
   };
 });
 
@@ -559,7 +559,7 @@ describe('Registry Read Operations', () => {
 
     // Tests DID normalization
     it('normalizes DID before searching', async () => {
-      const { normalizeDid } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       
       (readContract as any).mockResolvedValueOnce(1);
       (readContract as any).mockResolvedValueOnce(null);
@@ -614,7 +614,7 @@ describe('Registry Read Operations', () => {
     // This test verifies that hasAnyTraits normalizes DID before checking
     it('normalizes DID before checking traits', async () => {
       const { hasAnyTraits } = await import('@/lib/contracts/registry.read');
-      const { normalizeDid } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       
       (readContract as any).mockResolvedValueOnce(false);
 
@@ -668,7 +668,7 @@ describe('Registry Read Operations', () => {
     // This test verifies that hasAllTraits normalizes DID before checking
     it('normalizes DID before checking traits', async () => {
       const { hasAllTraits } = await import('@/lib/contracts/registry.read');
-      const { normalizeDid } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       
       (readContract as any).mockResolvedValueOnce(false);
 

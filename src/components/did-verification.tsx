@@ -10,7 +10,7 @@ import {
   Loader2Icon
 } from "lucide-react"
 import { useActiveAccount } from "thirdweb/react"
-import { normalizeDid, buildEvmDidPkh } from "@/lib/utils/did"
+import { normalizeDid, buildEvmDidPkh } from "@oma3/omatrust/identity"
 import { env } from "@/config/env"
 
 interface DidVerificationProps {

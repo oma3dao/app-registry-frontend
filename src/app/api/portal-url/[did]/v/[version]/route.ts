@@ -12,11 +12,11 @@ const isDefined = (value: any): boolean => value !== undefined && value !== null
 // Handler now accepts params for dynamic route segments
 export async function POST(
   request: NextRequest, 
-  { params }: { params: { did: string; version: string } } // Added params
+  { params }: { params: Promise<{ did: string; version: string }> }
 ) { 
   try {
     // Extract did and version from params object
-    const { did: _did, version: _version } = params; 
+    const { did: _did, version: _version } = await params; 
 
     // --- DID and Version Validation ---
     if (!validateDid(_did)) {

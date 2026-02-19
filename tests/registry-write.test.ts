@@ -19,12 +19,11 @@ vi.mock('@/lib/contracts/client', () => ({
   })),
 }));
 
-// Mock DID normalization (importOriginal pattern per TEST-MIGRATION-GUIDE)
-vi.mock('@/lib/utils/did', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+// Mock DID normalization
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
   return {
     ...actual,
-    normalizeDidWeb: vi.fn((did: string) => did.toLowerCase()),
     normalizeDid: vi.fn((did: string) => did.toLowerCase()),
   };
 });
@@ -99,7 +98,7 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDid } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareMintApp(mockMintInput);
 
       expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
@@ -245,7 +244,7 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDid } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareUpdateStatus(mockStatusInput);
 
       expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
@@ -303,7 +302,7 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDid } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareUpdateApp(mockUpdateInput);
 
       expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
@@ -542,7 +541,7 @@ describe('Registry Write Functions', () => {
 
     // Test DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDid } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareRegisterApp8004(mockMintInput);
 
       expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');

@@ -11,12 +11,11 @@ vi.mock('thirdweb/react', () => ({
   })),
 }));
 
-vi.mock('@/lib/utils/did', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
   return {
     ...actual,
     normalizeDidWeb: vi.fn((did: string) => did),
-    normalizeDid: vi.fn((did: string) => did),
     normalizeDomain: vi.fn((domain: string) => domain),
   };
 });

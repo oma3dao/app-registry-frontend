@@ -129,9 +129,9 @@ vi.mock('@/lib/rpc', () => ({
   withRetry: vi.fn((fn) => fn()),
 }));
 
-// Mock DID utils (importOriginal pattern per TEST-MIGRATION-GUIDE)
-vi.mock('@/lib/utils/did', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/utils/did')>();
+// Mock DID utils
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
   return {
     ...actual,
     normalizeDomain: vi.fn((domain) => domain.toLowerCase()),

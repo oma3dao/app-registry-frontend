@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle, XCircle, AlertCircle, Info } from "lucide-react";
 
 import { OnchainTransferInstructions } from "@/components/onchain-transfer-instructions";
-import { isEvmDidPkh, getNamespaceFromDidPkh } from "@/lib/utils/did";
+import { isEvmDidPkh, getNamespaceFromDidPkh } from "@oma3/omatrust/identity";
 
 interface DidPkhVerificationProps {
   did: string;
