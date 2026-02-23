@@ -862,13 +862,16 @@ export const linkedIdentifierSchema: AttestationSchema = {
   deployedUIDs: {
     97: '0xd6ef74f4f2f8d79a8993132577713ada1ae9ba937d8bbd69a174cd6afe6beef6', // BSC Testnet
     56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0xed79388b434965a35d50573b75f4bbd6e3bc7912103c4a6ac0aff6a510ccadac', // OMAchain Testnet
+    66238: '0x26e21911c55587925afee4b17839ab091e9829321b4a4e1658c497eb0088b453', // OMAchain Testnet
     6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
+  },
+  priorUIDs: {
+    66238: ['0xed79388b434965a35d50573b75f4bbd6e3bc7912103c4a6ac0aff6a510ccadac'] // OMAchain Testnet
   },
   deployedBlocks: {
     97: 52415311, // BSC Testnet
     56: 0, // BSC Mainnet
-    66238: 292, // OMAchain Testnet
+    66238: 379, // OMAchain Testnet
     6623: 0  // OMAchain Mainnet
   }
 };
