@@ -11,7 +11,7 @@
  *
  * ⚠️ CRITICAL: These tests validate against the ERC-8004 SPECIFICATION,
  * not just the current implementation behavior.
- * For extension-specific tests see: erc8004ext-security.test.ts, erc8004ext-web.test.ts
+ * For extension-specific tests see: erc8004ext-security.test.ts
  */
 
 import { describe, it, expect } from 'vitest';

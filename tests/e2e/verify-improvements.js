@@ -84,7 +84,7 @@ allPassed &= checkFile('CI_CD_ENHANCEMENTS_V2.md', 'CI/CD enhancements guide');
 
 // Check templates
 log('\n📋 Checking Test Templates:', 'yellow');
-allPassed &= checkFile('test-templates/basic-test.spec.ts', 'Basic test template');
+allPassed &= checkFile('tools/templates/basic-test.template.ts', 'Basic test template');
 allPassed &= checkFile('test-templates/api-test.spec.ts', 'API test template');
 allPassed &= checkFile('test-templates/form-test.spec.ts', 'Form test template');
 

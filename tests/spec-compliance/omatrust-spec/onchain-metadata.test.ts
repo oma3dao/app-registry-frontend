@@ -163,36 +163,6 @@ describe('OMATrust Identity Spec 5.1.1: Onchain Metadata (Table 1)', () => {
       expect(result.args).toContain(0); // patch
     });
 
-    it('includes status field (Required=Y, Mutable=Y) - OT-ID-004', () => {
-      /**
-       * Specification: OMATrust Identity Specification - Section 5.1.1 (Table 1)
-       * Requirement ID: OT-ID-004
-       * Requirement: "Application Registry NFT MUST store `status` field (Active, deprecated, replaced)"
-       * Field: status | Format: enum | Required: Y | Mutable: Y
-       * Values: Active, deprecated, replaced
-       */
-
-      // TODO: Implementation doesn't explicitly expose status field in prepareMintApp
-      // This test is a placeholder until status is added to the API
-      
-      const mintInput = {
-        did: 'did:web:example.com',
-        interfaces: 1,
-        dataUrl: 'https://example.com/metadata.json',
-        dataHash: '0x' + '1234567890abcdef'.repeat(4),
-        dataHashAlgorithm: 0 as const,
-        initialVersionMajor: 1,
-        initialVersionMinor: 0,
-        initialVersionPatch: 0,
-      };
-
-      const result = prepareMintApp(mintInput);
-      expect(result).toBeDefined();
-      
-      // TODO: Once status is exposed, test it:
-      // expect(result.args).toContainEqual(expect.objectContaining({ status: 'Active' }));
-    });
-
     it('includes dataUrl field (Required=Y, Mutable=Y) - OT-ID-007', () => {
       /**
        * Specification: OMATrust Identity Specification - Section 5.1.1 (Table 1)
@@ -286,40 +256,6 @@ describe('OMATrust Identity Spec 5.1.1: Onchain Metadata (Table 1)', () => {
       expect(resultSha.args).toContain(1); // Algorithm enum value
     });
 
-    it('caps traitHashes to ≤20 entries (Required=N) - OT-ID-010, OT-ID-011', () => {
-      /**
-       * Specification: OMATrust Identity Specification - Section 5.1.1 (Table 1)
-       * Requirement ID: OT-ID-010, OT-ID-011
-       * Requirement: "Implementations SHOULD cap `traitHashes` to ≤ 20 entries"
-       *              "Clients MUST NOT assume more than 20 `traitHashes` are indexed"
-       * Field: traitHashes | Format: [string] | Required: N | Mutable: Y
-       * Description: "A structure of hashed traits. Implementation is different for each VM. 
-       *               Implementations SHOULD cap on-chain traitHashes to ≤ 20 entries to mirror 
-       *               the off-chain keywords cap, and clients MUST NOT assume more than 20 are indexed."
-       * 
-       * See Appendix C for recommended trait strings.
-       */
-
-      // TODO: Implementation doesn't expose traitHashes in prepareMintApp yet
-      // This is a placeholder test
-      
-      const twentyTraits = Array.from({ length: 20 }, (_, i) => `trait${i}`);
-      const twentyOneTraits = Array.from({ length: 21 }, (_, i) => `trait${i}`);
-
-      // Test: 20 traits should be accepted
-      // expect(validateTraitHashes(twentyTraits)).toBe(true);
-      
-      // Test: 21 traits should be rejected or capped
-      // expect(validateTraitHashes(twentyOneTraits)).toBe(false);
-      // OR
-      // const capped = capTraitHashes(twentyOneTraits);
-      // expect(capped.length).toBeLessThanOrEqual(20);
-
-      // Placeholder assertion
-      expect(twentyTraits.length).toBe(20);
-      expect(twentyOneTraits.length).toBeGreaterThan(20);
-    });
-
     it('includes interfaces field (Required=Y, Mutable=N) - OT-ID-012, OT-ID-013', () => {
       /**
        * Specification: OMATrust Identity Specification - Section 5.1.1 (Table 1)
@@ -361,77 +297,7 @@ describe('OMATrust Identity Spec 5.1.1: Onchain Metadata (Table 1)', () => {
       expect(resultMultiple.args).toContain(3); // Interfaces bitmap
     });
   });
-
-  describe('Field Mutability Requirements', () => {
-    it('enforces immutability of did field - OT-ID-002', () => {
-      /**
-       * Specification: OMATrust Identity Specification - Section 5.1.1 (Table 1)
-       * Requirement ID: OT-ID-002
-       * Requirement: "`did` field MUST be immutable"
-       * Field: did | Mutable: N
-       * 
-       * The DID, once set during minting, cannot be changed.
-       */
-
-      // TODO: This requires testing update functions that don't exist yet
-      // Placeholder test documents the requirement
-      
-      const initialDid = 'did:web:example.com';
-      const attemptedNewDid = 'did:web:different.com';
-
-      // Test concept: Any update function should reject DID changes
-      // expect(() => updateAppDid(tokenId, attemptedNewDid)).toThrow();
-      
-      expect(initialDid).not.toBe(attemptedNewDid);
-    });
-
-    it('enforces immutability of interfaces field - OT-ID-013', () => {
-      /**
-       * Specification: OMATrust Identity Specification - Section 5.1.1 (Table 1)
-       * Requirement ID: OT-ID-013
-       * Requirement: "`interfaces` MUST be immutable"
-       * Field: interfaces | Mutable: N
-       * 
-       * The interfaces capability bitmap, once set during minting, cannot be changed.
-       */
-
-      // TODO: This requires testing update functions that don't exist yet
-      // Placeholder test documents the requirement
-      
-      const initialInterfaces = 1; // Human only
-      const attemptedNewInterfaces = 3; // Human + API
-
-      // Test concept: Any update function should reject interfaces changes
-      // expect(() => updateAppInterfaces(tokenId, attemptedNewInterfaces)).toThrow();
-      
-      expect(initialInterfaces).not.toBe(attemptedNewInterfaces);
-    });
-
-    it('allows versionHistory updates (append-only) - OT-ID-003', () => {
-      /**
-       * Specification: OMATrust Identity Specification - Section 5.1.1 (Table 1)
-       * Requirement ID: OT-ID-003
-       * Requirement: "`versionHistory` is mutable but append-only"
-       * Field: versionHistory | Mutable: Y (append only)
-       * 
-       * New versions can be added to versionHistory, but existing entries cannot be modified or removed.
-       */
-
-      // TODO: This requires testing version update functions
-      // Placeholder test documents the requirement
-      
-      const initialVersion = { major: 1, minor: 0, patch: 0 };
-      const newVersion = { major: 1, minor: 1, patch: 0 };
-
-      // Test concept: Should allow appending new version
-      // expect(appendVersion(tokenId, newVersion)).toBe(true);
-      
-      // Test concept: Should reject modifying existing version
-      // expect(() => modifyVersion(tokenId, 0, newVersion)).toThrow();
-      
-      expect(initialVersion.major).toBe(1);
-      expect(newVersion.minor).toBe(1);
-    });
-  });
 });
+
+
 

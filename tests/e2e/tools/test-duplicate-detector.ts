@@ -6,12 +6,13 @@
  * 
  * Usage:
  * ```bash
- * npx tsx tests/e2e/test-duplicate-detector.ts
+ * npx tsx tests/e2e/tools/test-duplicate-detector.ts
  * ```
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+const E2E_ROOT = path.join(__dirname, '..');
 
 interface DuplicatePattern {
   code: string;
@@ -24,7 +25,7 @@ interface DuplicatePattern {
  * Get all test files
  */
 function getTestFiles(): string[] {
-  const testDir = path.join(__dirname);
+  const testDir = E2E_ROOT;
   const files: string[] = [];
 
   function walkDir(dir: string): void {
@@ -220,8 +221,9 @@ if (require.main === module) {
   console.log(formatDuplicateResults(duplicates));
 
   // Write to file
-  const outputPath = path.join(__dirname, 'DUPLICATE_DETECTION.md');
+  const outputPath = path.join(E2E_ROOT, 'DUPLICATE_DETECTION.md');
   fs.writeFileSync(outputPath, formatDuplicateResults(duplicates));
   console.log(`\n📄 Results saved to: ${outputPath}\n`);
 }
+
 

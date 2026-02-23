@@ -978,7 +978,7 @@ describe('/api/verify-and-attest', () => {
       }),
       getBlockNumber: vi.fn().mockResolvedValue(103), // 3 confirmations
       getBlock: vi.fn().mockResolvedValue({
-        timestamp: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
+        timestamp: 1_700_000_000, // fixed timestamp for deterministic behavior
       }),
     };
     

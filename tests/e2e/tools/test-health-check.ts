@@ -10,12 +10,13 @@
  * 
  * Usage:
  * ```bash
- * npx tsx tests/e2e/test-health-check.ts
+ * npx tsx tests/e2e/tools/test-health-check.ts
  * ```
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+const E2E_ROOT = path.join(__dirname, '..');
 
 interface HealthCheckResult {
   unusedUtilities: string[];
@@ -37,7 +38,7 @@ interface HealthCheckResult {
  * Get all test files
  */
 function getTestFiles(): string[] {
-  const testDir = path.join(__dirname);
+  const testDir = E2E_ROOT;
   const files: string[] = [];
 
   function walkDir(dir: string): void {
@@ -62,7 +63,7 @@ function getTestFiles(): string[] {
  * Get all utility files
  */
 function getUtilityFiles(): string[] {
-  const testDir = path.join(__dirname);
+  const testDir = E2E_ROOT;
   const files: string[] = [];
   const utilityFiles = [
     'test-helpers.ts',
@@ -484,11 +485,12 @@ if (require.main === module) {
   console.log(formatHealthCheckResults(result));
 
   // Write to file
-  const outputPath = path.join(__dirname, 'TEST_HEALTH_CHECK.md');
+  const outputPath = path.join(E2E_ROOT, 'TEST_HEALTH_CHECK.md');
   fs.writeFileSync(outputPath, formatHealthCheckResults(result));
   console.log(`\n📄 Results saved to: ${outputPath}\n`);
 
   // Exit with appropriate code
   process.exit(result.score >= 75 ? 0 : 1);
 }
+
 

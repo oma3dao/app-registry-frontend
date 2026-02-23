@@ -10,12 +10,13 @@
  * 
  * Usage:
  * ```bash
- * npx tsx tests/e2e/test-report-generator.ts [test-results/results.json]
+ * npx tsx tests/e2e/tools/test-report-generator.ts [test-results/results.json]
  * ```
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+const E2E_ROOT = path.join(__dirname, '..');
 
 interface TestReport {
   summary: {
@@ -459,18 +460,18 @@ export function generateReports(resultPath: string): { markdown: string; html: s
 
 // Run if executed directly
 if (require.main === module) {
-  const resultPath = process.argv[2] || path.join(__dirname, '..', '..', 'test-results', 'results.json');
+  const resultPath = process.argv[2] || path.join(__dirname, '..', '..', '..', 'test-results', 'results.json');
   
   try {
     const { markdown, html } = generateReports(resultPath);
     
     // Write markdown report
-    const mdPath = path.join(__dirname, 'TEST_REPORT.md');
+    const mdPath = path.join(E2E_ROOT, 'TEST_REPORT.md');
     fs.writeFileSync(mdPath, markdown);
     console.log(`✅ Markdown report saved to: ${mdPath}\n`);
 
     // Write HTML report
-    const htmlPath = path.join(__dirname, 'TEST_REPORT.html');
+    const htmlPath = path.join(E2E_ROOT, 'TEST_REPORT.html');
     fs.writeFileSync(htmlPath, html);
     console.log(`✅ HTML report saved to: ${htmlPath}\n`);
     console.log(`📄 Open ${htmlPath} in your browser to view the report\n`);
@@ -479,4 +480,5 @@ if (require.main === module) {
     process.exit(1);
   }
 }
+
 

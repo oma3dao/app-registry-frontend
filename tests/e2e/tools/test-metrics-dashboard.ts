@@ -6,12 +6,13 @@
  * 
  * Usage:
  * ```bash
- * npx tsx tests/e2e/test-metrics-dashboard.ts
+ * npx tsx tests/e2e/tools/test-metrics-dashboard.ts
  * ```
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+const E2E_ROOT = path.join(__dirname, '..');
 
 interface DashboardData {
   healthScores: Array<{ date: string; score: number }>;
@@ -32,7 +33,7 @@ interface DashboardData {
  * Load health check history
  */
 function loadHealthCheckHistory(): Array<{ date: string; score: number }> {
-  const reportsDir = path.join(__dirname, 'maintenance-reports');
+  const reportsDir = path.join(E2E_ROOT, 'maintenance-reports');
   const healthScores: Array<{ date: string; score: number }> = [];
 
   if (!fs.existsSync(reportsDir)) {
@@ -62,7 +63,7 @@ function loadHealthCheckHistory(): Array<{ date: string; score: number }> {
  * Load metrics history
  */
 function loadMetricsHistory(): Array<{ date: string; total: number; passed: number; failed: number; averageDuration: number; slowestTest: string }> {
-  const metricsPath = path.join(__dirname, 'test-metrics-history.json');
+  const metricsPath = path.join(E2E_ROOT, 'test-metrics-history.json');
   
   if (!fs.existsSync(metricsPath)) {
     return [];
@@ -85,7 +86,7 @@ function loadMetricsHistory(): Array<{ date: string; total: number; passed: numb
  * Load coverage history
  */
 function loadCoverageHistory(): Array<{ date: string; coverage: number }> {
-  const reportsDir = path.join(__dirname, 'maintenance-reports');
+  const reportsDir = path.join(E2E_ROOT, 'maintenance-reports');
   const coverage: Array<{ date: string; coverage: number }> = [];
 
   if (!fs.existsSync(reportsDir)) {
@@ -117,7 +118,7 @@ function loadCoverageHistory(): Array<{ date: string; coverage: number }> {
  * Get current health score
  */
 function getCurrentHealthScore(): number {
-  const healthCheckPath = path.join(__dirname, 'TEST_HEALTH_CHECK.md');
+  const healthCheckPath = path.join(E2E_ROOT, 'TEST_HEALTH_CHECK.md');
   
   if (!fs.existsSync(healthCheckPath)) {
     return 0;
@@ -133,7 +134,7 @@ function getCurrentHealthScore(): number {
  * Get flaky tests from metrics
  */
 function getFlakyTests(): Array<{ test: string; flakinessRate: number }> {
-  const metricsPath = path.join(__dirname, 'test-metrics-history.json');
+  const metricsPath = path.join(E2E_ROOT, 'test-metrics-history.json');
   
   if (!fs.existsSync(metricsPath)) {
     return [];
@@ -500,7 +501,7 @@ function main() {
     const data = generateDashboardData();
     const html = generateHTMLDashboard(data);
     
-    const outputPath = path.join(__dirname, 'TEST_METRICS_DASHBOARD.html');
+    const outputPath = path.join(E2E_ROOT, 'TEST_METRICS_DASHBOARD.html');
     fs.writeFileSync(outputPath, html);
     
     console.log('✅ Dashboard generated successfully!');
@@ -523,4 +524,5 @@ if (require.main === module) {
 }
 
 export { generateDashboardData, generateHTMLDashboard };
+
 
