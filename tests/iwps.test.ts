@@ -58,89 +58,78 @@ describe('IWPS utility functions', () => {
   });
 
   describe('detectDeviceParameters', () => {
-    // This test verifies that device parameters are detected correctly
-    it('detects device parameters correctly', () => {
-      // Mock navigator properties
+    it.each([
+      {
+        platform: 'MacIntel',
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        maxTouchPoints: undefined,
+        expectedOs: 'macos',
+        label: 'macOS',
+        fullResult: {
+          sourceOs: 'macos',
+          sourceIsa: null,
+          sourceBits: null,
+          sourceClientType: 'browser',
+          sourceOsVersion: null,
+        },
+      },
+      {
+        platform: 'Win32',
+        userAgent: undefined,
+        maxTouchPoints: undefined,
+        expectedOs: 'windows',
+        label: 'Windows',
+        fullResult: undefined,
+      },
+      {
+        platform: 'Linux x86_64',
+        userAgent: undefined,
+        maxTouchPoints: undefined,
+        expectedOs: 'linux',
+        label: 'Linux',
+        fullResult: undefined,
+      },
+      {
+        platform: 'iPhone',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
+        maxTouchPoints: undefined,
+        expectedOs: 'ios',
+        label: 'iOS',
+        fullResult: undefined,
+      },
+      {
+        platform: 'Linux armv8l',
+        userAgent: 'Mozilla/5.0 (Linux; Android 10; SM-G973F)',
+        maxTouchPoints: 5,
+        expectedOs: 'linux',
+        label: 'Android (detected as Linux)',
+        fullResult: undefined,
+      },
+    ])('detects $label platform correctly', ({ platform, userAgent, maxTouchPoints, expectedOs, fullResult }) => {
       Object.defineProperty(navigator, 'platform', {
-        value: 'MacIntel',
+        value: platform,
         writable: true,
       });
-      Object.defineProperty(navigator, 'userAgent', {
-        value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-        writable: true,
-      });
+      if (userAgent !== undefined) {
+        Object.defineProperty(navigator, 'userAgent', {
+          value: userAgent,
+          writable: true,
+        });
+      }
+      if (maxTouchPoints !== undefined) {
+        Object.defineProperty(navigator, 'maxTouchPoints', {
+          value: maxTouchPoints,
+          writable: true,
+        });
+      }
 
       const result = detectDeviceParameters();
 
-      expect(result).toEqual({
-        sourceOs: 'macos',
-        sourceIsa: null,
-        sourceBits: null,
-        sourceClientType: 'browser',
-        sourceOsVersion: null,
-      });
-    });
-
-    // This test checks Windows platform detection
-    it('detects Windows platform correctly', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: 'Win32',
-        writable: true,
-      });
-
-      const result = detectDeviceParameters();
-
-      expect(result.sourceOs).toBe('windows');
-    });
-
-    // This test checks Linux platform detection
-    it('detects Linux platform correctly', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: 'Linux x86_64',
-        writable: true,
-      });
-
-      const result = detectDeviceParameters();
-
-      expect(result.sourceOs).toBe('linux');
-    });
-
-    // This test checks iOS detection
-    it('detects iOS platform correctly', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: 'iPhone',
-        writable: true,
-      });
-      Object.defineProperty(navigator, 'userAgent', {
-        value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
-        writable: true,
-      });
-
-      const result = detectDeviceParameters();
-
-      expect(result.sourceOs).toBe('ios');
-    });
-
-    // This test checks Android detection
-    it('detects Android platform correctly', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: 'Linux armv8l',
-        writable: true,
-      });
-      Object.defineProperty(navigator, 'userAgent', {
-        value: 'Mozilla/5.0 (Linux; Android 10; SM-G973F)',
-        writable: true,
-      });
-      Object.defineProperty(navigator, 'maxTouchPoints', {
-        value: 5,
-        writable: true,
-      });
-
-      const result = detectDeviceParameters();
-
-      // The code checks platform for 'linux' first, so it returns 'linux' for Android devices
-      // Android detection via userAgent only happens if platform doesn't include 'linux'
-      expect(result.sourceOs).toBe('linux');
+      if (fullResult) {
+        expect(result).toEqual(fullResult);
+      } else {
+        expect(result.sourceOs).toBe(expectedOs);
+      }
     });
 
     // This test verifies error handling

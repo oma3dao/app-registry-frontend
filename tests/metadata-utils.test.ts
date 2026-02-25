@@ -55,53 +55,18 @@ describe('Metadata Utils', () => {
       expect(typeof parsed).toBe('object');
     });
 
-    // Tests undefined optional fields use empty string fallback (lines 36-39, 42)
-    it('uses empty string fallback for undefined name', () => {
-      const nftWithoutName = { ...mockNFT, name: undefined };
-      const result = buildMetadataJSON(nftWithoutName);
+    it.each([
+      { field: 'name', key: 'name', expected: '' },
+      { field: 'description', key: 'description', expected: '' },
+      { field: 'publisher', key: 'publisher', expected: '' },
+      { field: 'image', key: METADATA_JSON_ICON_URL_KEY, expected: '' },
+      { field: 'external_url', key: METADATA_JSON_MARKETING_URL_KEY, expected: '' },
+      { field: 'fungibleTokenId', key: METADATA_JSON_TOKEN_CONTRACT_KEY, expected: '' },
+    ])('uses empty string fallback for undefined $field', ({ field, key, expected }) => {
+      const nft = { ...mockNFT, [field]: undefined } as NFT;
+      const result = buildMetadataJSON(nft);
       const parsed = JSON.parse(result);
-
-      expect(parsed.name).toBe('');
-    });
-
-    it('uses empty string fallback for undefined description', () => {
-      const nftWithoutDesc = { ...mockNFT, description: undefined };
-      const result = buildMetadataJSON(nftWithoutDesc);
-      const parsed = JSON.parse(result);
-
-      expect(parsed.description).toBe('');
-    });
-
-    it('uses empty string fallback for undefined publisher', () => {
-      const nftWithoutPub = { ...mockNFT, publisher: undefined };
-      const result = buildMetadataJSON(nftWithoutPub);
-      const parsed = JSON.parse(result);
-
-      expect(parsed.publisher).toBe('');
-    });
-
-    it('uses empty string fallback for undefined image', () => {
-      const nftWithoutImage = { ...mockNFT, image: undefined };
-      const result = buildMetadataJSON(nftWithoutImage);
-      const parsed = JSON.parse(result);
-
-      expect(parsed[METADATA_JSON_ICON_URL_KEY]).toBe('');
-    });
-
-    it('uses empty string fallback for undefined external_url', () => {
-      const nftWithoutExternal = { ...mockNFT, external_url: undefined };
-      const result = buildMetadataJSON(nftWithoutExternal);
-      const parsed = JSON.parse(result);
-
-      expect(parsed[METADATA_JSON_MARKETING_URL_KEY]).toBe('');
-    });
-
-    it('uses empty string fallback for undefined fungibleTokenId', () => {
-      const nftWithoutToken = { ...mockNFT, fungibleTokenId: undefined };
-      const result = buildMetadataJSON(nftWithoutToken);
-      const parsed = JSON.parse(result);
-
-      expect(parsed[METADATA_JSON_TOKEN_CONTRACT_KEY]).toBe('');
+      expect(parsed[key]).toBe(expected);
     });
 
     it('uses empty array fallback for undefined screenshotUrls', () => {
@@ -307,22 +272,11 @@ describe('Metadata Utils', () => {
       expect(result).toBeNull();
     });
 
-    // Tests null metadata
-    it('returns null for null metadata', () => {
-      const nullJson = JSON.stringify(null);
-
-      const result = buildMetadataStructure(nullJson);
-
-      expect(result).toBeNull();
-    });
-
-    // Tests non-object metadata
-    it('returns null for non-object metadata', () => {
-      const stringJson = JSON.stringify('just a string');
-
-      const result = buildMetadataStructure(stringJson);
-
-      expect(result).toBeNull();
+    it.each([
+      { label: 'null metadata', json: JSON.stringify(null) },
+      { label: 'non-object metadata', json: JSON.stringify('just a string') },
+    ])('returns null for $label', ({ json }) => {
+      expect(buildMetadataStructure(json)).toBeNull();
     });
 
     // Tests metadata with invalid URLs (should still return structure but log warning)
@@ -409,72 +363,34 @@ describe('Metadata Utils', () => {
 
     // Tests invalid description URL - removed, not in OMATrust spec
 
-    // Tests invalid marketing URL
-    it('throws error for invalid marketing URL', () => {
-      validMetadata.external_url = 'not-a-url';
-
-      expect(() => validateMetadata(validMetadata)).toThrow('Invalid marketing URL');
+    it.each([
+      { label: 'marketing URL', mutate: (m: MetadataContractData) => { m.external_url = 'not-a-url'; }, msg: 'Invalid marketing URL' },
+      { label: 'icon URL', mutate: (m: MetadataContractData) => { m.image = 'invalid-icon-url'; }, msg: 'Invalid icon URL' },
+      { label: 'first screenshot URL', mutate: (m: MetadataContractData) => { m.screenshotUrls = ['invalid-screenshot-url']; }, msg: 'First screenshot URL is invalid' },
+      { label: 'platform download URL', mutate: (m: MetadataContractData) => { m.platforms = { web: { downloadUrl: 'http://example .com', launchUrl: 'https://example.com/launch' } }; }, msg: 'Invalid web download URL' },
+      { label: 'platform launch URL', mutate: (m: MetadataContractData) => { m.platforms = { web: { downloadUrl: 'https://example.com/download', launchUrl: 'http://example@.com' } }; }, msg: 'Invalid web launch URL' },
+    ])('throws error for invalid $label', ({ mutate, msg }) => {
+      mutate(validMetadata);
+      expect(() => validateMetadata(validMetadata)).toThrow(msg);
     });
 
-    // Tests invalid icon URL
-    it('throws error for invalid icon URL', () => {
-      validMetadata.image = 'invalid-icon-url';
-
-      expect(() => validateMetadata(validMetadata)).toThrow('Invalid icon URL');
-    });
-
-    // Tests invalid first screenshot URL
-    it('throws error for invalid first screenshot URL', () => {
-      validMetadata.screenshotUrls = ['invalid-screenshot-url'];
-
-      expect(() => validateMetadata(validMetadata)).toThrow('First screenshot URL is invalid');
-    });
-
-    // Tests invalid screenshot URL at specific position
     it('throws error for invalid screenshot URL at specific position', () => {
       validMetadata.screenshotUrls = [
         'https://example.com/valid.png',
         'invalid-url',
         'https://example.com/valid2.png'
       ];
-
       expect(() => validateMetadata(validMetadata)).toThrow('Invalid screenshot URL at position 1');
     });
 
-    // Tests missing platform URLs
-    it('throws error when no platform URLs are provided', () => {
-      validMetadata.platforms = {
-        web: {
-          supported: ['VR', 'AR']
-          // No downloadUrl or launchUrl
-        }
-      };
-
+    it.each([
+      { label: 'no platform URLs provided', platforms: { web: { supported: ['VR', 'AR'] } } },
+      { label: 'no platforms are provided', platforms: undefined },
+      { label: 'platforms object is empty', platforms: {} },
+      { label: 'platforms have no download or launch URLs', platforms: { web: { supported: ['VR', 'AR'] } } },
+    ])('throws error when $label', ({ platforms }) => {
+      (validMetadata as any).platforms = platforms;
       expect(() => validateMetadata(validMetadata)).toThrow('At least one platform availability URL (Download or Launch) is required');
-    });
-
-    // Tests invalid platform download URL
-    it('throws error for invalid platform download URL', () => {
-      validMetadata.platforms = {
-        web: {
-          downloadUrl: 'http://example .com', // Invalid: space in domain
-          launchUrl: 'https://example.com/launch'
-        }
-      };
-
-      expect(() => validateMetadata(validMetadata)).toThrow('Invalid web download URL');
-    });
-
-    // Tests invalid platform launch URL
-    it('throws error for invalid platform launch URL', () => {
-      validMetadata.platforms = {
-        web: {
-          downloadUrl: 'https://example.com/download',
-          launchUrl: 'http://example@.com' // Invalid: special character in domain
-        }
-      };
-
-      expect(() => validateMetadata(validMetadata)).toThrow('Invalid web launch URL');
     });
 
     // Tests valid metadata with multiple platforms

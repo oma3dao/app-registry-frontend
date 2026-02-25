@@ -18,7 +18,7 @@ vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
 	return {
 		...actual,
-		normalizeDidWeb: (input: string) => `did:web:${input}`,
+		normalizeDidWeb: (input: string) => (input.startsWith('did:') ? input : `did:web:${input}`),
 	};
 })
 

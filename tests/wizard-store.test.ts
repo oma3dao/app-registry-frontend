@@ -86,17 +86,17 @@ describe('useStepStatusStore', () => {
     expect(result.current.getStatus('step-2')).toBe('idle');
   });
 
-  it('should support all step status types', () => {
+  it.each([
+    { status: 'idle' as StepStatus, step: 'step-0' },
+    { status: 'checking' as StepStatus, step: 'step-1' },
+    { status: 'ready' as StepStatus, step: 'step-2' },
+    { status: 'error' as StepStatus, step: 'step-3' },
+  ])('should support $status status type', ({ status, step }) => {
     const { result } = renderHook(() => useStepStatusStore());
-    const statuses: StepStatus[] = ['idle', 'checking', 'ready', 'error'];
-    
-    statuses.forEach((status, index) => {
-      act(() => {
-        result.current.setStatus(`step-${index}`, status);
-      });
-      
-      expect(result.current.getStatus(`step-${index}`)).toBe(status);
+    act(() => {
+      result.current.setStatus(step, status);
     });
+    expect(result.current.getStatus(step)).toBe(status);
   });
 
   it('should maintain state across multiple renders', () => {

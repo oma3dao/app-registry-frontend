@@ -77,9 +77,9 @@ describe('LandingPage component', () => {
   it('renders the main heading and description', () => {
     render(<LandingPage />);
     
-    expect(screen.getByText('OMATrust is Trust for')).toBeInTheDocument();
-    expect(screen.getByText('Online Services')).toBeInTheDocument();
-    expect(screen.getByText(/OMATrust is the internet's decentralized trust layer/)).toBeInTheDocument();
+    expect(screen.getByText('OMATrust')).toBeInTheDocument();
+    expect(screen.getByText('App Registry')).toBeInTheDocument();
+    expect(screen.getByText(/ERC-8004 compliant Identity Registry/)).toBeInTheDocument();
   });
 
   it('renders the connect wallet button', () => {
@@ -110,14 +110,14 @@ describe('LandingPage component', () => {
     
     // LandingPage should still render its content even when wallet is connected
     // The redirect logic is handled by the parent component
-    expect(screen.getByText('OMATrust is Trust for')).toBeInTheDocument();
+    expect(screen.getByText('OMATrust')).toBeInTheDocument();
   });
 
   it('initially does not show the NFT grid section', () => {
     render(<LandingPage />);
     
     // Initially, the NFT grid should not be visible due to the 1-second delay
-    expect(screen.queryByText('Latest Registered Apps')).not.toBeInTheDocument();
+    expect(screen.queryByText('Latest Registrations')).not.toBeInTheDocument();
   });
 }); 
 
@@ -137,10 +137,10 @@ describe('LandingPage component - extended coverage', () => {
     render(<LandingPage />);
     
     // Component should render initially without errors
-    expect(screen.getByText('OMATrust is Trust for')).toBeInTheDocument();
+    expect(screen.getByText('OMATrust')).toBeInTheDocument();
     
     // The async loading behavior is tested implicitly through other component tests
-    expect(screen.getByText('Online Services')).toBeInTheDocument();
+    expect(screen.getByText('App Registry')).toBeInTheDocument();
   });
 
   it('verifies modal interaction functions exist and can be called', async () => {
@@ -148,7 +148,7 @@ describe('LandingPage component - extended coverage', () => {
     render(<LandingPage />);
     
     // Component should render without errors
-    expect(screen.getByText('OMATrust is Trust for')).toBeInTheDocument();
+    expect(screen.getByText('OMATrust')).toBeInTheDocument();
     
     // The modal handlers are tested through integration, not direct function calls
     // This test ensures the component renders successfully with all its handlers
@@ -168,7 +168,7 @@ describe('LandingPage component - extended coverage', () => {
     
     // Component should not crash, just handle the error gracefully
     // The grid might still render but with no items
-    expect(screen.getByText('OMATrust is Trust for')).toBeInTheDocument();
+    expect(screen.getByText('OMATrust')).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -184,7 +184,7 @@ describe('LandingPage component - extended coverage', () => {
     });
     
     // Component should not crash, just handle the error gracefully
-    expect(screen.getByText('OMATrust is Trust for')).toBeInTheDocument();
+    expect(screen.getByText('OMATrust')).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -331,7 +331,7 @@ describe('LandingPage component - extended coverage', () => {
       render(<LandingPage />);
       
       // The function exists and is a stub - component should render without error
-      expect(screen.getByText('OMATrust is Trust for')).toBeInTheDocument();
+      expect(screen.getByText('OMATrust')).toBeInTheDocument();
       
       logSpy.mockRestore();
     });
@@ -342,7 +342,7 @@ describe('LandingPage component - extended coverage', () => {
       render(<LandingPage />);
       
       // The function exists and is a stub - component should render without error
-      expect(screen.getByText('OMATrust is Trust for')).toBeInTheDocument();
+      expect(screen.getByText('OMATrust')).toBeInTheDocument();
       
       logSpy.mockRestore();
     });

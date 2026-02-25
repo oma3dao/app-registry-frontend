@@ -35,7 +35,7 @@ describe('PreAlphaBanner component', () => {
   it('renders when not previously dismissed', () => {
     render(<PreAlphaBanner />);
     
-    expect(screen.getByText(/Pre-Alpha Preview/)).toBeInTheDocument();
+    expect(screen.getByText(/Devaloper Preview/)).toBeInTheDocument();
     expect(screen.getByText(/Smart contracts are deployed to testnets only/)).toBeInTheDocument();
   });
 
@@ -45,7 +45,7 @@ describe('PreAlphaBanner component', () => {
     
     render(<PreAlphaBanner />);
     
-    expect(screen.queryByText(/Pre-Alpha Preview/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Devaloper Preview/)).not.toBeInTheDocument();
   });
 
   // This test verifies that the dismiss button is present and accessible
@@ -64,7 +64,7 @@ describe('PreAlphaBanner component', () => {
     const dismissButton = screen.getByRole('button', { name: /dismiss banner/i });
     fireEvent.click(dismissButton);
     
-    expect(screen.queryByText(/Pre-Alpha Preview/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Devaloper Preview/)).not.toBeInTheDocument();
   });
 
   // This test verifies that dismiss button click sets session storage
@@ -81,7 +81,7 @@ describe('PreAlphaBanner component', () => {
   it('has correct styling classes', () => {
     render(<PreAlphaBanner />);
     
-    const banner = screen.getByText(/Pre-Alpha Preview/).closest('.relative');
+    const banner = screen.getByText(/Devaloper Preview/).closest('.relative');
     expect(banner).toHaveClass('relative', 'bg-yellow-100', 'text-black', 'px-4', 'py-3', 'shadow-sm', 'border-b');
   });
 
@@ -97,7 +97,7 @@ describe('PreAlphaBanner component', () => {
   it('has correct content structure', () => {
     render(<PreAlphaBanner />);
     
-    const container = screen.getByText(/Pre-Alpha Preview/).closest('.max-w-7xl');
+    const container = screen.getByText(/Devaloper Preview/).closest('.max-w-7xl');
     expect(container).toHaveClass('max-w-7xl', 'mx-auto', 'flex', 'items-center', 'justify-between');
   });
 
@@ -105,7 +105,7 @@ describe('PreAlphaBanner component', () => {
   it('banner text has correct styling', () => {
     render(<PreAlphaBanner />);
     
-    const text = screen.getByText(/Pre-Alpha Preview/);
+    const text = screen.getByText(/Devaloper Preview/);
     expect(text).toHaveClass('text-sm', 'font-medium');
   });
 
@@ -128,7 +128,7 @@ describe('PreAlphaBanner component', () => {
     expect(dismissButton).toHaveAttribute('aria-label', 'Dismiss banner');
     
     // Check that the banner text is readable
-    expect(screen.getByText(/Pre-Alpha Preview/)).toBeInTheDocument();
+    expect(screen.getByText(/Devaloper Preview/)).toBeInTheDocument();
   });
 
   // This test checks that the banner handles session storage errors
@@ -148,25 +148,25 @@ describe('PreAlphaBanner component', () => {
     const { rerender } = render(<PreAlphaBanner />);
     
     // Initially visible
-    expect(screen.getByText(/Pre-Alpha Preview/)).toBeInTheDocument();
+    expect(screen.getByText(/Devaloper Preview/)).toBeInTheDocument();
     
     // Click dismiss
     const dismissButton = screen.getByRole('button', { name: /dismiss banner/i });
     fireEvent.click(dismissButton);
     
     // Should be hidden
-    expect(screen.queryByText(/Pre-Alpha Preview/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Devaloper Preview/)).not.toBeInTheDocument();
     
     // Rerender should still be hidden
     rerender(<PreAlphaBanner />);
-    expect(screen.queryByText(/Pre-Alpha Preview/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Devaloper Preview/)).not.toBeInTheDocument();
   });
 
   // This test checks that the banner is responsive
   it('has responsive layout', () => {
     render(<PreAlphaBanner />);
     
-    const container = screen.getByText(/Pre-Alpha Preview/).closest('.max-w-7xl');
+    const container = screen.getByText(/Devaloper Preview/).closest('.max-w-7xl');
     expect(container).toHaveClass('max-w-7xl', 'mx-auto', 'flex', 'items-center', 'justify-between');
   });
 

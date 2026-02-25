@@ -68,9 +68,10 @@ vi.mock('@/lib/utils/app-converter', () => {
   
   return {
     appSummariesToNFTs: vi.fn((apps, address) => apps.map(convertAppToNFT)),
-    appSummariesToNFTsWithMetadata: vi.fn(async (apps, address) => {
-      // Return promise that resolves to converted NFTs
-      return Promise.resolve(apps.map(convertAppToNFT));
+    appSummariesToNFTsWithMetadata: vi.fn((apps, address) => {
+      // Return value directly (not wrapped in Promise) so augmentApps completes
+      // before test teardown, avoiding setState-after-unmount unhandled rejection
+      return apps.map(convertAppToNFT) as any;
     }),
   };
 });

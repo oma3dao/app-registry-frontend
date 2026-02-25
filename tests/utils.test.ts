@@ -19,6 +19,25 @@ describe('utils', () => {
     it('returns false in test environment', () => {
       expect(isMobile()).toBe(false);
     });
+
+    it.each([
+      { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)', expected: true, label: 'iPhone' },
+      { userAgent: 'Mozilla/5.0 (Linux; Android 10; SM-G975F)', expected: true, label: 'Android' },
+      { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', expected: false, label: 'Desktop' },
+    ])('returns $expected for $label user agent', ({ userAgent, expected }) => {
+      const originalNavigator = window.navigator;
+      Object.defineProperty(window, 'navigator', {
+        value: { userAgent },
+        writable: true,
+        configurable: true
+      });
+      expect(isMobile()).toBe(expected);
+      Object.defineProperty(window, 'navigator', {
+        value: originalNavigator,
+        writable: true,
+        configurable: true
+      });
+    });
   });
 
   // Test debounce function
@@ -84,12 +103,27 @@ describe('utils', () => {
       });
     });
 
-    it('handles null input', () => {
-      expect(normalizeMetadata(null)).toEqual({});
+    it.each([null, undefined])('handles %s input', (input) => {
+      expect(normalizeMetadata(input)).toEqual({});
     });
 
-    it('handles undefined input', () => {
-      expect(normalizeMetadata(undefined)).toEqual({});
+    it('preserves all provided fields', () => {
+      const input = {
+        name: 'Test App',
+        description: 'A test application',
+        publisher: 'Test Publisher',
+        external_url: 'https://example.com',
+        image: 'https://example.com/image.png',
+        screenshotUrls: ['https://example.com/shot1.png'],
+        platforms: { web: { launchUrl: 'https://app.example.com' } }
+      };
+      const result = normalizeMetadata(input);
+      expect(result).toEqual(input);
+    });
+
+    it.each(['not-an-array', null])('handles screenshotUrls as %s', (screenshotUrls) => {
+      const result = normalizeMetadata({ screenshotUrls });
+      expect(result.screenshotUrls).toEqual([]);
     });
   });
 }); 
@@ -105,11 +139,15 @@ describe('fetchMetadataImage', () => {
     expect(result).toBe('https://example.com/image.png');
   });
 
-  // This test checks that fetchMetadataImage returns null if no image is present
-  it('returns null if image is missing', async () => {
+  it.each([
+    { image: undefined, label: 'missing' },
+    { image: '', label: 'empty string' },
+    { image: '   ', label: 'whitespace only' },
+    { image: 12345, label: 'not a string' },
+  ])('returns null if image is $label', async ({ image }) => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({})
+      json: async () => (image === undefined ? {} : { image })
     });
     const result = await fetchMetadataImage('https://data.com');
     expect(result).toBeNull();
@@ -122,6 +160,16 @@ describe('fetchMetadataImage', () => {
       status: 500,
       statusText: 'Internal Server Error',
       json: async () => ({ error: 'fail' })
+    });
+    const result = await fetchMetadataImage('https://data.com');
+    expect(result).toBeNull();
+  });
+
+  // This test checks that fetchMetadataImage returns null when API returns error in response body
+  it('returns null when API response contains error field', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ error: 'Failed to fetch metadata' })
     });
     const result = await fetchMetadataImage('https://data.com');
     expect(result).toBeNull();
