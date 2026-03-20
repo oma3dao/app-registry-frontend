@@ -14,7 +14,6 @@ import * as path from 'path';
 import {
   createThirdwebClient,
   defineChain,
-  prepareTransaction,
   waitForReceipt,
   Engine,
   type PreparedTransaction,
@@ -72,28 +71,33 @@ export async function submitViaServerWallet(
     executionOptions: { type: 'EOA', from: managed.walletAddress },
   });
 
-  const { transactionId } = await serverWallet.enqueueTransaction({ transaction });
-  console.log(`[issuer-key] Enqueued transaction: ${transactionId}`);
+  try {
+    const { transactionId } = await serverWallet.enqueueTransaction({ transaction });
+    console.log(`[issuer-key] Enqueued transaction: ${transactionId}`);
 
-  const txResult = await Engine.waitForTransactionHash({
-    client,
-    transactionId,
-    timeoutInSeconds: 120,
-  });
-  console.log(`[issuer-key] Transaction sent: ${txResult.transactionHash}`);
+    const txResult = await Engine.waitForTransactionHash({
+      client,
+      transactionId,
+      timeoutInSeconds: 120,
+    });
+    console.log(`[issuer-key] Transaction sent: ${txResult.transactionHash}`);
 
-  const receipt = await waitForReceipt({
-    client,
-    chain,
-    transactionHash: txResult.transactionHash,
-  });
-  console.log(`[issuer-key] Confirmed in block ${receipt.blockNumber}`);
+    const receipt = await waitForReceipt({
+      client,
+      chain,
+      transactionHash: txResult.transactionHash,
+    });
+    console.log(`[issuer-key] Confirmed in block ${receipt.blockNumber}`);
 
-  return {
-    transactionHash: receipt.transactionHash,
-    blockNumber: Number(receipt.blockNumber),
-    logs: receipt.logs as Array<{ topics: readonly string[]; data: string }>,
-  };
+    return {
+      transactionHash: receipt.transactionHash,
+      blockNumber: Number(receipt.blockNumber),
+      logs: receipt.logs as Array<{ topics: readonly string[]; data: string }>,
+    };
+  } catch (err) {
+    console.error('[issuer-key] Server wallet transaction failed:', err);
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -606,6 +606,7 @@ export async function submitControllerWitnessAttestation(
     } catch (err) {
       if (err instanceof ControllerWitnessRouteError) throw err;
       const reason = (err as any)?.reason || (err as Error).message;
+      console.error('[controller-witness] Server wallet error:', err);
       throw new ControllerWitnessRouteError(
         `EAS attestation submission failed (server wallet): ${reason}`,
         500,
