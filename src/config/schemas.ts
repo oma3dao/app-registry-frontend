@@ -4,6 +4,13 @@
 // Schema definitions for attestation forms
 export type FieldType = 'string' | 'integer' | 'array' | 'enum' | 'datetime' | 'uri' | 'object' | 'json'
 
+/** A rich option with a human-readable label and optional description */
+export interface RichOption {
+  value: string
+  label: string
+  description?: string
+}
+
 export interface FormField {
   name: string
   type: FieldType
@@ -11,7 +18,7 @@ export interface FormField {
   description?: string
   required: boolean
   placeholder?: string
-  options?: (string | number)[] // for enum fields (strings or integers)
+  options?: (string | number | RichOption)[] // for enum fields (strings or integers) or rich options with labels/descriptions
   format?: string // for validation (uri, date-time, etc.)
   pattern?: string // regex pattern for string validation
   min?: number // for integer fields
@@ -286,7 +293,7 @@ const endorsementFields: FormField[] = [
     "placeholder": "Enter version",
     "subtype": "semver",
     "maxLength": 50,
-    "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    "pattern": "^\\d+(\\.\\d+){0,2}$"
   },
   {
     "name": "policyURI",
@@ -367,9 +374,26 @@ const keyBindingFields: FormField[] = [
     "name": "keyPurpose",
     "type": "array",
     "label": "Key Purpose",
-    "description": "Permitted purposes for this key (e.g., 'authentication', 'assertionMethod', 'keyAgreement', 'capabilityInvocation', 'capabilityDelegation').",
+    "description": "Permitted W3C DID Core verification relationships for this key. A key should not be used for both signing and encryption — use separate keys for each purpose.",
     "required": true,
-    "placeholder": "Enter keypurpose"
+    "placeholder": "Enter keypurpose",
+    "options": [
+      {
+        "value": "authentication",
+        "label": "Shared Control",
+        "description": "Authorize transactions, authenticate to dApps, and act on behalf of the DID"
+      },
+      {
+        "value": "assertionMethod",
+        "label": "Signatures",
+        "description": "Sign attestations, verifiable credentials, and other structured data"
+      },
+      {
+        "value": "keyAgreement",
+        "label": "Encryption",
+        "description": "Establish encrypted channels and perform key exchange (ECDH). Do not combine with signing purposes."
+      }
+    ]
   },
   {
     "name": "proofs",
@@ -518,7 +542,7 @@ const securityAssessmentFields: FormField[] = [
     "placeholder": "Enter version",
     "subtype": "semver",
     "maxLength": 50,
-    "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    "pattern": "^\\d+(\\.\\d+){0,2}$"
   },
   {
     "name": "versionHW",
@@ -702,7 +726,7 @@ const userReviewFields: FormField[] = [
     "placeholder": "Enter version",
     "subtype": "semver",
     "maxLength": 50,
-    "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    "pattern": "^\\d+(\\.\\d+){0,2}$"
   },
   {
     "name": "ratingValue",
