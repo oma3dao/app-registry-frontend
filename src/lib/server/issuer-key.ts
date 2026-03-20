@@ -1,37 +1,104 @@
 /**
- * Server-side utility for loading issuer private key
+ * Server-side utility for loading issuer credentials
  * Used by API routes for signing attestation transactions
  * 
- * Note: This only returns a private key for direct signing.
- * Check for Thirdweb Managed Vault separately (different signing flow).
- * 
- * Priority:
- * 1. ISSUER_PRIVATE_KEY env var (Vercel/deployment - simple testnet approach)
- * 2. SSH file ~/.ssh/local-attestation-key (local dev)
+ * Signing priority:
+ * 1. Thirdweb Engine server wallet (testnet/mainnet — key never leaves Vault)
+ * 2. ISSUER_PRIVATE_KEY env var (Vercel/deployment — simple testnet approach)
+ * 3. SSH file ~/.ssh/local-attestation-key (local dev)
  */
 
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import {
+  createThirdwebClient,
+  defineChain,
+  prepareTransaction,
+  waitForReceipt,
+  Engine,
+  type PreparedTransaction,
+} from 'thirdweb';
 
 /**
  * Check if Thirdweb Managed Vault is configured
  * Returns wallet address if available, null otherwise
- * 
- * TODO: Re-enable for production deployment
  */
 export function getThirdwebManagedWallet(): { secretKey: string; walletAddress: string } | null {
-  // TODO: Uncomment for production Thirdweb Managed Vault support
-  // const secretKey = process.env.THIRDWEB_SECRET_KEY;
-  // const walletAddress = process.env.THIRDWEB_SERVER_WALLET_ADDRESS;
-  // 
-  // if (secretKey && walletAddress) {
-  //   console.log('[issuer-key] Thirdweb Managed Vault configured');
-  //   return { secretKey, walletAddress };
-  // }
-  
+  const secretKey = process.env.THIRDWEB_SECRET_KEY;
+  const walletAddress = process.env.THIRDWEB_SERVER_WALLET_ADDRESS;
+
+  if (secretKey && walletAddress) {
+    console.log('[issuer-key] Thirdweb Managed Vault configured');
+    return { secretKey, walletAddress };
+  }
+
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Engine server wallet transaction submission
+// ---------------------------------------------------------------------------
+
+export interface ServerWalletReceipt {
+  transactionHash: string;
+  blockNumber: number;
+  logs: Array<{ topics: readonly string[]; data: string }>;
+}
+
+/**
+ * Submit a prepared Thirdweb transaction via the Engine server wallet.
+ *
+ * Uses the Engine enqueue → waitForTransactionHash → waitForReceipt flow.
+ * This is the standard pattern for all server-side signing on testnet/mainnet.
+ *
+ * @param transaction - A prepared Thirdweb transaction (from prepareContractCall or prepareTransaction)
+ * @param chainId - Target chain ID
+ * @param rpc - RPC endpoint URL
+ * @param managed - Server wallet credentials (from getThirdwebManagedWallet)
+ */
+export async function submitViaServerWallet(
+  transaction: PreparedTransaction,
+  chainId: number,
+  rpc: string,
+  managed: { secretKey: string; walletAddress: string },
+): Promise<ServerWalletReceipt> {
+  const client = createThirdwebClient({ secretKey: managed.secretKey });
+  const chain = defineChain({ id: chainId, rpc });
+
+  const serverWallet = Engine.serverWallet({
+    client,
+    address: managed.walletAddress,
+    executionOptions: { type: 'EOA', from: managed.walletAddress },
+  });
+
+  const { transactionId } = await serverWallet.enqueueTransaction({ transaction });
+  console.log(`[issuer-key] Enqueued transaction: ${transactionId}`);
+
+  const txResult = await Engine.waitForTransactionHash({
+    client,
+    transactionId,
+    timeoutInSeconds: 120,
+  });
+  console.log(`[issuer-key] Transaction sent: ${txResult.transactionHash}`);
+
+  const receipt = await waitForReceipt({
+    client,
+    chain,
+    transactionHash: txResult.transactionHash,
+  });
+  console.log(`[issuer-key] Confirmed in block ${receipt.blockNumber}`);
+
+  return {
+    transactionHash: receipt.transactionHash,
+    blockNumber: Number(receipt.blockNumber),
+    logs: receipt.logs as Array<{ topics: readonly string[]; data: string }>,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Private key loading (fallback for devnet / local dev)
+// ---------------------------------------------------------------------------
 
 export function loadIssuerPrivateKey(): `0x${string}` {
   // 1. Check environment variable first (for Vercel/deployment)

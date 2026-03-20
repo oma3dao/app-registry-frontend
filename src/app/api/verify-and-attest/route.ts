@@ -11,14 +11,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createThirdwebClient, getContract, readContract, prepareContractCall, sendTransaction } from 'thirdweb';
-import { defineChain } from 'thirdweb/chains';
+import { createThirdwebClient, getContract, readContract, prepareContractCall, sendTransaction, defineChain, waitForReceipt } from 'thirdweb';
 import { privateKeyToAccount } from 'thirdweb/wallets';
 import { ethers } from 'ethers';
 import { localhost, omachainTestnet, omachainMainnet } from '@/config/chains';
 import { getRpcUrl, withRetry } from '@/lib/rpc';
 import { normalizeDomain, buildEvmDidPkh } from '@oma3/omatrust/identity';
-import { loadIssuerPrivateKey, getThirdwebManagedWallet } from '@/lib/server/issuer-key';
+import { loadIssuerPrivateKey, getThirdwebManagedWallet, submitViaServerWallet } from '@/lib/server/issuer-key';
 import { calculateTransferAmount, PROOF_PURPOSE } from '@/lib/verification/onchain-transfer';
 import resolverAbi from '@/abi/resolver.json';
 import dns from 'dns';
@@ -66,7 +65,7 @@ async function checkExistingAttestations(
   debug('check-attestations', `Checking DID ownership for: ${did}`);
 
   const client = createThirdwebClient({ clientId });
-  const chain = defineChain(chainId);
+  const chain = defineChain({ id: chainId, rpc: getRpcUrl(chainId) });
   const resolver = getContract({
     client,
     chain,
@@ -751,51 +750,34 @@ async function writeAttestation(
   }
 
   const client = createThirdwebClient({ clientId });
-  const chain = defineChain(chainId);
+  const chain = defineChain({ id: chainId, rpc: getRpcUrl(chainId) });
   const resolver = getContract({ client, chain, address: resolverAddress });
 
-  // Check for Thirdweb Managed Vault (highest priority - production ready)
+  // Check for Thirdweb server wallet (highest priority - production ready)
   const managedWallet = getThirdwebManagedWallet();
 
   let txHash: string;
 
   if (managedWallet) {
-    // Production: Use Thirdweb Managed Vault (HSM-secured)
-    debug('write-attestation', 'Using Thirdweb Transactions API');
+    // Production: Use Engine server wallet (key never leaves Vault)
+    debug('write-attestation', `Using Thirdweb server wallet: ${managedWallet.walletAddress}`);
 
-    // Prepare the transaction
+    const client = createThirdwebClient({ secretKey: managedWallet.secretKey });
+    const chain = defineChain({ id: chainId, rpc: getRpcUrl(chainId) });
+    const resolverContract = getContract({ client, chain, address: resolverAddress });
+
     const tx = prepareContractCall({
-      contract: resolver,
+      contract: resolverContract,
       method: 'function upsertDirect(bytes32 didHash, bytes32 controllerAddress, uint64 expiresAt)',
       params: [didHash, controllerAddress, 0n], // 0 = never expires
     });
 
-    // Send via Thirdweb Transactions API
-    const response = await fetch(`https://embedded-wallet.thirdweb.com/api/2023-11-30/transaction/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-secret-key': managedWallet.secretKey,
-      },
-      body: JSON.stringify({
-        chainId: chainId.toString(),
-        transaction: tx,
-        from: managedWallet.walletAddress,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      debug('write-attestation', 'Thirdweb API error:', error);
-      throw new Error(`Thirdweb API error: ${error}`);
-    }
-
-    const result = await response.json();
-    txHash = result.transactionHash;
-    debug('write-attestation', `Transaction sent via Thirdweb: ${txHash}`);
+    const receipt = await submitViaServerWallet(tx, chainId, getRpcUrl(chainId), managedWallet);
+    txHash = receipt.transactionHash;
+    debug('write-attestation', `Transaction confirmed: ${txHash} (block ${receipt.blockNumber})`);
 
   } else {
-    // Testnet/Development: Use direct private key signing
+    // Devnet/Development: Use direct private key signing
     debug('write-attestation', 'Using direct private key signing (ISSUER_PRIVATE_KEY or SSH file)');
 
     const privateKey = loadIssuerPrivateKey();
@@ -816,11 +798,15 @@ async function writeAttestation(
 
     txHash = result.transactionHash;
     debug('write-attestation', `Transaction sent: ${txHash}`);
-  }
 
-  // Wait for 1 confirmation (fast for testnets)
-  debug('write-attestation', 'Waiting for confirmation...');
-  await new Promise(resolve => setTimeout(resolve, 3000)); // Simple wait
+    // Wait for confirmation
+    debug('write-attestation', 'Waiting for confirmation...');
+    await waitForReceipt({
+      client,
+      chain,
+      transactionHash: txHash as `0x${string}`,
+    });
+  }
 
   debug('write-attestation', '✅ Attestation written successfully');
   return txHash;
@@ -1094,7 +1080,7 @@ export async function POST(request: NextRequest) {
     let currentOwnerAfter: string | null = null;
     try {
       const client = createThirdwebClient({ clientId });
-      const chain = defineChain(activeChain.chainId);
+      const chain = defineChain({ id: activeChain.chainId, rpc: activeChain.rpc });
       const resolver = getContract({ client, chain, address: activeChain.contracts.resolver, abi: resolverAbi as any });
       const didHash = ethers.id(did) as `0x${string}`;
       currentOwnerAfter = await readContract({

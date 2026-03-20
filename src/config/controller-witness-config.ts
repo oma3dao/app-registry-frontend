@@ -20,11 +20,16 @@ export const APPROVED_WITNESS_CHAINS: Record<number, string> = {
 };
 
 export const APPROVED_CONTROLLER_WITNESS_ATTESTERS: Record<number, string[]> = {
-  // Testnet issuers (from contract-addresses.txt)
+  // Devnet issuers
+  // 66233: [],
+  // Testnet issuers
   66238: [
     '0x7D5beD223Bc343F114Aa28961Cc447dbbc9c2330',
     '0x766910dc543034ce7a6525c1307c5b6fe92ebb0b',
+    `0x6f05D46cD048d3249F4Db6BAd6d06e2069BCD5eb` // Thirdweb attestation server wallet
   ],
   // Mainnet issuers — will differ from testnet
-  // 6623: [],
+  6623: [
+    `0x96fa5ab5E519641bD8A840A6b26D17DB7497618b` // Thirdweb attestation server wallet
+  ]
 };

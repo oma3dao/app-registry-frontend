@@ -67,7 +67,8 @@ import {
   findControllerInDnsTxt,
   findControllerInDidDoc,
 } from '@/lib/server/evidence';
-import { loadIssuerPrivateKey } from '@/lib/server/issuer-key';
+import { loadIssuerPrivateKey, getThirdwebManagedWallet, submitViaServerWallet } from '@/lib/server/issuer-key';
+import { getContract, prepareContractCall, createThirdwebClient, defineChain } from 'thirdweb';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -522,24 +523,7 @@ export async function submitControllerWitnessAttestation(
     );
   }
 
-  // Load server-side private key for signing
-  let privateKey: `0x${string}`;
-  try {
-    privateKey = loadIssuerPrivateKey();
-  } catch (err) {
-    throw new ControllerWitnessRouteError(
-      `Issuer key not configured: ${(err as Error).message}`,
-      500,
-      'SERVER_ERROR',
-    );
-  }
-
-  // Create wallet connected to the chain's RPC
-  const rpcUrl = getRpcUrl(params.chainId);
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const wallet = new ethers.Wallet(privateKey, provider);
-
-  // Encode attestation data
+  // Encode attestation data (shared by both paths)
   const encoder = new SchemaEncoder(easSchemaString);
   const encodedData = encoder.encodeData([
     { name: 'subject', value: params.subject, type: 'string' },
@@ -548,54 +532,149 @@ export async function submitControllerWitnessAttestation(
     { name: 'observedAt', value: BigInt(observedAt), type: 'uint256' },
   ]);
 
-  // Submit to EAS
-  const eas = new EAS(params.easContract);
-  eas.connect(wallet as any);
+  const rpcUrl = getRpcUrl(params.chainId);
+  const recipient = didToAddress(params.subject);
 
-  try {
-    const tx = await eas.attest({
-      schema: controllerWitnessSchemaUid,
-      data: {
-        recipient: didToAddress(params.subject), // DID Address of the subject for attestation indexing
-        expirationTime: 0n,
-        revocable: false,
-        refUID: ZERO_UID,
-        data: encodedData,
-      },
-    });
+  // Attested event: Attested(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schemaUID)
+  // uid is non-indexed → it's in log data, not topics
+  const ATTESTED_EVENT_TOPIC = '0x8bf46bf4cfd674fa735a3d63ec1c9ad4153f033c290341f3a588b75685141b35';
 
-    const newAttestationUID = await tx.wait();
-    const txHash = tx.receipt?.hash ?? null;
+  // Build the attestation request struct for raw contract calls
+  const attestationRequest = {
+    schema: controllerWitnessSchemaUid,
+    data: {
+      recipient,
+      expirationTime: 0n,
+      revocable: false,
+      refUID: ZERO_UID,
+      data: encodedData,
+      value: 0n,
+    },
+  };
 
-    // Block number from the receipt
-    const blockNumber = tx.receipt?.blockNumber ?? null;
+  const managed = getThirdwebManagedWallet();
 
-    // Record in cache for duplicate detection
-    recordWitnessAttestation(
-      params.subject,
-      params.controller,
-      newAttestationUID,
-      wallet.address,
-      observedAt,
-    );
+  if (managed) {
+    // ── Server wallet path (testnet/mainnet) ──────────────────────────
+    console.log(`[controller-witness] Using Thirdweb server wallet: ${managed.walletAddress}`);
 
-    console.log(`[controller-witness] Attestation submitted: ${newAttestationUID}`);
+    try {
+      const client = createThirdwebClient({ secretKey: managed.secretKey });
+      const chain = defineChain({ id: params.chainId, rpc: rpcUrl });
+      const easContract = getContract({ client, chain, address: params.easContract });
 
-    return {
-      success: true,
-      uid: newAttestationUID,
-      txHash,
-      blockNumber,
-      observedAt,
-      existing: false,
-    };
-  } catch (err) {
-    if (err instanceof ControllerWitnessRouteError) throw err;
-    const reason = (err as any)?.reason || (err as Error).message;
-    throw new ControllerWitnessRouteError(
-      `EAS attestation submission failed: ${reason}`,
-      500,
-      'SERVER_ERROR',
-    );
+      const transaction = prepareContractCall({
+        contract: easContract,
+        method: 'function attest((bytes32 schema, (address recipient, uint64 expirationTime, bool revocable, bytes32 refUID, bytes data, uint256 value) data) request) payable returns (bytes32)',
+        params: [attestationRequest as any],
+      });
+
+      const receipt = await submitViaServerWallet(transaction, params.chainId, rpcUrl, managed);
+
+      // Parse attestation UID from Attested event log data
+      let newAttestationUID: string | null = null;
+      for (const log of receipt.logs) {
+        if (log.topics[0] === ATTESTED_EVENT_TOPIC) {
+          // uid is the first (and only) non-indexed field → first 32 bytes of data
+          newAttestationUID = log.data.slice(0, 66); // 0x + 64 hex chars
+          break;
+        }
+      }
+
+      if (!newAttestationUID) {
+        throw new Error('Attested event not found in transaction logs');
+      }
+
+      recordWitnessAttestation(
+        params.subject,
+        params.controller,
+        newAttestationUID,
+        managed.walletAddress,
+        observedAt,
+      );
+
+      console.log(`[controller-witness] Attestation submitted: ${newAttestationUID}`);
+
+      return {
+        success: true,
+        uid: newAttestationUID,
+        txHash: receipt.transactionHash,
+        blockNumber: receipt.blockNumber,
+        observedAt,
+        existing: false,
+      };
+    } catch (err) {
+      if (err instanceof ControllerWitnessRouteError) throw err;
+      const reason = (err as any)?.reason || (err as Error).message;
+      throw new ControllerWitnessRouteError(
+        `EAS attestation submission failed (server wallet): ${reason}`,
+        500,
+        'SERVER_ERROR',
+      );
+    }
+  } else {
+    // ── Private key fallback (devnet / local dev) ─────────────────────
+    console.log('[controller-witness] Using private key fallback');
+
+    let privateKey: `0x${string}`;
+    try {
+      privateKey = loadIssuerPrivateKey();
+    } catch (err) {
+      throw new ControllerWitnessRouteError(
+        `Issuer key not configured: ${(err as Error).message}`,
+        500,
+        'SERVER_ERROR',
+      );
+    }
+
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const wallet = new ethers.Wallet(privateKey, provider);
+
+    const eas = new EAS(params.easContract);
+    eas.connect(wallet as any);
+
+    try {
+      const tx = await eas.attest({
+        schema: controllerWitnessSchemaUid,
+        data: {
+          recipient,
+          expirationTime: 0n,
+          revocable: false,
+          refUID: ZERO_UID,
+          data: encodedData,
+        },
+      });
+
+      const newAttestationUID = await tx.wait();
+      const txHash = tx.receipt?.hash ?? null;
+      const blockNumber = tx.receipt?.blockNumber ?? null;
+
+      recordWitnessAttestation(
+        params.subject,
+        params.controller,
+        newAttestationUID,
+        wallet.address,
+        observedAt,
+      );
+
+      console.log(`[controller-witness] Attestation submitted: ${newAttestationUID}`);
+
+      return {
+        success: true,
+        uid: newAttestationUID,
+        txHash,
+        blockNumber,
+        observedAt,
+        existing: false,
+      };
+    } catch (err) {
+      if (err instanceof ControllerWitnessRouteError) throw err;
+      const reason = (err as any)?.reason || (err as Error).message;
+      throw new ControllerWitnessRouteError(
+        `EAS attestation submission failed: ${reason}`,
+        500,
+        'SERVER_ERROR',
+      );
+    }
   }
 }
