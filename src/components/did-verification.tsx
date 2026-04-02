@@ -138,8 +138,8 @@ export function DidVerification({ did, onVerificationComplete, isVerified }: Did
 
               <p className="font-medium mt-3">Method 2: DNS TXT Record</p>
               <ul className="list-disc ml-4 mt-1 space-y-1">
-                <li>Add a TXT record at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">_omatrust.{domain}</code></li>
-                <li>Name: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">_omatrust</code></li>
+                <li>Add a TXT record at: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">_controllers.{domain}</code></li>
+                <li>Name: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">_controllers</code></li>
                 <li>Value: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs break-all">v=1;controller={controllerDid}</code></li>
                 <li className="text-xs text-gray-600 dark:text-gray-400">Note: Use semicolon (;) as separator. Spaces also supported but not recommended.</li>
                 <li className="font-medium text-amber-700 dark:text-amber-400">⏱️ Wait at least 15 minutes after setup before clicking Verify (DNS propagation time)</li>

@@ -115,7 +115,7 @@ async function checkExistingAttestations(
  * Check DNS TXT record for did:web verification
  */
 async function checkDidWebViaDns(domain: string, connectedAddress: string): Promise<VerificationResult> {
-  const txtRecordName = `_omatrust.${domain}`;
+  const txtRecordName = `_controllers.${domain}`;
   debug('verify-did-web', `Checking DNS TXT record: ${txtRecordName}`);
 
   try {
@@ -349,7 +349,7 @@ async function verifyDidWeb(did: string, connectedAddress: string): Promise<Veri
   return {
     success: false,
     error: 'DID ownership verification failed',
-    details: `DNS check: ${dnsResult.error || 'Failed'}. DID document check: ${didDocResult.error || 'Failed'}. Ensure you have either: 1) DNS TXT record at _omatrust.${domain} with value "v=1;controller=did:pkh:eip155:66238:${connectedAddress}" OR 2) DID document at https://${domain}/.well-known/did.json with your address in verificationMethod`
+    details: `DNS check: ${dnsResult.error || 'Failed'}. DID document check: ${didDocResult.error || 'Failed'}. Ensure you have either: 1) DNS TXT record at _controllers.${domain} with value "v=1;controller=did:pkh:eip155:66238:${connectedAddress}" OR 2) DID document at https://${domain}/.well-known/did.json with your address in verificationMethod`
   };
 }
 

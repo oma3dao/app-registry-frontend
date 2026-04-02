@@ -74,27 +74,27 @@ describe('OMATrust Identity Spec 5.1.3 - DID Confirmation Methods', () => {
     /**
      * Test: DNS TXT record verification format
      * Requirement ID: OT-ID-071
-     * Requirement: "did:web MUST support DNS TXT record verification (_omatrust.<domain>)"
+     * Requirement: "did:web MUST support DNS TXT record verification (_controllers.<domain>)"
      */
     it('should construct correct DNS TXT record name - OT-ID-071', () => {
       const did = 'did:web:example.com';
       const domain = did.replace('did:web:', '');
-      const expectedDnsName = `_omatrust.${domain}`;
+      const expectedDnsName = `_controllers.${domain}`;
       
-      expect(expectedDnsName).toBe('_omatrust.example.com');
+      expect(expectedDnsName).toBe('_controllers.example.com');
     });
     
     /**
      * Test: DNS TXT record for subdomain
      * Requirement ID: OT-ID-071
-     * Requirement: "DNS TXT record MUST be placed at _omatrust prefix of domain"
+     * Requirement: "DNS TXT record MUST be placed at _controllers prefix of domain"
      */
     it('should handle DNS TXT record for subdomains - OT-ID-071', () => {
       const did = 'did:web:app.example.com';
       const domain = did.replace('did:web:', '');
-      const expectedDnsName = `_omatrust.${domain}`;
+      const expectedDnsName = `_controllers.${domain}`;
       
-      expect(expectedDnsName).toBe('_omatrust.app.example.com');
+      expect(expectedDnsName).toBe('_controllers.app.example.com');
     });
   });
   

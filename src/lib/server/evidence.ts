@@ -118,7 +118,7 @@ export function addressesMatch(a: string, b: string): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Query `_omatrust.<domain>` DNS TXT records and look for a controller
+ * Query `_controllers.<domain>` DNS TXT records and look for a controller
  * that matches the expected address.
  *
  * @param domain - bare domain (e.g. "example.com"), not a DID
@@ -128,7 +128,7 @@ export async function findControllerInDnsTxt(
   domain: string,
   expectedController: string,
 ): Promise<EvidenceResult> {
-  const txtRecordName = `_omatrust.${domain}`;
+  const txtRecordName = `_controllers.${domain}`;
 
   let records: string[][];
   try {

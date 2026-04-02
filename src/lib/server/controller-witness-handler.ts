@@ -384,7 +384,7 @@ export async function verifyControllerEvidence(
  * DNS TXT evidence check.
  *
  * Extracts the domain from the subject DID (must be did:web) and queries
- * `_omatrust.<domain>` for a `v=1;controller=<DID>` record whose address
+ * `_controllers.<domain>` for a `v=1;controller=<DID>` record whose address
  * matches the controller.
  */
 export async function checkDnsTxtEvidence(

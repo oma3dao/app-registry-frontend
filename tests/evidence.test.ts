@@ -186,7 +186,7 @@ describe('evidence', () => {
 
       expect(result.found).toBe(true);
       expect(result.matchedController).toBe(expectedDid);
-      expect(getResolveTxt()).toHaveBeenCalledWith('_omatrust.example.com');
+      expect(getResolveTxt()).toHaveBeenCalledWith('_controllers.example.com');
     });
 
     it('returns found when matching by raw address', async () => {
@@ -205,7 +205,7 @@ describe('evidence', () => {
 
       expect(result.found).toBe(false);
       expect(result.details).toContain('No TXT records found');
-      expect(result.details).toContain('_omatrust.example.com');
+      expect(result.details).toContain('_controllers.example.com');
     });
 
     it('returns not found when controller does not match', async () => {
