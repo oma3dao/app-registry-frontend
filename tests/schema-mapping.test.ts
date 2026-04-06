@@ -63,11 +63,12 @@ describe('schema/mapping (complex functions)', () => {
     expect(result.initialVersionMinor).toBe(3)
     expect(result.initialVersionPatch).toBe(4)
     expect(result.interfaces).toBe(1 + 4) // human (1) + smartContract (4)
-    expect(result.dataHash).toMatch(/^0x[a-f0-9]{64}$/)
+    expect(result.dataHash).toBe('0x' + 'a'.repeat(64))
     expect(result.traitHashes).toEqual(['hash_trait1', 'hash_trait2'])
     expect(result.fungibleTokenId).toBe('eip155:1:0x123')
     expect(result.contractId).toBe('0x456')
-    expect(result.metadataJson).toBeTruthy() // Should include metadataJson when hosted
+    expect(typeof result.metadataJson).toBe('string')
+    expect(result.metadataJson.length).toBeGreaterThan(0)
   })
 
   it('toMintAppInput excludes metadataJson for non-hosted URLs', () => {
@@ -102,9 +103,10 @@ describe('schema/mapping (complex functions)', () => {
     expect(result.newMinor).toBe(5)
     expect(result.newPatch).toBe(10)
     expect(result.newInterfaces).toBe(1 + 2) // human (1) + api (2)
-    expect(result.newDataHash).toMatch(/^0x[a-f0-9]{64}$/)
+    expect(result.newDataHash).toBe('0x' + 'a'.repeat(64))
     expect(result.newTraitHashes).toEqual(['hash_trait1'])
-    expect(result.metadataJson).toBeTruthy() // Should include metadataJson when hosted
+    expect(typeof result.metadataJson).toBe('string')
+    expect(result.metadataJson.length).toBeGreaterThan(0)
   })
 
   it('toUpdateAppInput excludes metadataJson for non-hosted URLs', () => {

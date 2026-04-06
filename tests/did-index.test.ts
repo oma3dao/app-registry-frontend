@@ -50,9 +50,9 @@ describe('DID Address Utilities', () => {
   });
 
   describe('computeDidHash', () => {
-    it('computes hash for did:web', () => {
+    it('computes expected hash for did:web:example.com', () => {
       const hash = computeDidHash('did:web:example.com');
-      expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(hash).toBe('0x505b0e657e7acabd2c14e517173a347faed486bb69081ef673c6e52c03f57f3e');
     });
 
     it('produces consistent hash for same DID', () => {
@@ -69,10 +69,10 @@ describe('DID Address Utilities', () => {
   });
 
   describe('computeDidAddress (replaces computeDidIndex)', () => {
-    it('computes index address from hash', () => {
+    it('computes expected index address from hash', () => {
       const hash = '0x' + '1234567890abcdef'.repeat(4);
       const address = computeDidAddress(hash);
-      expect(address).toMatch(/^0x[0-9a-f]{40}$/);
+      expect(address).toBe('0x90abcdef1234567890abcdef1234567890abcdef');
     });
 
     it('produces consistent address for same hash', () => {
@@ -84,9 +84,9 @@ describe('DID Address Utilities', () => {
   });
 
   describe('didToAddress (replaces didToIndexAddress)', () => {
-    it('converts DID to index address', () => {
+    it('converts DID to expected index address', () => {
       const address = didToAddress('did:web:example.com');
-      expect(address).toMatch(/^0x[0-9a-f]{40}$/);
+      expect(address).toBe('0x173a347faed486bb69081ef673c6e52c03f57f3e');
     });
 
     it('produces consistent address for same DID', () => {

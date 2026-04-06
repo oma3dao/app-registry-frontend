@@ -165,11 +165,10 @@ describe('Registry Write Functions', () => {
       expect(result.params[1]).toBe(7);
     });
 
-    // Tests dataHash format
-    it('formats dataHash as 0x-prefixed string', () => {
+    it('passes the exact dataHash provided in input', () => {
       const result = prepareMintApp(mockMintInput);
 
-      expect(result.params[3]).toMatch(/^0x[0-9a-f]{64}$/i);
+      expect(result.params[3]).toBe('0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef');
     });
 
     // Tests dataHashAlgorithm
@@ -308,12 +307,10 @@ describe('Registry Write Functions', () => {
       expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
-    // Tests with new data hash
-    // Note: Contract no longer accepts newDataUrl as string, only newDataHash as bytes32
-    it('includes new data hash when provided', () => {
+    it('passes the exact newDataHash provided in input', () => {
       const result = prepareUpdateApp(mockUpdateInput);
 
-      expect(result.params[2]).toMatch(/^0x[0-9a-f]{64}$/i); // newDataHash is at index 2
+      expect(result.params[2]).toBe('0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890');
     });
 
     // Tests with new interfaces

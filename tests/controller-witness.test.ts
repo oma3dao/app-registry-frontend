@@ -84,6 +84,7 @@ vi.mock('@/lib/server/evidence', () => ({
 
 vi.mock('@/lib/server/issuer-key', () => ({
   loadIssuerPrivateKey: vi.fn(() => '0x' + '1'.repeat(64) as `0x${string}`),
+  getThirdwebManagedWallet: vi.fn(() => null),
 }));
 
 const validBody: Record<string, unknown> = {

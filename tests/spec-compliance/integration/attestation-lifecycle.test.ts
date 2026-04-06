@@ -125,8 +125,8 @@ describe('Attestation Lifecycle Integration', () => {
         }
       );
 
-      expect(attestation.uid).toMatch(/^0x[a-f0-9]{64}$/i);
-      expect(attestation.attester).toMatch(/^0x/);
+      expect(attestation.uid).toBe('0x' + '1'.repeat(64));
+      expect(attestation.attester).toBe('0xAttester1' + '0'.repeat(30));
       expect(attestation.time).toBeGreaterThan(0);
       expect(attestation.decodedData?.subject).toBe('did:web:example.com');
     });

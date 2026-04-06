@@ -84,8 +84,9 @@ describe('OMATrust Identity Spec 5.1.3: JSON Policies and Hash Verification', ()
 
       const result = canonicalizeForHash(obj);
       
-      // Hash should be a valid keccak256 hash (0x + 64 hex chars)
-      expect(result.hash).toMatch(/^0x[a-fA-F0-9]{64}$/);
+      expect(result.jcsJson).toBe('{"a":"first","m":"middle","nested":{"a":1,"b":2},"z":"last"}');
+      const result2 = canonicalizeForHash(obj);
+      expect(result.hash).toBe(result2.hash);
     });
 
     it('computes hash from canonicalized UTF-8 bytes - OT-ID-092', () => {
