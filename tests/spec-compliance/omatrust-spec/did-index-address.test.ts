@@ -80,10 +80,8 @@ describe('OMATrust Identity Spec 5.3: DID → Index Address', () => {
       const did = 'did:web:example.com';
       const hash = computeDidHash(did);
 
-      // Hash should be 32 bytes (64 hex chars + 0x prefix)
-      expect(hash).toMatch(/^0x[a-f0-9]{64}$/);
+      expect(hash).toBe('0x505b0e657e7acabd2c14e517173a347faed486bb69081ef673c6e52c03f57f3e');
 
-      // Same DID should produce same hash
       const hash2 = computeDidHash(did);
       expect(hash).toBe(hash2);
     });
@@ -119,8 +117,7 @@ describe('OMATrust Identity Spec 5.3: DID → Index Address', () => {
       const did = 'did:web:example.com';
       const indexAddress = didToAddress(did);
 
-      // Should be a valid Ethereum address
-      expect(indexAddress).toMatch(/^0x[a-f0-9]{40}$/);
+      expect(indexAddress).toBe('0x173a347faed486bb69081ef673c6e52c03f57f3e');
     });
 
     it('OT-ID-141: EAS recipient equals computed indexAddress', () => {

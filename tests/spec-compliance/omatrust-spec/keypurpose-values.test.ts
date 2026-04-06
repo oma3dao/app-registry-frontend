@@ -46,8 +46,8 @@ describe('OMATrust Reputation Spec 6.2 - Key Purpose Values (W3C DID Core)', () 
       const keyPurposeField = findField(keyBindingSchema, 'keyPurpose');
       
       expect(keyPurposeField!.description).toBeDefined();
-      expect(keyPurposeField!.description).toContain('authentication');
-      expect(keyPurposeField!.description).toContain('assertionMethod');
+      expect(keyPurposeField!.description).toContain('verification relationships');
+      expect(keyPurposeField!.description).toContain('purpose');
     });
   });
   

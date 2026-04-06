@@ -6,13 +6,13 @@ import { canonicalizeForHash } from '@/lib/utils/dataurl';
 
 describe('dataurl utilities', () => {
   describe('canonicalizeForHash', () => {
-    it('canonicalizes simple object', () => {
+    it('canonicalizes simple object with expected JCS and deterministic hash', () => {
       const obj = { name: 'Test', version: '1.0.0' };
       const result = canonicalizeForHash(obj);
       
-      expect(result.jcsJson).toBeDefined();
-      expect(result.hash).toBeDefined();
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(result.jcsJson).toBe('{"name":"Test","version":"1.0.0"}');
+      const result2 = canonicalizeForHash(obj);
+      expect(result.hash).toBe(result2.hash);
     });
 
     it('sorts object keys consistently', () => {
@@ -50,10 +50,12 @@ describe('dataurl utilities', () => {
           platforms: { windows: 'https://download.example.com/windows', mac: 'https://download.example.com/mac' },
         },
       },
-    ])('handles $label', ({ obj }) => {
-      const result = canonicalizeForHash(obj);
-      expect(result.jcsJson).toBeDefined();
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+    ])('handles $label deterministically', ({ obj }) => {
+      const result1 = canonicalizeForHash(obj);
+      const result2 = canonicalizeForHash(obj);
+      expect(result1.jcsJson).toBe(result2.jcsJson);
+      expect(result1.hash).toBe(result2.hash);
+      expect(result1.hash).toMatch(/^0x[0-9a-f]{64}$/);
     });
 
     it('produces consistent hash for same object', () => {
@@ -76,37 +78,35 @@ describe('dataurl utilities', () => {
       expect(result1.hash).not.toBe(result2.hash);
     });
 
-    it('handles null values', () => {
+    it('handles null values with correct JCS', () => {
       const obj = { name: 'Test', value: null };
       const result = canonicalizeForHash(obj);
       
-      expect(result.jcsJson).toContain('null');
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(result.jcsJson).toBe('{"name":"Test","value":null}');
+      expect(result.hash).toBe(canonicalizeForHash(obj).hash);
     });
 
-    it('handles boolean values', () => {
+    it('handles boolean values with correct JCS key ordering', () => {
       const obj = { name: 'Test', active: true, disabled: false };
       const result = canonicalizeForHash(obj);
       
-      expect(result.jcsJson).toContain('true');
-      expect(result.jcsJson).toContain('false');
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(result.jcsJson).toBe('{"active":true,"disabled":false,"name":"Test"}');
+      expect(result.hash).toBe(canonicalizeForHash(obj).hash);
     });
 
-    it('handles numeric values', () => {
+    it('handles numeric values with correct JCS', () => {
       const obj = { name: 'Test', count: 42, price: 3.14 };
       const result = canonicalizeForHash(obj);
       
-      expect(result.jcsJson).toContain('42');
-      expect(result.jcsJson).toContain('3.14');
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(result.jcsJson).toBe('{"count":42,"name":"Test","price":3.14}');
+      expect(result.hash).toBe(canonicalizeForHash(obj).hash);
     });
 
-    it('handles empty object', () => {
+    it('handles empty object with correct JCS and deterministic hash', () => {
       const obj = {};
       const result = canonicalizeForHash(obj);
       expect(result.jcsJson).toBe('{}');
-      expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(result.hash).toBe(canonicalizeForHash({}).hash);
     });
 
     it('JCS JSON has no whitespace', () => {
@@ -161,8 +161,10 @@ describe('computeDataHashFromDataUrl', () => {
     
     const result = await computeDataHashFromDataUrl('https://example.com/metadata.json');
     
+    expect(result.jcsJson).toBe('{"name":"Test","version":"1.0.0"}');
     expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
-    expect(result.jcsJson).toBeDefined();
+    const result2 = await computeDataHashFromDataUrl('https://example.com/metadata.json');
+    expect(result.hash).toBe(result2.hash);
   });
 
   it('throws error for non-OK HTTP response', async () => {
@@ -274,9 +276,9 @@ describe('computeDataHashFromDataUrl', () => {
     
     mockFetch.mockResolvedValue(mockResponse);
     
-    const result = await computeDataHashFromDataUrl('https://example.com/metadata.json', 1);
+    const resultSha = await computeDataHashFromDataUrl('https://example.com/metadata.json', 1);
     
-    expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(resultSha.hash).toMatch(/^0x[0-9a-f]{64}$/);
   });
 
   it('handles empty chunks gracefully', async () => {
@@ -303,6 +305,7 @@ describe('computeDataHashFromDataUrl', () => {
     const result = await computeDataHashFromDataUrl('https://example.com/metadata.json');
     
     expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(result.jcsJson).toBe('{"name":"Test"}');
   });
 
   it('accepts timeout configuration', async () => {
@@ -327,8 +330,8 @@ describe('computeDataHashFromDataUrl', () => {
     
     const result = await computeDataHashFromDataUrl('https://example.com/data.json', 0, { timeoutMs: 5000 });
     
-    expect(result).toBeDefined();
     expect(result.hash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(result.jcsJson).toBe('{"test":true}');
   });
 });
 

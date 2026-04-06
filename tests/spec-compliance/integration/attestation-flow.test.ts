@@ -71,9 +71,8 @@ describe('Integration: App Registration to Attestation Flow', () => {
       const did = 'did:web:myapp.example.com';
       const indexAddress = didToAddress(did);
       
-      expect(indexAddress).toMatch(/^0x[a-f0-9]{40}$/);
+      expect(indexAddress).toBe('0xfe2dd752228590472d3914a16438383111449b71');
       
-      // Same DID should produce same address
       const indexAddress2 = didToAddress(did);
       expect(indexAddress).toBe(indexAddress2);
     });
@@ -96,8 +95,9 @@ describe('Integration: App Registration to Attestation Flow', () => {
       
       const { jcsJson, hash } = canonicalizeForHash(offchainMetadata);
       
-      expect(jcsJson).toBeDefined();
-      expect(hash).toMatch(/^0x[a-f0-9]{64}$/);
+      expect(typeof jcsJson).toBe('string');
+      expect(jcsJson.length).toBeGreaterThan(0);
+      expect(hash).toBe('0x' + 'a'.repeat(64));
     });
 
     it('detects metadata tampering', async () => {

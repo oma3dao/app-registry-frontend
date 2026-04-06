@@ -35,6 +35,7 @@ vi.mock('thirdweb', () => ({
   })),
   sendTransaction: vi.fn(),
   defineChain: vi.fn((chainId: number) => ({ id: chainId })),
+  waitForReceipt: vi.fn().mockResolvedValue({ status: 'success' }),
 }));
 
 // Mock thirdweb wallets
@@ -141,7 +142,11 @@ vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
 // Mock issuer key loader
 vi.mock('@/lib/server/issuer-key', () => ({
   loadIssuerPrivateKey: vi.fn(() => mockEnv.ISSUER_PRIVATE_KEY),
-  getThirdwebManagedWallet: vi.fn(() => null), // Default to non-managed mode
+  getThirdwebManagedWallet: vi.fn(() => null),
+  submitViaServerWallet: vi.fn().mockResolvedValue({
+    transactionHash: '0xmanagedTx',
+    blockNumber: 1n,
+  }),
 }));
 
 const originalFetch = global.fetch;
@@ -582,28 +587,7 @@ describe('/api/verify-and-attest', () => {
    * Test: returns 500 when resolver is not configured (covers lines 871-873)
    * Tests the resolver configuration check in the verify-and-attest route
    */
-  it('returns 500 when resolver contract is not configured', async () => {
-    // Save original active chain
-    const originalChain = process.env.NEXT_PUBLIC_ACTIVE_CHAIN;
-    
-    // We need to mock the chains config to have a chain without resolver
-    // This is tricky because the chains are imported statically
-    // Instead, we'll rely on the fact that the test env should handle this
-    // For now, let's verify that the code path exists and is reachable
-    
-    // The resolver check happens at line 870-873
-    // To trigger it, we would need a valid chain but no resolver contract
-    // This is primarily defensive code for misconfiguration
-    
-    // Restore
-    if (originalChain) {
-      process.env.NEXT_PUBLIC_ACTIVE_CHAIN = originalChain;
-    }
-    
-    // This test documents the existence of the error path
-    // In practice, all chains in the codebase have resolvers configured
-    expect(true).toBe(true);
-  });
+  it.todo('returns 500 when resolver contract is not configured — requires dynamic chain config mock');
 
   /**
    * Test: handles transaction errors
@@ -645,6 +629,7 @@ describe('/api/verify-and-attest', () => {
   it('uses Thirdweb managed wallet when available', async () => {
     const dns = await import('dns');
     const { readContract, prepareContractCall } = await import('thirdweb');
+    const { submitViaServerWallet } = await import('@/lib/server/issuer-key');
 
     const connectedAddress = '0x1234567890123456789012345678901234567890';
 
@@ -666,11 +651,6 @@ describe('/api/verify-and-attest', () => {
       [`v=1 caip10=eip155:1:${connectedAddress}`],
     ]);
 
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ transactionHash: '0xmanagedTx' }),
-    }) as any;
-
     const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
       method: 'POST',
       body: JSON.stringify({
@@ -685,11 +665,11 @@ describe('/api/verify-and-attest', () => {
     expect(response.status).toBe(200);
     expect(data.ok).toBe(true);
     expect(data.txHashes).toEqual(['0xmanagedTx']);
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('embedded-wallet.thirdweb.com'),
-      expect.objectContaining({
-        headers: expect.objectContaining({ 'x-secret-key': 'managed-secret' }),
-      }),
+    expect(submitViaServerWallet).toHaveBeenCalledWith(
+      expect.anything(),
+      31337,
+      expect.any(String),
+      { walletAddress: connectedAddress, secretKey: 'managed-secret' },
     );
   });
 
@@ -776,7 +756,8 @@ describe('/api/verify-and-attest', () => {
     expect(response.status).toBe(500);
     expect(data.ok).toBe(false);
     expect(data.status).toBe('failed');
-    expect(data.error).toBeDefined();
+    expect(typeof data.error).toBe('string');
+    expect(data.error.length).toBeGreaterThan(0);
   });
 
   /**
@@ -815,7 +796,8 @@ describe('/api/verify-and-attest', () => {
       // If debug mode is enabled, verify the structure
       if (data.debug) {
         expect(data.debug.did).toBe('did:web:example.com');
-        expect(data.debug.didHash).toBeDefined();
+        expect(typeof data.debug.didHash).toBe('string');
+        expect(data.debug.didHash).toMatch(/^0x[0-9a-fA-F]{64}$/);
       }
     } finally {
       // Restore original env
@@ -1364,28 +1346,27 @@ it('returns 500 when all attestation writes fail', async () => {
       expect(data.ok).toBe(true);
       expect(data.status).toBe('ready');
 
-      // Verify complete debug payload (lines 1104-1121)
       expect(data.debug).toBeDefined();
       expect(data.debug.did).toBe('did:web:example.com');
-      expect(data.debug.didHash).toBeDefined();
+      expect(typeof data.debug.didHash).toBe('string');
+      expect(data.debug.didHash).toMatch(/^0x[0-9a-fA-F]{64}$/);
       expect(data.debug.currentOwnerAfter).toBe(connectedAddress);
-      expect(data.debug.issuerAddress).toBeDefined();
-      expect(data.debug.issuerType).toBeDefined();
+      expect(typeof data.debug.issuerAddress).toBe('string');
+      expect(typeof data.debug.issuerType).toBe('string');
       
-      // Verify contractAddresses (lines 1110-1114)
-      expect(data.debug.contractAddresses).toBeDefined();
-      expect(data.debug.contractAddresses.registry).toBeDefined();
-      expect(data.debug.contractAddresses.metadata).toBeDefined();
-      expect(data.debug.contractAddresses.resolver).toBeDefined();
+      expect(data.debug.contractAddresses).toEqual({
+        registry: '0xLocalRegistry',
+        metadata: '0xLocalMetadata',
+        resolver: '0xLocalResolver',
+      });
       
-      // Verify chainInfo (lines 1115-1119)
-      expect(data.debug.chainInfo).toBeDefined();
-      expect(data.debug.chainInfo.name).toBeDefined();
-      expect(data.debug.chainInfo.chainId).toBeDefined();
-      expect(data.debug.chainInfo.rpc).toBeDefined();
+      expect(data.debug.chainInfo).toEqual({
+        name: 'Localhost',
+        chainId: 31337,
+        rpc: 'http://localhost:8545',
+      });
       
-      // Verify elapsed time is present
-      expect(data.elapsed).toBeDefined();
+      expect(typeof data.elapsed).toBe('string');
     });
 
     /**
@@ -1459,27 +1440,26 @@ it('returns 500 when all attestation writes fail', async () => {
       const response = await DebugPOST(request);
       const data = await response.json();
 
-      // Verify failure response
       expect(response.status).toBe(403);
       expect(data.ok).toBe(false);
-      expect(data.error).toBeDefined();
+      expect(typeof data.error).toBe('string');
+      expect(data.error.length).toBeGreaterThan(0);
 
-      // Verify complete debug payload (lines 960-972)
       expect(data.debug).toBeDefined();
       expect(data.debug.did).toBe('did:web:example.com');
-      expect(data.debug.didHash).toBeDefined();
+      expect(typeof data.debug.didHash).toBe('string');
+      expect(data.debug.didHash).toMatch(/^0x[0-9a-fA-F]{64}$/);
       expect(data.debug.connectedAddress).toBe(connectedAddress);
-      expect(data.debug.activeChain).toBeDefined();
-      expect(data.debug.chainId).toBeDefined();
+      expect(data.debug.activeChain).toBe('Localhost');
+      expect(data.debug.chainId).toBe(31337);
       
-      // Verify contractAddresses (lines 966-970)
-      expect(data.debug.contractAddresses).toBeDefined();
-      expect(data.debug.contractAddresses.registry).toBeDefined();
-      expect(data.debug.contractAddresses.metadata).toBeDefined();
-      expect(data.debug.contractAddresses.resolver).toBeDefined();
+      expect(data.debug.contractAddresses).toEqual({
+        registry: '0xLocalRegistry',
+        metadata: '0xLocalMetadata',
+        resolver: '0xLocalResolver',
+      });
       
-      // Verify elapsed time is present
-      expect(data.elapsed).toBeDefined();
+      expect(typeof data.elapsed).toBe('string');
     });
 
     /**
@@ -1517,30 +1497,28 @@ it('returns 500 when all attestation writes fail', async () => {
       const response = await DebugPOST(request);
       const data = await response.json();
 
-      // Verify failure response
       expect(response.status).toBe(500);
       expect(data.ok).toBe(false);
       expect(data.error).toBe('Failed to write attestations to blockchain');
       expect(Array.isArray(data.details)).toBe(true);
 
-      // Verify complete debug payload (lines 1054-1068)
       expect(data.debug).toBeDefined();
       expect(data.debug.did).toBe('did:web:example.com');
-      expect(data.debug.didHash).toBeDefined();
+      expect(typeof data.debug.didHash).toBe('string');
+      expect(data.debug.didHash).toMatch(/^0x[0-9a-fA-F]{64}$/);
       expect(data.debug.connectedAddress).toBe(connectedAddress);
-      expect(data.debug.activeChain).toBeDefined();
-      expect(data.debug.chainId).toBeDefined();
-      expect(data.debug.resolverAddress).toBeDefined();
-      expect(data.debug.signerInfo).toBeDefined();
+      expect(data.debug.activeChain).toBe('Localhost');
+      expect(data.debug.chainId).toBe(31337);
+      expect(typeof data.debug.resolverAddress).toBe('string');
+      expect(typeof data.debug.signerInfo).toBe('string');
       
-      // Verify contractAddresses (lines 1062-1066)
-      expect(data.debug.contractAddresses).toBeDefined();
-      expect(data.debug.contractAddresses.registry).toBeDefined();
-      expect(data.debug.contractAddresses.metadata).toBeDefined();
-      expect(data.debug.contractAddresses.resolver).toBeDefined();
+      expect(data.debug.contractAddresses).toEqual({
+        registry: '0xLocalRegistry',
+        metadata: '0xLocalMetadata',
+        resolver: '0xLocalResolver',
+      });
       
-      // Verify elapsed time is present
-      expect(data.elapsed).toBeDefined();
+      expect(typeof data.elapsed).toBe('string');
     });
 
     it('catches issuer-derivation errors gracefully and continues processing', async () => {
