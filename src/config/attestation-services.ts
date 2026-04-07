@@ -63,6 +63,12 @@ export function getAllServiceIds(): string[] {
   return Object.keys(ATTESTATION_SERVICES)
 }
 
+// Ownership attestation TTL configuration
+// When writing DID ownership attestations via upsertDirect, this TTL forces
+// periodic DNS TXT / did.json re-verification. The resolver's maxTTLSeconds
+// is 2 years, so 30 days is well within the cap.
+export const OWNERSHIP_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
 // Controller Witness grace period configuration
 // When creating key-binding or linked-identifier attestations, the effectiveAt
 // default is pushed forward by this amount so the Controller Witness API can

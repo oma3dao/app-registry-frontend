@@ -19,6 +19,8 @@ import { getRpcUrl, withRetry } from '@/lib/rpc';
 import { normalizeDomain, buildEvmDidPkh } from '@oma3/omatrust/identity';
 import { loadIssuerPrivateKey, getThirdwebManagedWallet, submitViaServerWallet } from '@/lib/server/issuer-key';
 import { calculateTransferAmount, PROOF_PURPOSE } from '@/lib/verification/onchain-transfer';
+import { OWNERSHIP_TTL_SECONDS } from '@/config/attestation-services';
+import { APPROVED_CONTROLLER_WITNESS_ATTESTERS } from '@/config/controller-witness-config';
 import resolverAbi from '@/abi/resolver.json';
 import dns from 'dns';
 import { promisify } from 'util';
@@ -38,8 +40,10 @@ const resolveTxt = promisify(dns.resolveTxt);
 // Force Node.js runtime
 export const runtime = 'nodejs';
 
-// Check if debug mode is enabled
-const isDebugMode = process.env.NEXT_PUBLIC_DEBUG_ADAPTER === 'true';
+// Check if debug mode is enabled (evaluated per-request, not at module load)
+function isDebugMode(): boolean {
+  return process.env.NEXT_PUBLIC_DEBUG_ADAPTER === 'true';
+}
 
 // Debug logger
 function debug(section: string, message: string, data?: any) {
@@ -61,7 +65,7 @@ async function checkExistingAttestations(
   resolverAddress: string,
   chainId: number,
   clientId: string
-): Promise<{ present: string[]; missing: string[] }> {
+): Promise<{ present: string[]; missing: string[]; expiresAt?: number }> {
   debug('check-attestations', `Checking DID ownership for: ${did}`);
 
   const client = createThirdwebClient({ clientId });
@@ -92,8 +96,34 @@ async function checkExistingAttestations(
       currentOwner.toLowerCase() === connectedAddress.toLowerCase();
 
     if (hasValidOwnership) {
-      debug('check-attestations', `✅ Valid DID ownership attestation exists`);
-      return { present: requiredSchemas, missing: [] };
+      // Try to read expiry info from known issuers for logging
+      let expiresAtSeconds: number | undefined;
+      try {
+        const issuers = APPROVED_CONTROLLER_WITNESS_ATTESTERS[chainId] || [];
+        for (const issuer of issuers) {
+          const [ok, , expiresAtRaw] = await readContract({
+            contract: resolver,
+            method: 'function hasActive(address issuer, bytes32 didHash) view returns (bool ok, bytes32 controllerAddress, uint64 expiresAt)',
+            params: [issuer as `0x${string}`, didHash],
+          }) as [boolean, string, bigint];
+          if (ok) {
+            expiresAtSeconds = Number(expiresAtRaw);
+            break;
+          }
+        }
+        if (expiresAtSeconds === undefined) {
+          debug('check-attestations', `✅ Valid DID ownership attestation exists (issuer entry not found)`);
+        } else if (expiresAtSeconds === 0) {
+          debug('check-attestations', `✅ Valid DID ownership attestation exists (non-expiring)`);
+        } else {
+          const expiresDate = new Date(expiresAtSeconds * 1000).toISOString();
+          const remainingDays = Math.round((expiresAtSeconds - Date.now() / 1000) / 86400);
+          debug('check-attestations', `✅ Valid DID ownership attestation exists (expires: ${expiresDate}, ~${remainingDays} days remaining)`);
+        }
+      } catch {
+        debug('check-attestations', `✅ Valid DID ownership attestation exists (expiry lookup failed)`);
+      }
+      return { present: requiredSchemas, missing: [], expiresAt: expiresAtSeconds };
     } else {
       debug('check-attestations', `❌ No valid DID ownership attestation (owner: ${currentOwner})`);
       return { present: [], missing: requiredSchemas };
@@ -757,6 +787,9 @@ async function writeAttestation(
   const managedWallet = getThirdwebManagedWallet();
 
   let txHash: string;
+  const expiresAt = BigInt(Math.floor(Date.now() / 1000) + OWNERSHIP_TTL_SECONDS);
+  const expiresDate = new Date(Number(expiresAt) * 1000).toISOString();
+  debug('write-attestation', `TTL: ${OWNERSHIP_TTL_SECONDS}s (~${Math.round(OWNERSHIP_TTL_SECONDS / 86400)} days), expiresAt: ${expiresAt} (${expiresDate})`);
 
   if (managedWallet) {
     // Production: Use Engine server wallet (key never leaves Vault)
@@ -769,7 +802,7 @@ async function writeAttestation(
     const tx = prepareContractCall({
       contract: resolverContract,
       method: 'function upsertDirect(bytes32 didHash, bytes32 controllerAddress, uint64 expiresAt)',
-      params: [didHash, controllerAddress, 0n], // 0 = never expires
+      params: [didHash, controllerAddress, expiresAt],
     });
 
     const receipt = await submitViaServerWallet(tx, chainId, getRpcUrl(chainId), managedWallet);
@@ -788,7 +821,7 @@ async function writeAttestation(
     const tx = prepareContractCall({
       contract: resolver,
       method: 'function upsertDirect(bytes32 didHash, bytes32 controllerAddress, uint64 expiresAt)',
-      params: [didHash, controllerAddress, 0n],
+      params: [didHash, controllerAddress, expiresAt],
     });
 
     const result = await sendTransaction({
@@ -885,7 +918,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Thirdweb client ID not configured' }, { status: 500 });
     }
 
-    // Derive issuer information once at the beginning
+    // Step 1: Check for existing attestations
+    debug('main', '--- STEP 1: CHECK EXISTING ATTESTATIONS ---');
+    const { present, missing, expiresAt: attestationExpiresAt } = await checkExistingAttestations(
+      did,
+      connectedAddress,
+      requiredSchemas,
+      activeChain.contracts.resolver,
+      activeChain.chainId,
+      clientId
+    );
+
+    if (missing.length === 0) {
+      debug('main', '✅ All attestations already exist (fast path)');
+      const elapsed = Date.now() - startTime;
+      return NextResponse.json({
+        ok: true,
+        status: 'ready',
+        attestations: { present, missing },
+        ...(isDebugMode() && {
+          debug: {
+            did,
+            didHash: ethers.id(did),
+            ...(attestationExpiresAt != null && {
+              expiresAt: attestationExpiresAt,
+              ...(attestationExpiresAt > 0 && {
+                expiresAtISO: new Date(attestationExpiresAt * 1000).toISOString(),
+                remainingDays: Math.round((attestationExpiresAt - Date.now() / 1000) / 86400),
+              }),
+              ...(attestationExpiresAt === 0 && { note: 'non-expiring (written before TTL was enabled)' }),
+            }),
+          }
+        }),
+        message: 'All attestations already exist',
+        elapsed: `${elapsed}ms`,
+      });
+    }
+
+    // Derive issuer information (deferred until after fast-path check to avoid
+    // unnecessary private key loads when attestations already exist)
     try {
       const managedWallet = getThirdwebManagedWallet();
       if (managedWallet) {
@@ -903,35 +974,6 @@ export async function POST(request: NextRequest) {
       issuerAddress = `Error: ${e instanceof Error ? e.message : String(e)}`;
       issuerType = 'Error';
       debug('main', `Issuer derivation failed: ${issuerAddress}`);
-    }
-
-    // Step 1: Check for existing attestations
-    debug('main', '--- STEP 1: CHECK EXISTING ATTESTATIONS ---');
-    const { present, missing } = await checkExistingAttestations(
-      did,
-      connectedAddress,
-      requiredSchemas,
-      activeChain.contracts.resolver,
-      activeChain.chainId,
-      clientId
-    );
-
-    if (missing.length === 0) {
-      debug('main', '✅ All attestations already exist (fast path)');
-      const elapsed = Date.now() - startTime;
-      return NextResponse.json({
-        ok: true,
-        status: 'ready',
-        attestations: { present, missing },
-        ...(isDebugMode && {
-          debug: {
-            did,
-            didHash: ethers.id(did),
-          }
-        }),
-        message: 'All attestations already exist',
-        elapsed: `${elapsed}ms`,
-      });
     }
 
     // Step 2: Verify DID ownership
@@ -961,7 +1003,7 @@ export async function POST(request: NextRequest) {
         details: verificationResult.details,
         method: verificationResult.method,
         attestations: { present, missing },
-        ...(isDebugMode && {
+        ...(isDebugMode() && {
           debug: {
             did,
             didHash: ethers.id(did),
@@ -1018,7 +1060,7 @@ export async function POST(request: NextRequest) {
           schema,
           error: errorString,
           // Only include sensitive debug info in debug mode
-          ...(isDebugMode && {
+          ...(isDebugMode() && {
             diagnostics: {
               issuerAddress,
               contractAddress: activeChain.contracts.resolver,
@@ -1055,7 +1097,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to write attestations to blockchain',
         details: writeErrors,
         attestations: { present, missing },
-        ...(isDebugMode && {
+        ...(isDebugMode() && {
           debug: {
             did,
             didHash: ethers.id(did),
@@ -1105,13 +1147,18 @@ export async function POST(request: NextRequest) {
       },
       txHashes,
       ...(writeErrors.length > 0 && { warnings: writeErrors }),
-      ...(isDebugMode && {
+      ...(isDebugMode() && {
         debug: {
           did,
           didHash: ethers.id(did),
           currentOwnerAfter,
           issuerAddress,
           issuerType,
+          attestationTTL: {
+            ttlSeconds: OWNERSHIP_TTL_SECONDS,
+            ttlDays: Math.round(OWNERSHIP_TTL_SECONDS / 86400),
+            expiresAtISO: new Date((Math.floor(Date.now() / 1000) + OWNERSHIP_TTL_SECONDS) * 1000).toISOString(),
+          },
           contractAddresses: {
             registry: activeChain.contracts.registry,
             metadata: activeChain.contracts.metadata,
@@ -1138,7 +1185,7 @@ export async function POST(request: NextRequest) {
       ok: false,
       status: 'failed',
       error: 'Internal server error',
-      ...(isDebugMode && {
+      ...(isDebugMode() && {
         details: errorMsg,
         stack: errorStack?.split('\n').slice(0, 10).join('\n'),
         debug: {
