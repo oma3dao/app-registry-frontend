@@ -20,10 +20,9 @@ vi.mock('thirdweb/react', () => {
 vi.mock('@/lib/verification/onchain-transfer', () => ({
 	calculateTransferAmount: vi.fn(() => BigInt('100000000000000')),
 	formatTransferAmount: vi.fn(() => ({ formatted: '0.01', symbol: 'ETH', wei: '100000000000000' })),
-	getRecipientAddress: vi.fn((_chainId: number, mintingWallet: string) => mintingWallet),
-	getChainIdFromDid: vi.fn(() => 1),
 	getExplorerAddressUrl: vi.fn((_chainId: number, address: string) => `https://explorer/address/${address}`),
 	getExplorerTxUrl: vi.fn((_chainId: number, hash: string) => `https://explorer/tx/${hash}`),
+	PROOF_PURPOSE: { SHARED_CONTROL: 'shared-control', COMMERCIAL_TX: 'commercial-tx' },
 }))
 
 const getUseActiveAccountMock = () => {
@@ -77,7 +76,7 @@ describe('OnchainTransferInstructions', () => {
 
 		expect(screen.getAllByText('From (Controlling Wallet)')[0]).toBeInTheDocument()
 		expect(screen.getAllByText('To (Minting Wallet)')[0]).toBeInTheDocument()
-		expect(screen.getByText('Exact Amount (CRITICAL - Must be exact!)')).toBeInTheDocument()
+		expect(screen.getByText('Exact Amount')).toBeInTheDocument()
 
 		const hashInput = screen.getByLabelText(/Transaction Hash/i)
 		fireEvent.change(hashInput, { target: { value: ' 0xabc123 ' } })
@@ -101,7 +100,7 @@ describe('OnchainTransferInstructions', () => {
 		fireEvent.click(openFromButton)
 		expect(openSpy).toHaveBeenCalledWith(expect.stringContaining(controllingWallet), '_blank')
 
-		const amountSection = screen.getAllByText('Exact Amount (CRITICAL - Must be exact!)')[0].parentElement!
+		const amountSection = screen.getAllByText('Exact Amount')[0].parentElement!
 		const amountCopyButton = amountSection.querySelector('button') as HTMLButtonElement
 		fireEvent.click(amountCopyButton)
 		expect(navigator.clipboard.writeText).toHaveBeenCalledWith('0.01')
@@ -149,7 +148,7 @@ describe('OnchainTransferInstructions', () => {
 	it('shows and hides copy success indicator after timeout', () => {
 		renderComponent()
 
-		const amountSection = screen.getAllByText('Exact Amount (CRITICAL - Must be exact!)')[0].parentElement!
+		const amountSection = screen.getAllByText('Exact Amount')[0].parentElement!
 		const amountCopyButton = amountSection.querySelector('button') as HTMLButtonElement
 		
 		// Verify copy button exists before clicking

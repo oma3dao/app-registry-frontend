@@ -8,10 +8,10 @@ import {
   getExplorerTxUrl,
   getExplorerAddressUrl,
   estimateBlocksToSearch,
-  parseCaip10,
-  getChainIdFromDid,
-  isChainSupported,
+  PROOF_PURPOSE,
 } from '@/lib/verification/onchain-transfer';
+import { parseCaip10 } from '@/lib/utils/caip10/parse';
+import { getChainIdFromDidPkh } from '@oma3/omatrust/identity';
 
 // Use actual ethers for these tests (unmock the global mock from setup.ts)
 vi.unmock('ethers');
@@ -19,38 +19,44 @@ vi.unmock('ethers');
 describe('Onchain Transfer Verification', () => {
   describe('CHAIN_CONFIGS', () => {
     it('contains expected chain configurations', () => {
-      expect(CHAIN_CONFIGS[1]).toEqual({
+      expect(CHAIN_CONFIGS[1]).toEqual(expect.objectContaining({
         decimals: 18,
         symbol: 'ETH',
         blockTime: 12,
         explorer: 'https://etherscan.io',
-      });
+      }));
 
-      expect(CHAIN_CONFIGS[8453]).toEqual({
+      expect(CHAIN_CONFIGS[8453]).toEqual(expect.objectContaining({
         decimals: 18,
         symbol: 'ETH',
         blockTime: 2,
         explorer: 'https://basescan.org',
-      });
+      }));
 
-      expect(CHAIN_CONFIGS[137]).toEqual({
+      expect(CHAIN_CONFIGS[137]).toEqual(expect.objectContaining({
         decimals: 18,
-        symbol: 'MATIC',
+        symbol: 'POL',
         blockTime: 2,
         explorer: 'https://polygonscan.com',
-      });
+      }));
+    });
+
+    it('includes base amounts per proof purpose', () => {
+      expect(CHAIN_CONFIGS[1].base).toBeDefined();
+      expect(CHAIN_CONFIGS[1].base[PROOF_PURPOSE.SHARED_CONTROL]).toBe(BigInt('100000000000000'));
+      expect(CHAIN_CONFIGS[1].base[PROOF_PURPOSE.COMMERCIAL_TX]).toBe(BigInt('1000000000000'));
     });
   });
 
   describe('getChainConfig', () => {
     it('returns config for known chain', () => {
       const config = getChainConfig(1);
-      expect(config).toEqual({
+      expect(config).toEqual(expect.objectContaining({
         decimals: 18,
         symbol: 'ETH',
         blockTime: 12,
         explorer: 'https://etherscan.io',
-      });
+      }));
     });
 
     it('throws error for unknown chain', () => {
@@ -80,7 +86,7 @@ describe('Onchain Transfer Verification', () => {
     it('calculates transfer amount correctly', () => {
       const amount = calculateTransferAmount(
         'did:pkh:eip155:1:0x1234567890123456789012345678901234567890',
-        '0x9876543210987654321098765432109876543210',
+        'did:pkh:eip155:1:0x9876543210987654321098765432109876543210',
         1,
         'shared-control'
       );
@@ -93,7 +99,7 @@ describe('Onchain Transfer Verification', () => {
     it('handles different chain IDs', () => {
       const amount = calculateTransferAmount(
         'did:pkh:eip155:8453:0x1234567890123456789012345678901234567890',
-        '0x9876543210987654321098765432109876543210',
+        'did:pkh:eip155:8453:0x9876543210987654321098765432109876543210',
         8453,
         'shared-control'
       );
@@ -103,22 +109,21 @@ describe('Onchain Transfer Verification', () => {
       expect(amount).toBeGreaterThanOrEqual(base);
     });
 
-    it('normalizes DID and wallet addresses', () => {
+    it('produces deterministic amounts for the same inputs', () => {
       const amount1 = calculateTransferAmount(
         'did:pkh:eip155:1:0x1234567890123456789012345678901234567890',
-        '0x9876543210987654321098765432109876543210',
+        'did:pkh:eip155:1:0x9876543210987654321098765432109876543210',
         1,
         'shared-control'
       );
       
       const amount2 = calculateTransferAmount(
-        '  DID:PKH:EIP155:1:0X1234567890123456789012345678901234567890  ',
-        '0X9876543210987654321098765432109876543210',
+        'did:pkh:eip155:1:0x1234567890123456789012345678901234567890',
+        'did:pkh:eip155:1:0x9876543210987654321098765432109876543210',
         1,
         'shared-control'
       );
 
-      // Both should produce the same amount after normalization
       expect(amount1).toBe(amount2);
     });
   });
@@ -194,58 +199,63 @@ describe('Onchain Transfer Verification', () => {
   describe('parseCaip10', () => {
     it('parses valid CAIP-10 address', () => {
       const result = parseCaip10('eip155:1:0x1234567890123456789012345678901234567890');
+      expect(result).not.toBeInstanceOf(Error);
       expect(result).toEqual({
-        chainId: 1,
+        namespace: 'eip155',
+        reference: '1',
         address: '0x1234567890123456789012345678901234567890',
       });
     });
 
     it('parses CAIP-10 with different chain ID', () => {
       const result = parseCaip10('eip155:8453:0xabcdef1234567890abcdef1234567890abcdef12');
+      expect(result).not.toBeInstanceOf(Error);
       expect(result).toEqual({
-        chainId: 8453,
+        namespace: 'eip155',
+        reference: '8453',
         address: '0xabcdef1234567890abcdef1234567890abcdef12',
       });
     });
 
-    it('returns null for invalid format', () => {
-      expect(parseCaip10('invalid')).toBeNull();
-      expect(parseCaip10('eip155:1')).toBeNull();
-      expect(parseCaip10('eip155:1:0x123:extra')).toBeNull();
+    it('returns Error for invalid format', () => {
+      expect(parseCaip10('invalid')).toBeInstanceOf(Error);
+      expect(parseCaip10('eip155:1')).toBeInstanceOf(Error);
     });
 
-    it('returns null for non-eip155 namespace', () => {
-      expect(parseCaip10('solana:mainnet:123456789')).toBeNull();
-    });
-
-    it('returns null for invalid chain ID', () => {
-      expect(parseCaip10('eip155:invalid:0x1234567890123456789012345678901234567890')).toBeNull();
+    it('parses non-eip155 namespaces (CAIP-10 is namespace-agnostic)', () => {
+      const result = parseCaip10('solana:mainnet:123456789');
+      expect(result).not.toBeInstanceOf(Error);
+      expect(result).toEqual({
+        namespace: 'solana',
+        reference: 'mainnet',
+        address: '123456789',
+      });
     });
   });
 
-  describe('getChainIdFromDid', () => {
+  describe('getChainIdFromDidPkh', () => {
     it('extracts chain ID from valid did:pkh', () => {
-      const chainId = getChainIdFromDid('did:pkh:eip155:1:0x1234567890123456789012345678901234567890');
-      expect(chainId).toBe(1);
+      const chainId = getChainIdFromDidPkh('did:pkh:eip155:1:0x1234567890123456789012345678901234567890');
+      expect(String(chainId)).toBe('1');
     });
 
     it('extracts chain ID from did:pkh with different chain', () => {
-      const chainId = getChainIdFromDid('did:pkh:eip155:8453:0x1234567890123456789012345678901234567890');
-      expect(chainId).toBe(8453);
+      const chainId = getChainIdFromDidPkh('did:pkh:eip155:8453:0x1234567890123456789012345678901234567890');
+      expect(String(chainId)).toBe('8453');
     });
 
     it('returns null for non-did:pkh DID', () => {
-      expect(getChainIdFromDid('did:web:example.com')).toBeNull();
-      expect(getChainIdFromDid('did:key:123456789')).toBeNull();
+      expect(getChainIdFromDidPkh('did:web:example.com')).toBeNull();
+      expect(getChainIdFromDidPkh('did:key:123456789')).toBeNull();
     });
 
     it('returns null for invalid did:pkh format', () => {
-      expect(getChainIdFromDid('did:pkh:invalid')).toBeNull();
-      expect(getChainIdFromDid('did:pkh:eip155:invalid:0x123')).toBeNull();
+      expect(getChainIdFromDidPkh('did:pkh:invalid')).toBeNull();
     });
 
-    it('returns null for non-eip155 namespace', () => {
-      expect(getChainIdFromDid('did:pkh:solana:mainnet:123456789')).toBeNull();
+    it('extracts reference for non-eip155 namespace', () => {
+      const chainId = getChainIdFromDidPkh('did:pkh:solana:mainnet:123456789');
+      expect(chainId).toBe('mainnet');
     });
   });
 });

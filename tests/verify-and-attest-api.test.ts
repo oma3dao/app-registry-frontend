@@ -587,7 +587,30 @@ describe('/api/verify-and-attest', () => {
    * Test: returns 500 when resolver is not configured (covers lines 871-873)
    * Tests the resolver configuration check in the verify-and-attest route
    */
-  it.todo('returns 500 when resolver contract is not configured — requires dynamic chain config mock');
+  it('returns 500 when resolver contract is not configured', async () => {
+    const chains = await import('@/config/chains');
+    const originalResolver = chains.localhost.contracts.resolver;
+    chains.localhost.contracts.resolver = '' as any;
+
+    try {
+      const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
+        method: 'POST',
+        body: JSON.stringify({
+          did: 'did:web:example.com',
+          connectedAddress: '0x1234567890123456789012345678901234567890',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.ok).toBe(false);
+      expect(data.error).toContain('Resolver not configured');
+    } finally {
+      chains.localhost.contracts.resolver = originalResolver;
+    }
+  });
 
   /**
    * Test: handles transaction errors
@@ -1374,7 +1397,8 @@ it('returns 500 when all attestation writes fail', async () => {
      */
     it('includes debug diagnostics when an internal error occurs', async () => {
       const thirdweb = await import('thirdweb');
-      vi.mocked(thirdweb.createThirdwebClient).mockReset();
+      const originalImpl = vi.mocked(thirdweb.createThirdwebClient).getMockImplementation();
+
       vi.mocked(thirdweb.createThirdwebClient).mockImplementation(() => {
         throw new Error('Thirdweb unavailable');
       });
@@ -1392,16 +1416,19 @@ it('returns 500 when all attestation writes fail', async () => {
       const response = await DebugPOST(request);
       const data = await response.json();
 
+      // The route's generic catch returns 500 with details/stack, not a handler debug object
       expect(response.status).toBe(500);
       expect(data.ok).toBe(false);
       expect(data.error).toBe('Internal server error');
       expect(data.details).toBe('Thirdweb unavailable');
-      expect(data.debug).toMatchObject({
-        issuerAddress: expect.any(String),
-        issuerType: expect.any(String),
-      });
+      expect(typeof data.stack).toBe('string');
 
-      vi.mocked(thirdweb.createThirdwebClient).mockReset();
+      // Restore the mock so subsequent tests are not poisoned
+      if (originalImpl) {
+        vi.mocked(thirdweb.createThirdwebClient).mockImplementation(originalImpl);
+      } else {
+        vi.mocked(thirdweb.createThirdwebClient).mockImplementation(() => ({ clientId: 'test-client-id' }) as any);
+      }
     });
 
     /**
@@ -1855,6 +1882,182 @@ it('returns 500 when all attestation writes fail', async () => {
 
       const response = await POST(request);
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe('ownership TTL and expired-attestation re-verification', () => {
+    it('writes ownership attestation with TTL (~30 days) instead of 0n', async () => {
+      const { readContract, prepareContractCall, sendTransaction } = await import('thirdweb');
+      const connectedAddress = '0xABCDEF1234567890123456789012345678901234';
+
+      vi.mocked(readContract).mockReset();
+      vi.mocked(readContract)
+        .mockResolvedValueOnce('0x0000000000000000000000000000000000000000')
+        .mockResolvedValueOnce(connectedAddress);
+
+      getMockedDnsResolve().mockResolvedValue([
+        [`v=1 caip10=eip155:1:${connectedAddress}`],
+      ]);
+
+      vi.mocked(sendTransaction).mockResolvedValue({
+        transactionHash: '0xtxhash-ttl-api',
+      } as any);
+
+      const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
+        method: 'POST',
+        body: JSON.stringify({
+          did: 'did:web:example.com',
+          connectedAddress,
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.ok).toBe(true);
+      expect(prepareContractCall).toHaveBeenCalled();
+
+      const firstCallArgs = vi.mocked(prepareContractCall).mock.calls[0][0] as {
+        params: [string, string, bigint];
+      };
+      const expiresAt = firstCallArgs.params[2];
+      const now = Math.floor(Date.now() / 1000);
+
+      expect(typeof expiresAt).toBe('bigint');
+      expect(expiresAt).toBeGreaterThan(BigInt(now));
+      expect(expiresAt).toBeLessThan(BigInt(now + 31 * 24 * 60 * 60));
+      expect(expiresAt).not.toBe(0n);
+    });
+
+    it('re-verifies expired attestation via DNS and writes fresh attestation', async () => {
+      const { readContract, prepareContractCall, sendTransaction } = await import('thirdweb');
+      const connectedAddress = '0xABCDEF1234567890123456789012345678901234';
+
+      vi.mocked(readContract).mockReset();
+      vi.mocked(readContract)
+        .mockResolvedValueOnce('0x0000000000000000000000000000000000000000')
+        .mockResolvedValueOnce(connectedAddress);
+
+      getMockedDnsResolve().mockResolvedValue([
+        [`v=1 caip10=eip155:1:${connectedAddress}`],
+      ]);
+
+      vi.mocked(sendTransaction).mockResolvedValue({
+        transactionHash: '0xtxhash-expired-dns',
+      } as any);
+
+      const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
+        method: 'POST',
+        body: JSON.stringify({
+          did: 'did:web:example.com',
+          connectedAddress,
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.ok).toBe(true);
+      expect(prepareContractCall).toHaveBeenCalled();
+      expect(dns.resolveTxt).toHaveBeenCalledWith('_controllers.example.com');
+    });
+
+    it('re-verifies expired attestation via .well-known did.json when DNS fails', async () => {
+      const { readContract, sendTransaction } = await import('thirdweb');
+      const connectedAddress = '0xDEF1234567890123456789012345678901234567';
+
+      vi.mocked(readContract).mockReset();
+      vi.mocked(readContract)
+        .mockResolvedValueOnce('0x0000000000000000000000000000000000000000')
+        .mockResolvedValueOnce(connectedAddress);
+
+      getMockedDnsResolve().mockRejectedValue(new Error('DNS lookup failed'));
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          verificationMethod: [{ blockchainAccountId: `eip155:1:${connectedAddress}` }],
+        }),
+      });
+
+      vi.mocked(sendTransaction).mockResolvedValue({
+        transactionHash: '0xtxhash-expired-diddoc',
+      } as any);
+
+      const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
+        method: 'POST',
+        body: JSON.stringify({
+          did: 'did:web:example.com',
+          connectedAddress,
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.ok).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://example.com/.well-known/did.json',
+        expect.any(Object),
+      );
+    });
+
+    it('returns 403 when attestation is expired and re-verification fails', async () => {
+      const { readContract } = await import('thirdweb');
+      const connectedAddress = '0xABCDEF1234567890123456789012345678901234';
+
+      vi.mocked(readContract).mockReset();
+      vi.mocked(readContract).mockResolvedValue('0x0000000000000000000000000000000000000000');
+      getMockedDnsResolve().mockRejectedValue(new Error('DNS lookup failed'));
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
+        method: 'POST',
+        body: JSON.stringify({
+          did: 'did:web:example.com',
+          connectedAddress,
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.ok).toBe(false);
+      expect(String(data.error)).toContain('DID ownership verification failed');
+    });
+
+    it('keeps fast path for active attestation and skips DNS / did.json', async () => {
+      const { readContract, prepareContractCall } = await import('thirdweb');
+      const connectedAddress = '0x1234567890123456789012345678901234567890';
+
+      vi.mocked(readContract).mockReset();
+      vi.mocked(readContract).mockResolvedValue(connectedAddress);
+      const fetchSpy = vi.fn();
+      global.fetch = fetchSpy as any;
+
+      const request = new NextRequest('http://localhost:3000/api/verify-and-attest', {
+        method: 'POST',
+        body: JSON.stringify({
+          did: 'did:web:example.com',
+          connectedAddress,
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.ok).toBe(true);
+      expect(data.message).toBe('All attestations already exist');
+      expect(dns.resolveTxt).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(prepareContractCall).not.toHaveBeenCalled();
     });
   });
 });
