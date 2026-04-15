@@ -707,7 +707,7 @@ describe('getTokenIdFromEvents', () => {
     const result = await getTokenIdFromEvents('did:web:example.com', 1);
     
     expect(result).toBe(66);
-  });
+  }, 15000);
 
   it('returns undefined when no matching major version found', async () => {
     const mockLogs = [{

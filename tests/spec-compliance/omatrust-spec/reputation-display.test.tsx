@@ -178,7 +178,7 @@ describe('OMATrust Reputation Spec: Attestation List Component', () => {
       attester: '0x1234567890123456789012345678901234567890',
       recipient: '0xRecipient',
       data: '0x',
-      time: 1704067200, // Jan 1, 2024
+      time: 1704153600, // Jan 2, 2024 00:00 UTC — avoids timezone ambiguity at year boundary
       expirationTime: 0,
       revocationTime: 0,
       refUID: '0x',
@@ -227,8 +227,8 @@ describe('OMATrust Reputation Spec: Attestation List Component', () => {
 
       render(<AttestationList attestations={[mockAttestation]} />);
       
-      // Unix timestamp 1704067200 = Jan 1, 2024
-      // The exact format depends on locale, but should contain the date
+      // Unix timestamp 1704153600 = Jan 2, 2024 00:00 UTC
+      // The exact format depends on locale, but should contain the year
       const dateText = screen.getByText(/2024/);
       expect(dateText).toBeInTheDocument();
     });
@@ -260,7 +260,7 @@ describe('OMATrust Reputation Spec: Attestation List Component', () => {
       attester: '0x1234567890123456789012345678901234567890',
       recipient: '0xRecipient',
       data: '0x',
-      time: 1704067200,
+      time: 1704153600,
       expirationTime: 0,
       revocationTime: 0,
       refUID: '0x',
@@ -365,7 +365,7 @@ describe('OMATrust Reputation Spec: Attestation List Component', () => {
           attester: '0x1111111111111111111111111111111111111111',
           recipient: '0xRecipient',
           data: '0x',
-          time: 1704067200,
+          time: 1704153600,
           expirationTime: 0,
           revocationTime: 0,
           refUID: '0x',

@@ -338,12 +338,12 @@ describe('Data Model Specification Compliance', () => {
     });
 
     // Test: Endpoint URL validation
-    it('enforces url must be valid URL (line 47)', () => {
-      // Specification: src/schema/data-model.ts:47
-      // Requirement: url: z.string().url()
+    it('enforces endpoint must be valid URL (line 64)', () => {
+      // Specification: src/schema/data-model.ts:64
+      // Requirement: endpoint: z.string().url()
       
-      expect(EndpointConfig.shape.url.safeParse('https://api.example.com').success).toBe(true);
-      expect(EndpointConfig.shape.url.safeParse('not-a-url').success).toBe(false);
+      expect(EndpointConfig.shape.endpoint.safeParse('https://api.example.com').success).toBe(true);
+      expect(EndpointConfig.shape.endpoint.safeParse('not-a-url').success).toBe(false);
     });
 
     // Test: Type field requirement
