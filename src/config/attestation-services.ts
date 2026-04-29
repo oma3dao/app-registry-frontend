@@ -63,6 +63,23 @@ export function getAllServiceIds(): string[] {
   return Object.keys(ATTESTATION_SERVICES)
 }
 
+// Ownership attestation TTL configuration
+// When writing DID ownership attestations via upsertDirect, this TTL forces
+// periodic DNS TXT / did.json re-verification. The resolver's maxTTLSeconds
+// is 2 years, so 30 days is well within the cap.
+export const OWNERSHIP_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+// Controller Witness grace period configuration
+// When creating key-binding or linked-identifier attestations, the effectiveAt
+// default is pushed forward by this amount so the Controller Witness API can
+// observe and attest controller evidence before the attestation becomes effective.
+export const CONTROLLER_WITNESS_CONFIG = {
+  /** Schema IDs whose effectiveAt default gets the grace period */
+  graceSchemaIds: ['key-binding', 'linked-identifier'],
+  /** Seconds added to current time for the default effectiveAt */
+  graceSeconds: 120, // 2 minutes — enough for OMAchain finality + witness call
+}
+
 // Query configuration for fetching latest attestations
 export const ATTESTATION_QUERY_CONFIG = {
   // Progressive block ranges to try when querying for attestations

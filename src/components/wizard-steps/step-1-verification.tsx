@@ -23,7 +23,7 @@ import { Caip10Input } from "@/components/caip10-input";
 import { DidVerification } from "@/components/did-verification";
 import { DidPkhVerification } from "@/components/did-pkh-verification";
 import { InterfacesSelector } from "@/components/interfaces-selector";
-import { buildDidPkhFromCaip10 } from "@/lib/utils/did";
+import { buildDidPkhFromCaip10 } from "@oma3/omatrust/identity";
 import {
   NAME_PLACEHOLDER,
   VERSION_PLACEHOLDER,

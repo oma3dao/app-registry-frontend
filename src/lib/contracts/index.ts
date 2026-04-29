@@ -53,7 +53,7 @@ export {
   prepareUpdateStatus,
 } from './registry.write';
 
-// Utilities
+// Utilities — re-exported from @oma3/omatrust SDK
 export {
   // Validation
   isValidDid,
@@ -87,7 +87,7 @@ export {
   getNamespaceFromDidPkh,
   isEvmDidPkh,
   getDomainFromDidWeb,
-} from '../utils/did';
+} from '@oma3/omatrust/identity';
 
 export {
   normalizeEvmError,

@@ -1,0 +1,46 @@
+{
+  "metrics": [
+    {
+      "timestamp": "2025-12-11T04:39:00.729Z",
+      "totalTests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "duration": 5627,
+      "averageDuration": 5627,
+      "slowestTest": {
+        "name": "debug - check what is actually on the page > undefined",
+        "duration": 5627,
+        "file": "landing-page-debug.spec.ts"
+      },
+      "fastestTest": {
+        "name": "debug - check what is actually on the page > undefined",
+        "duration": 5627,
+        "file": "landing-page-debug.spec.ts"
+      },
+      "passRate": 100,
+      "flakyTests": [],
+      "testBreakdown": [
+        {
+          "file": "landing-page-debug.spec.ts",
+          "tests": 1,
+          "passed": 1,
+          "failed": 0,
+          "duration": 5627
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalRuns": 1,
+    "averagePassRate": 100,
+    "averageDuration": 5627,
+    "mostFlakyTests": [],
+    "slowestTests": [
+      {
+        "test": "landing-page-debug.spec.ts",
+        "averageDuration": 5627
+      }
+    ]
+  }
+}

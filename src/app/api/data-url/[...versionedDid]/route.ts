@@ -13,11 +13,12 @@ import { log } from '@/lib/log';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { versionedDid: string[] } }
+  { params }: { params: Promise<{ versionedDid: string[] }> }
 ) {
   try {
     // Join the path segments to reconstruct the full versionedDID
-    const versionedDID = params.versionedDid.join('/');
+    const { versionedDid } = await params;
+    const versionedDID = versionedDid.join('/');
     
     log('[API data-url] Received request for versionedDID:', versionedDID);
     

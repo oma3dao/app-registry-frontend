@@ -3,36 +3,19 @@
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import NFTGrid from "@/components/nft-grid"
-import { useAppsList } from "@/lib/contracts"
 import { getTotalActiveApps, listActiveApps } from "@/lib/contracts/registry.read"
 import type { NFT } from "@/schema/data-model"
 import { LANDING_PAGE_NUM_APPS } from "@/config/app-config"
 import NFTViewModal from "@/components/nft-view-modal"
 import { log } from "@/lib/log"
-import { useActiveAccount } from "thirdweb/react"
 import { appSummariesToNFTsWithMetadata } from "@/lib/utils/app-converter"
-
-const ROTATING_SERVICES = [
-  "Online Services",
-  "Websites",
-  "Apps",
-  "Downloads",
-  "APIs",
-  "x402",
-  "MCP",
-  "A2A",
-  "Smart Contracts"
-];
 
 export default function LandingPage() {
   const [latestApps, setLatestApps] = useState<NFT[]>([])
   const [isLoadingImages, setIsLoadingImages] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [currentNft, setCurrentNft] = useState<NFT | null>(null)
-  const account = useActiveAccount()
   const [shouldLoadNFTs, setShouldLoadNFTs] = useState(false)
-  const [startIndex, setStartIndex] = useState(1)
-  const [currentServiceIndex, setCurrentServiceIndex] = useState(0)
   
   // Fetch total and latest apps (client-side for landing page)
   const [totalAppsCount, setTotalAppsCount] = useState(0);
@@ -122,15 +105,6 @@ export default function LandingPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Rotate through service types
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentServiceIndex((prev) => (prev + 1) % ROTATING_SERVICES.length)
-    }, 3000) // 1s fade in + 2s display + 1s fade out
-    
-    return () => clearInterval(interval)
-  }, [])
-  
   const isLoading = isLoadingApps || isLoadingImages
 
   // Opens the view modal for an NFT
@@ -156,7 +130,7 @@ export default function LandingPage() {
     log("Mint modal cannot be opened from landing page")
   }
   
-  // Memoize the NFT grid to prevent re-renders when only the rotating text changes
+  // Memoize the NFT grid to prevent unnecessary re-renders
   const nftGridSection = useMemo(() => {
     if (!shouldLoadNFTs) return null
     
@@ -179,19 +153,14 @@ export default function LandingPage() {
     <div className="flex flex-col items-center justify-center px-4 text-center">
       <div className="max-w-5xl mx-auto space-y-8 pb-12">
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl pt-12">
-          <span className="block text-primary">OMATrust is Trust for</span>
+          <span className="block text-primary">OMATrust</span>
           <span className="block text-slate-700 dark:text-slate-300">
-            <span 
-              key={currentServiceIndex} 
-              className="inline-block animate-fade-in"
-            >
-              {ROTATING_SERVICES[currentServiceIndex]}
-            </span>
+            App Registry
           </span>
         </h1>
 
         <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-          OMATrust is the internet&apos;s decentralized trust layer. It brings app store trust to the whole internet. Register your services to get started.
+          An ERC-8004 compliant Identity Registry with additional extensions that enable app store level trust. Register your services to get started.
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4" id="hero-connect">
@@ -219,17 +188,6 @@ export default function LandingPage() {
             #hero-connect .tw-connect-wallet:focus {
               outline: none !important;
               box-shadow: 0 0 0 2px rgb(59 130 246 / 0.5), 0 0 0 4px white !important;
-            }
-            
-            @keyframes fadeIn {
-              0% { opacity: 0; }
-              25% { opacity: 1; }
-              75% { opacity: 1; }
-              100% { opacity: 0; }
-            }
-            
-            .animate-fade-in {
-              animation: fadeIn 4s ease-in-out;
             }
           `}</style>
         </div>

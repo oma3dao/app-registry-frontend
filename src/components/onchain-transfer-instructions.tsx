@@ -17,7 +17,7 @@ import {
 import {
   getChainIdFromDidPkh,
   buildEvmDidPkh,
-} from "@/lib/utils/did";
+} from "@oma3/omatrust/identity";
 
 interface OnchainTransferInstructionsProps {
   did: string;
@@ -44,16 +44,16 @@ export function OnchainTransferInstructions({
     const extractedChainId = getChainIdFromDidPkh(did);
     if (!extractedChainId) return;
 
-    setChainId(extractedChainId);
+    setChainId(Number(extractedChainId));
 
     // Calculate the exact amount using the new spec
     // Subject = the DID being proven (controlling wallet owns this)
     // Counterparty = the minting wallet (recipient of the transfer)
-    const counterpartyDid = buildEvmDidPkh(extractedChainId, mintingWallet);
+    const counterpartyDid = buildEvmDidPkh(Number(extractedChainId), mintingWallet);
     const amount = calculateTransferAmount(
       did,
       counterpartyDid,
-      extractedChainId,
+      Number(extractedChainId),
       PROOF_PURPOSE.SHARED_CONTROL
     );
     setTransferAmount(amount);

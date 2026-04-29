@@ -21,11 +21,9 @@ vi.mock('ethers', () => ({
 
 describe('traits utilities', () => {
   describe('hashTrait', () => {
-    it('hashes a single trait to bytes32 format', () => {
+    it('hashes a single trait to the expected bytes32 value', () => {
       const hash = hashTrait('example-trait');
-      expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
-      expect(hash.startsWith('0x')).toBe(true);
-      expect(hash.length).toBe(66); // 0x + 64 hex chars
+      expect(hash).toBe('0x00000000000000000000000000000000000000000000000000000000060adfeb');
     });
 
     it('produces consistent hashes for same input', () => {
@@ -43,22 +41,18 @@ describe('traits utilities', () => {
 
     it('handles empty string', () => {
       const hash = hashTrait('');
-      expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
-      expect(hash.length).toBe(66);
+      expect(hash).toBe('0x0000000000000000000000000000000000000000000000000000000000000000');
     });
 
-    it('handles special characters', () => {
-      const traits = ['trait-with-dash', 'trait_with_underscore', 'trait.with.dot'];
-      traits.forEach(trait => {
-        const hash = hashTrait(trait);
-        expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
-      });
+    it('handles special characters with expected values', () => {
+      expect(hashTrait('trait-with-dash')).toBe('0x000000000000000000000000000000000000000000000000000000006fdb073a');
+      expect(hashTrait('trait_with_underscore')).toBe('0x000000000000000000000000000000000000000000000000000000001f0cfba2');
+      expect(hashTrait('trait.with.dot')).toBe('0x00000000000000000000000000000000000000000000000000000000579b43ff');
     });
 
     it('handles Unicode characters', () => {
       const hash = hashTrait('trait-émoji-🎉');
-      expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
-      expect(hash.length).toBe(66);
+      expect(hash).toBe('0x0000000000000000000000000000000000000000000000000000000021c82d8f');
     });
 
     it('is case-sensitive', () => {
@@ -69,15 +63,14 @@ describe('traits utilities', () => {
   });
 
   describe('hashTraits', () => {
-    it('hashes an array of traits', () => {
+    it('hashes an array of traits to expected values', () => {
       const traits = ['trait1', 'trait2', 'trait3'];
       const hashes = hashTraits(traits);
       
       expect(hashes).toHaveLength(3);
-      hashes.forEach(hash => {
-        expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
-        expect(hash.length).toBe(66);
-      });
+      expect(hashes[0]).toBe(hashTrait('trait1'));
+      expect(hashes[1]).toBe(hashTrait('trait2'));
+      expect(hashes[2]).toBe(hashTrait('trait3'));
     });
 
     it('returns empty array for empty input', () => {
@@ -105,7 +98,7 @@ describe('traits utilities', () => {
     it('handles single trait array', () => {
       const hashes = hashTraits(['single']);
       expect(hashes).toHaveLength(1);
-      expect(hashes[0]).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(hashes[0]).toBe(hashTrait('single'));
     });
 
     it('handles array with duplicate traits', () => {
@@ -119,7 +112,7 @@ describe('traits utilities', () => {
       expect(hashes[2]).not.toBe(hashes[0]);
     });
 
-    it('handles mixed content traits', () => {
+    it('handles mixed content traits with expected values', () => {
       const traits = [
         'simple',
         'with-dash',
@@ -132,8 +125,8 @@ describe('traits utilities', () => {
       const hashes = hashTraits(traits);
       
       expect(hashes).toHaveLength(traits.length);
-      hashes.forEach(hash => {
-        expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
+      traits.forEach((trait, i) => {
+        expect(hashes[i]).toBe(hashTrait(trait));
       });
     });
   });
@@ -149,7 +142,7 @@ describe('traits utilities', () => {
       });
     });
 
-    it('can hash standard interface names', () => {
+    it('hashes standard interface names to expected values', () => {
       const interfaces = [
         'ERC20',
         'ERC721',
@@ -160,8 +153,8 @@ describe('traits utilities', () => {
       
       const hashes = hashTraits(interfaces);
       expect(hashes).toHaveLength(interfaces.length);
-      hashes.forEach(hash => {
-        expect(hash).toMatch(/^0x[0-9a-f]{64}$/);
+      interfaces.forEach((name, i) => {
+        expect(hashes[i]).toBe(hashTrait(name));
       });
     });
   });

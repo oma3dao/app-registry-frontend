@@ -20,9 +20,13 @@ vi.mock('@/lib/contracts/client', () => ({
 }));
 
 // Mock DID normalization
-vi.mock('@/lib/utils/did', () => ({
-  normalizeDidWeb: vi.fn((did: string) => did.toLowerCase()),
-}));
+vi.mock('@oma3/omatrust/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@oma3/omatrust/identity')>();
+  return {
+    ...actual,
+    normalizeDid: vi.fn((did: string) => did.toLowerCase()),
+  };
+});
 
 // Mock error normalization
 vi.mock('@/lib/contracts/errors', () => ({
@@ -94,10 +98,10 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareMintApp(mockMintInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Tests with fungibleTokenId
@@ -161,11 +165,10 @@ describe('Registry Write Functions', () => {
       expect(result.params[1]).toBe(7);
     });
 
-    // Tests dataHash format
-    it('formats dataHash as 0x-prefixed string', () => {
+    it('passes the exact dataHash provided in input', () => {
       const result = prepareMintApp(mockMintInput);
 
-      expect(result.params[3]).toMatch(/^0x[0-9a-f]{64}$/i);
+      expect(result.params[3]).toBe('0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef');
     });
 
     // Tests dataHashAlgorithm
@@ -228,39 +231,22 @@ describe('Registry Write Functions', () => {
       expect(result.params).toHaveLength(3);
     });
 
-    // Tests Active status
-    it('converts Active status to 0', () => {
-      mockStatusInput.status = 'Active';
-      
+    it.each([
+      { status: 'Active' as const, expected: 0 },
+      { status: 'Deprecated' as const, expected: 1 },
+      { status: 'Replaced' as const, expected: 2 },
+    ])('converts $status status to $expected', ({ status, expected }) => {
+      mockStatusInput.status = status;
       const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(0);
-    });
-
-    // Tests Deprecated status
-    it('converts Deprecated status to 1', () => {
-      mockStatusInput.status = 'Deprecated';
-      
-      const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(1); // Deprecated = 1
-    });
-
-    // Tests Replaced status
-    it('converts Replaced status to 2', () => {
-      mockStatusInput.status = 'Replaced';
-      
-      const result = prepareUpdateStatus(mockStatusInput);
-
-      expect(result.params[2]).toBe(2);
+      expect(result.params[2]).toBe(expected);
     });
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareUpdateStatus(mockStatusInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Tests major version parameter
@@ -315,18 +301,16 @@ describe('Registry Write Functions', () => {
 
     // Tests DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareUpdateApp(mockUpdateInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
-    // Tests with new data hash
-    // Note: Contract no longer accepts newDataUrl as string, only newDataHash as bytes32
-    it('includes new data hash when provided', () => {
+    it('passes the exact newDataHash provided in input', () => {
       const result = prepareUpdateApp(mockUpdateInput);
 
-      expect(result.params[2]).toMatch(/^0x[0-9a-f]{64}$/i); // newDataHash is at index 2
+      expect(result.params[2]).toBe('0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890');
     });
 
     // Tests with new interfaces
@@ -554,10 +538,10 @@ describe('Registry Write Functions', () => {
 
     // Test DID normalization
     it('normalizes DID before preparing transaction', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDid } = await import('@oma3/omatrust/identity');
       prepareRegisterApp8004(mockMintInput);
 
-      expect(normalizeDidWeb).toHaveBeenCalledWith('did:web:example.com');
+      expect(normalizeDid).toHaveBeenCalledWith('did:web:example.com');
     });
 
     // Test error handling (covers lines 187-190)

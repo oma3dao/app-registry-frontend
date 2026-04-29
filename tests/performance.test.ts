@@ -10,7 +10,7 @@ describe('Performance Benchmarks', () => {
   describe('Utility Functions', () => {
     // Tests DID normalization performance
     it('normalizes DID in under 1ms', async () => {
-      const { normalizeDidWeb } = await import('@/lib/utils/did');
+      const { normalizeDidWeb } = await import('@oma3/omatrust/identity');
       
       const start = performance.now();
       
