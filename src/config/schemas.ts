@@ -261,84 +261,6 @@ const controllerWitnessFields: FormField[] = [
   }
 ]
 
-const endorsementFields: FormField[] = [
-  {
-    "name": "subject",
-    "type": "string",
-    "label": "Subject ID",
-    "description": "DID of the entity being endorsed or approved.",
-    "required": true,
-    "placeholder": "Enter subject",
-    "maxLength": 256,
-    "pattern": "^did:[a-z0-9]+:.+$",
-    "format": "did"
-  },
-  {
-    "name": "organization",
-    "type": "string",
-    "label": "Organization",
-    "description": "DID of the parent organization. Use this when endorsing a service or resource that belongs to an organization (e.g., endorsing did:web:example.com:service:api, set organization to did:web:example.com). Leave empty when endorsing an organization directly.",
-    "required": false,
-    "placeholder": "Enter organization",
-    "maxLength": 256,
-    "pattern": "^did:[a-z0-9]+:.+$",
-    "format": "did"
-  },
-  {
-    "name": "version",
-    "type": "string",
-    "label": "Software Version",
-    "description": "Semantic version of the endorsed subject (e.g., '1.2.3'). Optional - leave empty if endorsing the subject generally rather than a specific version.",
-    "required": false,
-    "placeholder": "Enter version",
-    "subtype": "semver",
-    "maxLength": 50,
-    "pattern": "^\\d+(\\.\\d+){0,2}$"
-  },
-  {
-    "name": "policyURI",
-    "type": "uri",
-    "label": "Policy URI",
-    "description": "Optional URI pointing to the criteria or process used for formal approvals.",
-    "required": false,
-    "placeholder": "https://example.com",
-    "maxLength": 256,
-    "format": "uri"
-  },
-  {
-    "name": "issuedAt",
-    "type": "integer",
-    "label": "Issued Date",
-    "description": "Unix timestamp (in seconds) when the attestation was issued. Default is the current time.",
-    "required": false,
-    "placeholder": "0",
-    "autoDefault": "current-timestamp",
-    "subtype": "timestamp",
-    "min": 0
-  },
-  {
-    "name": "effectiveAt",
-    "type": "integer",
-    "label": "Effective Date",
-    "description": "Optional Unix timestamp (in seconds) when the assessment becomes effective. Default is the current time.",
-    "required": false,
-    "placeholder": "0",
-    "autoDefault": "current-timestamp",
-    "subtype": "timestamp",
-    "min": 0
-  },
-  {
-    "name": "expiresAt",
-    "type": "integer",
-    "label": "Expiration Date",
-    "description": "Unix timestamp (in seconds) after which the assessment expires. Leave empty if the assessment does not expire.",
-    "required": false,
-    "placeholder": "0",
-    "subtype": "timestamp",
-    "min": 0
-  }
-]
-
 const keyBindingFields: FormField[] = [
   {
     "name": "subject",
@@ -830,26 +752,6 @@ export const controllerWitnessSchema: AttestationSchema = {
   }
 };
 
-export const endorsementSchema: AttestationSchema = {
-  id: 'endorsement',
-  title: 'Endorsement',
-  description: 'A lightweight attestation indicating support, trust, or approval for a DID-identified subject. The \'attestationType\' field may be used to distinguish informal endorsements from formal approvals.',
-  fields: endorsementFields,
-  easSchemaString: 'string subject, string organization, string version, string policyURI, string payload, string payloadVersion, string payloadSpecURI, string payloadSpecDigest, uint256 issuedAt, uint256 effectiveAt, uint256 expiresAt',
-  deployedUIDs: {
-    97: '0xda787e2c5b89cd1b2c77d7a9565573cc89bac752e9b587f3348e85c62d606a68', // BSC Testnet
-    56: '0x0000000000000000000000000000000000000000000000000000000000000000', // BSC Mainnet
-    66238: '0xb0cf93ef0f3feb858aa5d07a54f6589da5852883f378dfd0cae5315da1d679ac', // OMAchain Testnet
-    6623: '0x0000000000000000000000000000000000000000000000000000000000000000'  // OMAchain Mainnet
-  },
-  deployedBlocks: {
-    97: 52288891, // BSC Testnet
-    56: 0, // BSC Mainnet
-    66238: 290, // OMAchain Testnet
-    6623: 0  // OMAchain Mainnet
-  }
-};
-
 export const keyBindingSchema: AttestationSchema = {
   id: 'key-binding',
   title: 'Key Binding',
@@ -965,7 +867,6 @@ const allSchemas: AttestationSchema[] = [
   certificationSchema,
   commonSchema,
   controllerWitnessSchema,
-  endorsementSchema,
   keyBindingSchema,
   linkedIdentifierSchema,
   securityAssessmentSchema,

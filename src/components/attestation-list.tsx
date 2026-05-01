@@ -1,4 +1,4 @@
-import { Shield, Award, FileCheck, LinkIcon, Star, MessageSquare } from "lucide-react"
+import { Shield, Award, LinkIcon, Star, MessageSquare } from "lucide-react"
 import type { AttestationQueryResult } from "@/lib/attestation-queries"
 
 interface AttestationListProps {
@@ -7,7 +7,6 @@ interface AttestationListProps {
 
 const schemaIcons: Record<string, any> = {
   'certification': Award,
-  'endorsement': FileCheck,
   'linked-identifier': LinkIcon,
   'security-assessment': Shield,
   'user-review': Star,
