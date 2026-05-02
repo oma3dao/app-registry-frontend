@@ -33,7 +33,7 @@ describe('attestation-services', () => {
       expect(typeof EAS_CONFIG.docs).toBe('string');
     });
 
-    it('supports OMAchain testnet and mainnet', () => {
+    it('supports OMAChain testnet and mainnet', () => {
       expect(EAS_CONFIG.supportedChains).toContain(OMACHAIN_TESTNET_ID);
       expect(EAS_CONFIG.supportedChains).toContain(OMACHAIN_MAINNET_ID);
     });
@@ -47,7 +47,7 @@ describe('attestation-services', () => {
       }
     });
 
-    it('has a valid 20-byte hex contract address for OMAchain testnet', () => {
+    it('has a valid 20-byte hex contract address for OMAChain testnet', () => {
       const addr = EAS_CONFIG.contracts[OMACHAIN_TESTNET_ID];
       expect(HEX_20_BYTES.test(addr)).toBe(true);
     });
@@ -96,13 +96,13 @@ describe('attestation-services', () => {
   });
 
   describe('getServicesForChain', () => {
-    it('returns EAS for OMAchain testnet', () => {
+    it('returns EAS for OMAChain testnet', () => {
       const services = getServicesForChain(OMACHAIN_TESTNET_ID);
       expect(services.length).toBeGreaterThan(0);
       expect(services.some((s) => s.id === 'eas')).toBe(true);
     });
 
-    it('returns EAS for OMAchain mainnet', () => {
+    it('returns EAS for OMAChain mainnet', () => {
       const services = getServicesForChain(OMACHAIN_MAINNET_ID);
       expect(services.length).toBeGreaterThan(0);
       expect(services.some((s) => s.id === 'eas')).toBe(true);
@@ -115,13 +115,13 @@ describe('attestation-services', () => {
   });
 
   describe('getContractAddress', () => {
-    it('returns contract address for EAS on OMAchain testnet', () => {
+    it('returns contract address for EAS on OMAChain testnet', () => {
       const addr = getContractAddress('eas', OMACHAIN_TESTNET_ID);
       expect(addr).toBeDefined();
       expect(HEX_20_BYTES.test(addr!)).toBe(true);
     });
 
-    it('returns a contract address entry for EAS on OMAchain mainnet (may be placeholder)', () => {
+    it('returns a contract address entry for EAS on OMAChain mainnet (may be placeholder)', () => {
       const addr = getContractAddress('eas', OMACHAIN_MAINNET_ID);
       expect(addr).toBeDefined();
       expect(typeof addr).toBe('string');

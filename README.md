@@ -123,7 +123,7 @@ The front-end gives users the option to create an embedded wallet using social l
 2. Click "Add Network"
 3. In newer versions, click "Add a network manually" at the bottom
 4. Enter the following details:
-   - **Network Name**: OMAchain Testnet
+   - **Network Name**: OMAChain Testnet
    - **New RPC URL**: https://rpc.testnet.chain.oma3.org/
    - **Chain ID**: 66238
    - **Currency Symbol**: OMA
@@ -151,7 +151,7 @@ The front-end gives users the option to create an embedded wallet using social l
 The application is deployed on Vercel and accessible at [registry.omatrust.org](https://registry.omatrust.org).
 
 **Branch:** `main`  
-**Chain:** OMAchain Testnet (66238) - will switch to mainnet when launched
+**Chain:** OMAChain Testnet (66238) - will switch to mainnet when launched
 
 ### Environment Variables
 
@@ -179,13 +179,13 @@ Server wallets are HSM-backed wallets managed by Thirdweb for secure transaction
 **Testnet Wallet:**
 - **Address:** `0x9F34eCb069d3990228b9796B0d89b9DbF0522A50`
 - **Smart Wallet:** `0xaB732b128B0a30e107B849B65A787de6C977C5C3`
-- **Network:** OMAchain Testnet (66238)
+- **Network:** OMAChain Testnet (66238)
 - **Purpose:** DID verification attestations
 
 **Production Wallet (Mainnet):**
 - **Address:** `0x899cFF436F62caDa923f8Ae7F2660Ecd2e99Bf76`
 - **Smart Wallet:** `0x603B04a8D4E1228171447a0b1CF83CB389142CfC`
-- **Network:** OMAchain Mainnet
+- **Network:** OMAChain Mainnet
 - **Purpose:** DID verification attestations (when mainnet launches)
 
 To list current wallets:
@@ -198,14 +198,14 @@ cd ../app-registry-evm-solidity
 
 Contract addresses are configured in `src/config/chains.ts`.
 
-**OMAchain Testnet (66238):**
+**OMAChain Testnet (66238):**
 - **Registry:** `0xb493465Bcb2151d5b5BaD19d87f9484c8B8A8e83`
 - **Metadata:** `0x13aD113D0DE923Ac117c82401e9E1208F09D7F19`
 - **Resolver:** `0xe4E8FBf35b6f4D975B4334ffAfaEfd0713217cAb`
 - **Deployer:** `0xC8cb41dD6F509f28cA4194f8e1574911281354eF`
 - **Deployed:** 2025-10-04 21:45:35 UTC
 
-**OMAchain Mainnet:**
+**OMAChain Mainnet:**
 - **Status:** Not deployed yet
 - Contracts will be deployed when mainnet launches
 

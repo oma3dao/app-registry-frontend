@@ -977,7 +977,7 @@ describe('Dashboard component', () => {
     
     // Should show testnet faucet notice
     expect(screen.getByText(/Need testnet OMA tokens?/i)).toBeInTheDocument();
-    expect(screen.getByText(/OMAchain Testnet Faucet/i)).toBeInTheDocument();
+    expect(screen.getByText(/OMAChain Testnet Faucet/i)).toBeInTheDocument();
   });
 
   // 29. Test mainnet (no faucet notice)

@@ -340,7 +340,7 @@ describe('OMATrust Reputation Spec 7.5 - Security Assessment Schema', () => {
     it('should have deployment UIDs configured', () => {
       expect(securityAssessmentSchema.deployedUIDs).toBeDefined();
       
-      // Check OMAchain Testnet deployment
+      // Check OMAChain Testnet deployment
       const omachainTestnetUID = securityAssessmentSchema.deployedUIDs?.[66238];
       expect(omachainTestnetUID).toBeDefined();
       expect(omachainTestnetUID).not.toBe('0x0000000000000000000000000000000000000000000000000000000000000000');

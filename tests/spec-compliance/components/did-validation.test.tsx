@@ -41,7 +41,7 @@ vi.mock('@/config/env', () => ({
     registryAddress: '0x1234567890123456789012345678901234567890',
     activeChain: {
       chainId: 66238,
-      name: 'OMAchain Testnet',
+      name: 'OMAChain Testnet',
       blockExplorers: [{ url: 'https://explorer.testnet.chain.oma3.org/' }],
     },
   },

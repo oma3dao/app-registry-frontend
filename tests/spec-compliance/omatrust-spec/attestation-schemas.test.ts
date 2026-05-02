@@ -555,12 +555,12 @@ describe('OMATrust Proofs Spec: Attestation Schema Definitions', () => {
       });
     });
 
-    it('OMAchain testnet has deployed schemas', () => {
+    it('OMAChain testnet has deployed schemas', () => {
       /**
        * Specification: OMATrust Proofs Specification
-       * Requirement: Schemas should be deployed to OMAchain
+       * Requirement: Schemas should be deployed to OMAChain
        * 
-       * OMAchain Testnet ID: 66238
+       * OMAChain Testnet ID: 66238
        */
 
       const OMACHAIN_TESTNET_ID = 66238;

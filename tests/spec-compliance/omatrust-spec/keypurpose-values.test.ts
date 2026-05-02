@@ -396,7 +396,7 @@ describe('OMATrust Reputation Spec 6.2 - Key Purpose Values (W3C DID Core)', () 
     it('should have deployment UIDs configured', () => {
       expect(keyBindingSchema.deployedUIDs).toBeDefined();
       
-      // Check OMAchain Testnet deployment
+      // Check OMAChain Testnet deployment
       const omachainTestnetUID = keyBindingSchema.deployedUIDs?.[66238];
       expect(omachainTestnetUID).toBeDefined();
     });

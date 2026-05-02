@@ -25,7 +25,7 @@ export const localhost = {
 };
 
 /**
- * OMAchain Testnet
+ * OMAChain Testnet
  * Chain ID: 66238
  * RPC: https://rpc.testnet.chain.oma3.org/
  * Explorer: https://explorer.testnet.chain.oma3.org/
@@ -35,7 +35,7 @@ export const omachainTestnet = {
   id: 66238,
   chainId: 66238,
   rpc: "https://rpc.testnet.chain.oma3.org/",
-  name: "OMAchain Testnet",
+  name: "OMAChain Testnet",
   nativeCurrency: {
     name: "OMA",
     symbol: "OMA",
@@ -43,7 +43,7 @@ export const omachainTestnet = {
   },
   blockExplorers: [
     {
-      name: "OMAchain Testnet Explorer",
+      name: "OMAChain Testnet Explorer",
       url: "https://explorer.testnet.chain.oma3.org/",
     },
   ],
@@ -57,7 +57,7 @@ export const omachainTestnet = {
 };
 
 /**
- * OMAchain Mainnet (Placeholder)
+ * OMAChain Mainnet (Placeholder)
  * Chain ID: TBD
  * RPC: TBD
  * Explorer: TBD
@@ -66,7 +66,7 @@ export const omachainMainnet = {
   id: 6623, // Placeholder - update when mainnet launches
   chainId: 6623,
   rpc: "https://rpc.chain.oma3.org/", // Placeholder
-  name: "OMAchain Mainnet",
+  name: "OMAChain Mainnet",
   nativeCurrency: {
     name: "OMA",
     symbol: "OMA",
@@ -74,7 +74,7 @@ export const omachainMainnet = {
   },
   blockExplorers: [
     {
-      name: "OMAchain Explorer",
+      name: "OMAChain Explorer",
       url: "https://explorer.chain.oma3.org/",
     },
   ],
@@ -92,7 +92,7 @@ export const omachainMainnet = {
  * Order matters - first chain is the default
  */
 export const supportedWalletChains = [
-  omachainTestnet,    // OMAchain testnet for OMA3 ecosystem testing
+  omachainTestnet,    // OMAChain testnet for OMA3 ecosystem testing
   // localhost,       // Uncomment only when actively using a local node
   omachainMainnet  // Placeholder - enable when mainnet is ready
 ];

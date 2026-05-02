@@ -342,7 +342,7 @@ export default function Dashboard() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium"
                 >
-                  OMAchain Testnet Faucet
+                  OMAChain Testnet Faucet
                   <ExternalLinkIcon size={14} />
                 </a>
                 {' '}to register apps and pay for transactions.  You can find your wallet address (it starts with 0x) by clicking the button in the top right corner of the screen.

@@ -13,11 +13,11 @@ export interface AttestationServiceConfig {
   estimatedGasCost?: Record<number, bigint> // chainId -> gas cost in wei
 }
 
-// EAS (Ethereum Attestation Service) Configuration for OMAchain
+// EAS (Ethereum Attestation Service) Configuration for OMAChain
 export const EAS_CONFIG: AttestationServiceConfig = {
   id: 'eas',
   name: 'Ethereum Attestation Service',
-  description: 'Decentralized attestation service on OMAchain',
+  description: 'Decentralized attestation service on OMAChain',
   website: 'https://attest.org/',
   docs: 'https://docs.attest.org/',
   supportedChains: [omachainTestnet.id, omachainMainnet.id],
@@ -30,7 +30,7 @@ export const EAS_CONFIG: AttestationServiceConfig = {
     'Schema registry',
     'Revocation support',
     'Composable attestations',
-    'OMAchain native'
+    'OMAChain native'
   ],
   estimatedGasCost: {
     [omachainTestnet.id]: BigInt('100000'),
@@ -77,7 +77,7 @@ export const CONTROLLER_WITNESS_CONFIG = {
   /** Schema IDs whose effectiveAt default gets the grace period */
   graceSchemaIds: ['key-binding', 'linked-identifier'],
   /** Seconds added to current time for the default effectiveAt */
-  graceSeconds: 120, // 2 minutes — enough for OMAchain finality + witness call
+  graceSeconds: 120, // 2 minutes — enough for OMAChain finality + witness call
 }
 
 // Query configuration for fetching latest attestations

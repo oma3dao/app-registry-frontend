@@ -54,21 +54,21 @@ describe('OMATrust Proof Spec Appendix A - Chain Parameters', () => {
     });
 
     /**
-     * Test: OMAchain testnet configuration
+     * Test: OMAChain testnet configuration
      * Chain ID 66238 for OMATrust ecosystem
      */
-    it('configures OMAchain testnet correctly', () => {
+    it('configures OMAChain testnet correctly', () => {
       expect(omachainTestnet.id).toBe(66238);
       expect(omachainTestnet.chainId).toBe(66238);
-      expect(omachainTestnet.name).toContain('OMAchain');
+      expect(omachainTestnet.name).toContain('OMAChain');
       expect(omachainTestnet.testnet).toBe(true);
       expect(omachainTestnet.rpc).toMatch(/^https?:\/\//);
     });
 
     /**
-     * Test: OMAchain mainnet placeholder
+     * Test: OMAChain mainnet placeholder
      */
-    it('has OMAchain mainnet placeholder', () => {
+    it('has OMAChain mainnet placeholder', () => {
       expect(omachainMainnet.id).toBeDefined();
       expect(omachainMainnet.testnet).toBe(false);
     });
@@ -112,9 +112,9 @@ describe('OMATrust Proof Spec Appendix A - Chain Parameters', () => {
     });
 
     /**
-     * Test: OMAchain CAIP-10 format
+     * Test: OMAChain CAIP-10 format
      */
-    it('formats OMAchain CAIP-10 addresses', () => {
+    it('formats OMAChain CAIP-10 addresses', () => {
       const address = '0xabcdef1234567890abcdef1234567890abcdef12';
       const caip10 = `eip155:${omachainTestnet.chainId}:${address}`;
       
@@ -201,9 +201,9 @@ describe('OMATrust Proof Spec Appendix A - Chain Parameters', () => {
     });
 
     /**
-     * Test: OMAchain has required contract addresses
+     * Test: OMAChain has required contract addresses
      */
-    it('OMAchain testnet has contract addresses', () => {
+    it('OMAChain testnet has contract addresses', () => {
       expect(omachainTestnet.contracts.registry).toMatch(/^0x[a-fA-F0-9]{40}$/);
       expect(omachainTestnet.contracts.metadata).toMatch(/^0x[a-fA-F0-9]{40}$/);
       expect(omachainTestnet.contracts.resolver).toMatch(/^0x[a-fA-F0-9]{40}$/);
@@ -213,7 +213,7 @@ describe('OMATrust Proof Spec Appendix A - Chain Parameters', () => {
     /**
      * Test: Chain has valid RPC URL
      */
-    it('OMAchain has valid RPC URL', () => {
+    it('OMAChain has valid RPC URL', () => {
       expect(omachainTestnet.rpc).toMatch(/^https:\/\//);
       expect(omachainTestnet.rpc).toContain('oma3.org');
     });
@@ -329,9 +329,9 @@ describe('OMATrust Proof Spec Appendix A - Chain Parameters', () => {
 
   describe('Block Explorer Integration', () => {
     /**
-     * Test: OMAchain has block explorer
+     * Test: OMAChain has block explorer
      */
-    it('OMAchain has block explorer URL', () => {
+    it('OMAChain has block explorer URL', () => {
       expect(omachainTestnet.blockExplorers).toBeDefined();
       expect(omachainTestnet.blockExplorers.length).toBeGreaterThan(0);
       expect(omachainTestnet.blockExplorers[0].url).toMatch(/^https:\/\//);
